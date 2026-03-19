@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CRM Subvenciones</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #2563eb; --blue-dk: #1d4ed8;
+      --red: #dc2626; --red-dk: #b91c1c; --green: #16a34a;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-400: #9ca3af; --gray-600: #4b5563; --gray-800: #1f2937;
+      --radius: 6px; --shadow: 0 1px 3px rgba(0,0,0,.12);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: var(--gray-800); background: var(--gray-50); line-height: 1.5; }
+    .app-container { min-height: 100vh; display: flex; flex-direction: column; }
+    .app-header { background: white; border-bottom: 1px solid var(--gray-200); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); }
+    .app-logo { font-weight: 700; font-size: 16px; color: var(--blue); cursor: pointer; }
+    .app-main { flex: 1; padding: 28px 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .toolbar h1 { font-size: 22px; font-weight: 600; }
+    .filtros { display: flex; gap: 10px; margin-bottom: 16px; }
+    .busqueda { flex: 1; padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 14px; }
+    .busqueda:focus { outline: none; border-color: var(--blue); }
+    .filtros select { padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius); background: white; font-size: 14px; cursor: pointer; }
+    .tabla-wrapper { background: white; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .tabla { width: 100%; border-collapse: collapse; }
+    .tabla th { background: var(--gray-50); text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--gray-200); }
+    .tabla td { padding: 11px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+    .tabla tbody tr:last-child td { border-bottom: none; }
+    .tabla tbody tr:hover { background: var(--gray-50); }
+    .mono { font-family: monospace; }
+    .acciones { display: flex; gap: 6px; }
+    .total-registros { padding: 8px 14px; font-size: 12px; color: var(--gray-400); text-align: right; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
+    .btn-primary:hover:not(:disabled) { background: var(--blue-dk); }
+    .btn-secondary { background: white; color: var(--gray-800); border-color: var(--gray-200); }
+    .btn-secondary:hover:not(:disabled) { background: var(--gray-100); }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-danger:hover:not(:disabled) { background: var(--red-dk); }
+    .btn-sm { padding: 5px 10px; font-size: 13px; }
+    .link-btn { background: none; border: none; cursor: pointer; color: var(--blue); font-size: 14px; font-weight: 500; text-align: left; padding: 0; }
+    .link-btn:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .badge-activo { background: #dcfce7; color: var(--green); }
+    .badge-inactivo { background: var(--gray-100); color: var(--gray-600); }
+    .alert { padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px; }
+    .alert-error { background: #fee2e2; color: var(--red-dk); border: 1px solid #fca5a5; }
+    .form-page { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; }
+    .form-page h2 { font-size: 18px; font-weight: 600; margin-bottom: 24px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .form-field { display: flex; flex-direction: column; gap: 5px; }
+    .form-field.col-2 { grid-column: span 2; }
+    label { font-size: 13px; font-weight: 500; color: var(--gray-600); }
+    input, textarea, select { width: 100%; padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius); font-size: 14px; font-family: inherit; }
+    input:focus, textarea:focus { outline: none; border-color: var(--blue); }
+    input.error, textarea.error { border-color: var(--red); }
+    .campo-error { font-size: 12px; color: var(--red); }
+    .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal { background: white; border-radius: var(--radius); padding: 28px; width: 440px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+    .modal h3 { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+    .modal p { color: var(--gray-600); margin-bottom: 20px; line-height: 1.6; }
+    .detalle-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; }
+    .detalle-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--gray-100); }
+    .detalle-header h2 { font-size: 20px; font-weight: 600; }
+    .detalle-razon { color: var(--gray-600); margin-top: 2px; }
+    .detalle-seccion { margin-bottom: 20px; }
+    .detalle-seccion h3 { font-size: 13px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+    .detalle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .detalle-campo { display: flex; flex-direction: column; gap: 2px; }
+    .detalle-label { font-size: 12px; color: var(--gray-400); }
+    .detalle-valor { font-size: 14px; }
+    .vacio { color: var(--gray-400); }
+    .detalle-notas { color: var(--gray-600); white-space: pre-wrap; }
+    .detalle-meta { display: flex; gap: 20px; font-size: 12px; color: var(--gray-400); margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--gray-100); margin-bottom: 20px; }
+    .cargando { color: var(--gray-400); padding: 20px 0; }
+    .vacio-msg { background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 48px; text-align: center; color: var(--gray-400); font-size: 15px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+const API = '';
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API + path, opts);
+  if (res.status === 204) return null;
+  const data = await res.json();
+  if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
+  return data;
+}
+
+const CAMPOS = [
+  { name: 'nombre_comercial', label: 'Nombre comercial *', required: true, col: 2 },
+  { name: 'razon_social',     label: 'Razón social *',     required: true, col: 2 },
+  { name: 'cif',              label: 'CIF *',               required: true, col: 1 },
+  { name: 'email',            label: 'Email *',             required: true, col: 1 },
+  { name: 'administrador',    label: 'Administrador',       required: false, col: 1 },
+  { name: 'dni',              label: 'DNI',                 required: false, col: 1 },
+  { name: 'direccion',        label: 'Dirección',           required: false, col: 2 },
+  { name: 'codigo_postal',    label: 'Código postal',       required: false, col: 1 },
+  { name: 'poblacion',        label: 'Población',           required: false, col: 1 },
+  { name: 'provincia',        label: 'Provincia',           required: false, col: 1 },
+  { name: 'telefono',         label: 'Teléfono',            required: false, col: 1 },
+  { name: 'notas',            label: 'Notas',               required: false, col: 2, textarea: true },
+];
+const EMPTY = { nombre_comercial:'', razon_social:'', cif:'', email:'', administrador:'', dni:'', telefono:'', direccion:'', codigo_postal:'', poblacion:'', provincia:'', notas:'' };
+
+function ClienteForm({ inicial, onGuardar, onCancelar, cargando, error }) {
+  const [form, setForm] = useState(EMPTY);
+  const [errores, setErrores] = useState({});
+  useEffect(() => {
+    if (inicial) setForm({ nombre_comercial: inicial.nombre_comercial||'', razon_social: inicial.razon_social||'', cif: inicial.cif||'', email: inicial.email||'', administrador: inicial.administrador||'', dni: inicial.dni||'', telefono: inicial.telefono||'', direccion: inicial.direccion||'', codigo_postal: inicial.codigo_postal||'', poblacion: inicial.poblacion||'', provincia: inicial.provincia||'', notas: inicial.notas||'' });
+  }, [inicial]);
+  function onChange(e) { const {name, value} = e.target; setForm(f=>({...f,[name]:value})); if(errores[name]) setErrores(e=>({...e,[name]:undefined})); }
+  function validar() {
+    const e = {};
+    if (!form.nombre_comercial.trim()) e.nombre_comercial = 'Obligatorio';
+    if (!form.razon_social.trim()) e.razon_social = 'Obligatorio';
+    if (!form.cif.trim()) e.cif = 'Obligatorio';
+    else if (!/^[A-HJNP-SUVW]\d{7}[0-9A-J]$/i.test(form.cif.trim())) e.cif = 'CIF inválido (ej: B12345678)';
+    if (!form.email.trim()) e.email = 'Obligatorio';
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) e.email = 'Email inválido';
+    if (form.codigo_postal && !/^\d{5}$/.test(form.codigo_postal.trim())) e.codigo_postal = 'Debe tener 5 dígitos';
+    return e;
+  }
+  function onSubmit(e) {
+    e.preventDefault();
+    const e2 = validar();
+    if (Object.keys(e2).length) { setErrores(e2); return; }
+    const payload = {};
+    for (const [k,v] of Object.entries(form)) payload[k] = v.trim() || null;
+    payload.nombre_comercial = form.nombre_comercial.trim();
+    payload.razon_social = form.razon_social.trim();
+    payload.cif = form.cif.trim().toUpperCase();
+    payload.email = form.email.trim().toLowerCase();
+    onGuardar(payload);
+  }
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      {error && <div className="alert alert-error" style={{marginBottom:16}}>{error}</div>}
+      <div className="form-grid">
+        {CAMPOS.map(({name,label,col,textarea}) => (
+          <div key={name} className={`form-field col-${col}`}>
+            <label htmlFor={name}>{label}</label>
+            {textarea
+              ? <textarea id={name} name={name} value={form[name]} onChange={onChange} rows={3} className={errores[name]?'error':''} />
+              : <input id={name} name={name} value={form[name]} onChange={onChange} className={errores[name]?'error':''} />}
+            {errores[name] && <span className="campo-error">{errores[name]}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="form-actions">
+        <button type="button" className="btn btn-secondary" onClick={onCancelar} disabled={cargando}>Cancelar</button>
+        <button type="submit" className="btn btn-primary" disabled={cargando}>{cargando ? 'Guardando…' : 'Guardar'}</button>
+      </div>
+    </form>
+  );
+}
+
+function ClienteDetalle({ cliente, onEditar, onVolver }) {
+  const campo = (label, valor) => (
+    <div className="detalle-campo">
+      <span className="detalle-label">{label}</span>
+      <span className="detalle-valor">{valor || <span className="vacio">—</span>}</span>
+    </div>
+  );
+  return (
+    <div className="detalle-card">
+      <div className="detalle-header">
+        <div><h2>{cliente.nombre_comercial}</h2><p className="detalle-razon">{cliente.razon_social}</p></div>
+        <span className={`badge ${cliente.activo?'badge-activo':'badge-inactivo'}`}>{cliente.activo?'Activo':'Inactivo'}</span>
+      </div>
+      <div className="detalle-seccion"><h3>Identificación</h3><div className="detalle-grid">{campo('CIF',cliente.cif)}{campo('Email',cliente.email)}{campo('Teléfono',cliente.telefono)}</div></div>
+      <div className="detalle-seccion"><h3>Representante legal</h3><div className="detalle-grid">{campo('Administrador',cliente.administrador)}{campo('DNI',cliente.dni)}</div></div>
+      <div className="detalle-seccion"><h3>Dirección</h3><div className="detalle-grid">{campo('Dirección',cliente.direccion)}{campo('C.P.',cliente.codigo_postal)}{campo('Población',cliente.poblacion)}{campo('Provincia',cliente.provincia)}</div></div>
+      {cliente.notas && <div className="detalle-seccion"><h3>Notas</h3><p className="detalle-notas">{cliente.notas}</p></div>}
+      <div className="detalle-meta"><span>Alta: {new Date(cliente.fecha_alta).toLocaleDateString('es-ES')}</span><span>Modificado: {new Date(cliente.actualizado_en).toLocaleString('es-ES')}</span></div>
+      <div className="form-actions"><button className="btn btn-secondary" onClick={onVolver}>← Volver</button><button className="btn btn-primary" onClick={onEditar}>Editar</button></div>
+    </div>
+  );
+}
+
+function ClientesList({ onNuevo, onVer, onEditar }) {
+  const [clientes, setClientes] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroActivo, setFiltroActivo] = useState('');
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState(null);
+  const [confirmar, setConfirmar] = useState(null);
+
+  const cargar = useCallback(async () => {
+    setCargando(true); setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (busqueda) params.set('q', busqueda);
+      if (filtroActivo !== '') params.set('activo', filtroActivo === 'activo');
+      const data = await apiFetch('/clientes?' + params);
+      setClientes(data);
+    } catch(e) { setError(e.message); } finally { setCargando(false); }
+  }, [busqueda, filtroActivo]);
+
+  useEffect(() => { const t = setTimeout(cargar, 300); return () => clearTimeout(t); }, [cargar]);
+
+  async function handleEliminar(c) {
+    try { await apiFetch('/clientes/'+c.id, {method:'DELETE'}); setConfirmar(null); cargar(); }
+    catch(e) { alert('Error: '+e.message); }
+  }
+
+  return (
+    <div>
+      <div className="toolbar"><h1>Clientes</h1><button className="btn btn-primary" onClick={onNuevo}>+ Nuevo cliente</button></div>
+      <div className="filtros">
+        <input className="busqueda" type="search" placeholder="Buscar por nombre, razón social, CIF o email…" value={busqueda} onChange={e=>setBusqueda(e.target.value)} />
+        <select value={filtroActivo} onChange={e=>setFiltroActivo(e.target.value)}>
+          <option value="">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option>
+        </select>
+      </div>
+      {error && <div className="alert alert-error">{error}</div>}
+      {cargando ? <p className="cargando">Cargando…</p>
+      : clientes.length === 0 ? <div className="vacio-msg">{busqueda ? `Sin resultados para "${busqueda}"` : 'No hay clientes. Crea el primero.'}</div>
+      : <div className="tabla-wrapper">
+          <table className="tabla">
+            <thead><tr><th>Nombre comercial</th><th>Razón social</th><th>CIF</th><th>Email</th><th>Población</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+              {clientes.map(c => (
+                <tr key={c.id}>
+                  <td><button className="link-btn" onClick={()=>onVer(c.id)}>{c.nombre_comercial}</button></td>
+                  <td>{c.razon_social}</td>
+                  <td className="mono">{c.cif}</td>
+                  <td>{c.email}</td>
+                  <td>{c.poblacion||'—'}</td>
+                  <td><span className={`badge ${c.activo?'badge-activo':'badge-inactivo'}`}>{c.activo?'Activo':'Inactivo'}</span></td>
+                  <td className="acciones">
+                    <button className="btn btn-sm btn-secondary" onClick={()=>onEditar(c.id)}>Editar</button>
+                    <button className="btn btn-sm btn-danger" onClick={()=>setConfirmar(c)}>Eliminar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="total-registros">{clientes.length} cliente{clientes.length!==1?'s':''}</p>
+        </div>}
+      {confirmar && (
+        <div className="modal-overlay" onClick={()=>setConfirmar(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <h3>Confirmar eliminación</h3>
+            <p>¿Eliminar a <strong>{confirmar.nombre_comercial}</strong>? Esta acción no se puede deshacer.</p>
+            <div className="form-actions">
+              <button className="btn btn-secondary" onClick={()=>setConfirmar(null)}>Cancelar</button>
+              <button className="btn btn-danger" onClick={()=>handleEliminar(confirmar)}>Sí, eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [vista, setVista] = useState('lista');
+  const [clienteActual, setClienteActual] = useState(null);
+  const [error, setError] = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function abrirDetalle(id) { setCargando(true); setError(null); try { setClienteActual(await apiFetch('/clientes/'+id)); setVista('detalle'); } catch(e){setError(e.message);} finally{setCargando(false);} }
+  async function abrirEditar(id) { setCargando(true); setError(null); try { setClienteActual(await apiFetch('/clientes/'+id)); setVista('editar'); } catch(e){setError(e.message);} finally{setCargando(false);} }
+  async function guardarNuevo(data) { setCargando(true); setError(null); try { await apiFetch('/clientes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); setVista('lista'); } catch(e){setError(e.message);} finally{setCargando(false);} }
+  async function guardarEdicion(data) { setCargando(true); setError(null); try { await apiFetch('/clientes/'+clienteActual.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); setVista('lista'); } catch(e){setError(e.message);} finally{setCargando(false);} }
+  function irALista() { setVista('lista'); setClienteActual(null); setError(null); }
+
+  return (
+    <div className="app-container">
+      <header className="app-header">
+        <span className="app-logo" onClick={irALista}>CRM Subvenciones</span>
+      </header>
+      <main className="app-main">
+        {vista === 'lista' && <ClientesList onNuevo={()=>{setClienteActual(null);setError(null);setVista('nuevo');}} onVer={abrirDetalle} onEditar={abrirEditar} />}
+        {(vista==='nuevo'||vista==='editar') && (
+          <div className="form-page">
+            <h2>{vista==='nuevo' ? 'Nuevo cliente' : `Editar: ${clienteActual?.nombre_comercial}`}</h2>
+            <ClienteForm inicial={vista==='editar'?clienteActual:null} onGuardar={vista==='nuevo'?guardarNuevo:guardarEdicion} onCancelar={irALista} cargando={cargando} error={error} />
+          </div>
+        )}
+        {vista==='detalle' && clienteActual && (
+          <>
+            {error && <div className="alert alert-error">{error}</div>}
+            <ClienteDetalle cliente={clienteActual} onEditar={()=>abrirEditar(clienteActual.id)} onVolver={irALista} />
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

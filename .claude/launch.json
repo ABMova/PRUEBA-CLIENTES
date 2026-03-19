@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "Backend — FastAPI (uvicorn)",
-      "runtimeExecutable": "uvicorn",
-      "runtimeArgs": ["app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
       "port": 8000,
       "cwd": "crm_subvenciones/backend"
     },
@@ -12,6 +12,13 @@
       "name": "Frontend — React (Vite)",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "cwd": "crm_subvenciones/frontend"
+    },
+    {
+      "name": "Frontend — Standalone (Python)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5173"],
       "port": 5173,
       "cwd": "crm_subvenciones/frontend"
     }
