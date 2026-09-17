@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+{% if avisos_configuracion %}
+<div class="aviso warn">
+  <strong>Falta configuracion para que la vigilancia funcione entera:</strong>
+  <ul style="margin:6px 0 0 18px;">
+    {% for aviso in avisos_configuracion %}<li>{{ aviso }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Resumen de hoy ({{ fecha_larga }})</h2>
+  <div class="kpis">
+    <div class="kpi"><div class="cifra">{{ kpis.nuevas_hoy }}</div><div class="rotulo">Publicaciones de hoy</div></div>
+    <div class="kpi"><div class="cifra">{{ kpis.altas_hoy }}</div><div class="rotulo">De alta relevancia</div></div>
+    <div class="kpi"><div class="cifra">{{ kpis.historico }}</div><div class="rotulo">Historico acumulado</div></div>
+    <div class="kpi"><div class="cifra">{{ kpis.descartadas }}</div><div class="rotulo">Descartadas</div></div>
+  </div>
+</div>
+
+<div class="fila">
+  <div class="card">
+    <h2>Estado de los siete boletines</h2>
+    <div class="tabla-desplazable">
+      <table class="datos">
+        <thead>
+          <tr><th>Boletin</th><th>Comunidad</th><th>Estado</th><th>Ultimo resultado</th><th>Comprobado</th></tr>
+        </thead>
+        <tbody>
+          {% for boletin in boletines %}
+          <tr>
+            <td><strong>{{ boletin.codigo }}</strong><br><span class="apoyo">{{ boletin.nombre }}</span></td>
+            <td>{{ boletin.comunidad }}</td>
+            <td>
+              {% if not boletin.activo %}<span class="pildora pendiente">desactivado</span>
+              {% elif boletin.ultimo_estado == 'correcto' %}<span class="pildora ok">correcto</span>
+              {% elif boletin.ultimo_estado == 'vacio' %}<span class="pildora aviso">sin boletin</span>
+              {% elif boletin.ultimo_estado == 'error' %}<span class="pildora error">error</span>
+              {% else %}<span class="pildora pendiente">pendiente</span>{% endif %}
+            </td>
+            <td>{{ boletin.ultimo_resultado or '-' }}</td>
+            <td class="apoyo">{{ boletin.ultima_ejecucion or 'nunca' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Planificacion</h2>
+    <p class="apoyo">Disparo automatico configurado en Ajustes.</p>
+    <ul class="lista-limpia">
+      <li>Hora: <strong>{{ ajustes.hora_ejecucion }}</strong> ({{ ajustes.zona_horaria }})</li>
+      <li>Dias: <strong>{{ ajustes.dias_ejecucion }}</strong></li>
+      <li>Estado: {% if ajustes.planificador_activo == '1' %}<span class="pildora ok">activo</span>{% else %}<span class="pildora pendiente">desactivado</span>{% endif %}</li>
+      <li>Proxima ejecucion: <strong>{{ proxima or 'sin programar' }}</strong></li>
+      <li>Destinatarios activos: <strong>{{ destinatarios }}</strong></li>
+    </ul>
+
+    <h3>Ultima ejecucion</h3>
+    {% if kpis.ultima_ejecucion %}
+    <ul class="lista-limpia">
+      <li>Fecha objetivo: {{ kpis.ultima_ejecucion.fecha_objetivo }} ({{ kpis.ultima_ejecucion.tipo }})</li>
+      <li>Estado:
+        {% set estado = kpis.ultima_ejecucion.estado %}
+        <span class="pildora {{ 'ok' if estado == 'correcta' else ('aviso' if estado in ('con_avisos','interrumpida') else ('proceso' if estado == 'en_curso' else 'error')) }}">{{ estado }}</span>
+      </li>
+      <li>Nuevas: {{ kpis.ultima_ejecucion.nuevas }} &middot; alta relevancia: {{ kpis.ultima_ejecucion.alta_relevancia }}</li>
+      <li>Boletines correctos: {{ kpis.ultima_ejecucion.boletines_ok }} &middot; fallidos: {{ kpis.ultima_ejecucion.boletines_fallidos }}</li>
+    </ul>
+    {% else %}
+    <p class="apoyo">Todavia no se ha ejecutado ninguna vigilancia.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Publicaciones recientes</h2>
+  {% if recientes %}
+  <div class="tabla-desplazable">
+    <table class="datos">
+      <thead><tr><th>Fecha</th><th>Comunidad</th><th>Titulo</th><th>Relevancia</th><th>Plazo</th></tr></thead>
+      <tbody>
+        {% for p in recientes %}
+        <tr class="{% if p.relevancia == 'alta' %}destacada{% endif %}">
+          <td class="celda-estrecha">{{ p.fecha_publicacion }}</td>
+          <td class="celda-estrecha">{{ p.comunidad }}</td>
+          <td>{{ p.titulo[:150] }}</td>
+          <td class="celda-estrecha">
+            {% if p.relevancia == 'alta' %}<span class="pildora alta">ALTA</span>
+            {% elif p.relevancia == 'media' %}<span class="pildora pendiente">media</span>
+            {% else %}<span class="pildora pendiente">baja</span>{% endif %}
+          </td>
+          <td class="celda-estrecha">
+            {% if p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo[:40] }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="apoyo">Sin publicaciones todavia. Lanza una ejecucion desde la pantalla Ejecuciones.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

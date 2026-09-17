@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="fila">
+  <div class="card">
+    <h2>Copias de seguridad</h2>
+    <p class="apoyo">Se hace una copia automatica al arrancar, con la API backup() de SQLite:
+       funciona con la aplicacion en marcha y no corrompe el WAL. Se conservan las
+       {{ maximo }} mas recientes.</p>
+    <form method="post" action="{{ url_for('web.copias') }}" style="margin-bottom:12px;">
+      <button type="submit" class="principal">Crear copia ahora</button>
+    </form>
+    <table class="datos">
+      <thead><tr><th>Fichero</th><th>Fecha</th><th>Tamano</th><th></th></tr></thead>
+      <tbody>
+        {% for c in copias %}
+        <tr>
+          <td class="mono">{{ c.nombre }}</td>
+          <td class="celda-estrecha">{{ c.fecha }}</td>
+          <td class="celda-estrecha">{{ c.tamano_kb }} KB</td>
+          <td class="celda-estrecha">
+            <form method="post" action="{{ url_for('web.restaurar') }}">
+              <input type="hidden" name="nombre" value="{{ c.nombre }}">
+              <button type="submit" class="boton-pequeno destructivo"
+                      data-confirmar="Restaurar {{ c.nombre }}? Antes se guardara una copia del estado actual.">Restaurar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not copias %}<tr><td colspan="4" class="apoyo">Todavia no hay copias.</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="flex:0 1 320px;">
+    <h2>Exportar historico</h2>
+    <p class="apoyo">La exportacion no incluye credenciales ni hashes de contrasena.</p>
+    <p><a class="boton" href="{{ url_for('web.exportar', formato='xlsx') }}">Descargar Excel</a></p>
+    <p><a class="boton" href="{{ url_for('web.exportar', formato='json') }}">Descargar JSON</a></p>
+    <h3>Carpeta de datos</h3>
+    <p class="apoyo mono" style="overflow-wrap:anywhere;">{{ carpeta_datos }}</p>
+  </div>
+</div>
+{% endblock %}

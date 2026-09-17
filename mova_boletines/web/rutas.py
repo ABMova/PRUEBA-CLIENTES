@@ -1,0 +1,645 @@
+"""Rutas web.
+
+Aqui SOLO se valida la entrada, se comprueban permisos y se elige plantilla.
+Nada de logica de dominio ni de SQL: eso vive en negocio/ y en datos/.
+"""
+from __future__ import annotations
+
+import logging
+import secrets
+from datetime import date, datetime
+
+from flask import (Blueprint, Response, current_app, flash, redirect, render_template,
+                   request, send_file, url_for)
+
+import config
+from datos import copias as copias_datos
+from datos import repositorio
+from integraciones import anthropic_cliente
+from negocio import correo, orquestador
+from negocio.boletines import fichas
+from negocio.extraccion import tesseract_disponible
+from web import auth
+
+registro = logging.getLogger(__name__)
+web = Blueprint("web", __name__)
+
+INTENTOS_MAX_IP = 20
+VENTANA_INTENTOS = 10  # minutos
+
+
+# ------------------------------------------------------------ contexto comun --
+@web.app_context_processor
+def contexto():
+    return {
+        "nombre_app": config.NOMBRE_APP,
+        "lema": config.LEMA,
+        "version": config.VERSION,
+        "marcador": config.MARCADOR_PENDIENTE,
+        "marcador_revision": config.MARCADOR_REVISION,
+        "carpeta_datos": str(config.DATOS),
+        "usuario": auth.usuario_actual(),
+    }
+
+
+def _proxima_ejecucion() -> str:
+    planificador = current_app.config.get("planificador")
+    if not planificador:
+        return ""
+    trabajos = planificador.get_jobs()
+    if not trabajos or trabajos[0].next_run_time is None:
+        return ""
+    return trabajos[0].next_run_time.strftime("%d/%m/%Y %H:%M")
+
+
+# ------------------------------------------------------------------ acceso --
+@web.route("/login", methods=["GET", "POST"])
+def login():
+    if auth.usuario_actual():
+        return redirect(url_for("web.panel"))
+
+    provisional = current_app.config.get("clave_provisional")
+    if request.method == "POST":
+        usuario = (request.form.get("usuario") or "").strip()
+        clave = request.form.get("clave") or ""
+        correcto, mensaje = auth.iniciar_sesion(usuario, clave, auth.ip_peticion(),
+                                                request.headers.get("User-Agent", ""))
+        if correcto:
+            destino = request.form.get("siguiente") or url_for("web.panel")
+            return redirect(destino if destino.startswith("/") else url_for("web.panel"))
+        flash(mensaje, "error")
+
+    return render_template("login.html", titulo_pagina="Acceso",
+                           siguiente=request.args.get("siguiente", ""),
+                           clave_provisional=provisional)
+
+
+@web.route("/salir")
+def salir():
+    auth.cerrar_sesion(auth.ip_peticion())
+    flash("Sesion cerrada", "ok")
+    return redirect(url_for("web.login"))
+
+
+@web.route("/cambiar-clave", methods=["GET", "POST"])
+def cambiar_clave():
+    fila = auth.usuario_actual()
+    if fila is None:
+        return redirect(url_for("web.login"))
+
+    if request.method == "POST":
+        actual = request.form.get("actual") or ""
+        nueva = request.form.get("nueva") or ""
+        repetida = request.form.get("repetida") or ""
+        usuario = repositorio.usuario_por_id(fila["usuario_id"])
+
+        if not repositorio.verificar_clave(usuario, actual):
+            flash("La contrasena actual no es correcta", "error")
+        elif nueva != repetida:
+            flash("Las dos contrasenas nuevas no coinciden", "error")
+        elif len(nueva) < 10:
+            flash("La contrasena nueva debe tener al menos 10 caracteres", "error")
+        elif nueva == actual:
+            flash("La contrasena nueva debe ser distinta de la actual", "error")
+        else:
+            repositorio.cambiar_clave(usuario["id"], nueva)
+            repositorio.registrar_auditoria(usuario["usuario"], "cambio_clave",
+                                            usuario["usuario"], "", auth.ip_peticion())
+            current_app.config["clave_provisional"] = None
+            flash("Contrasena cambiada", "ok")
+            return redirect(url_for("web.panel"))
+
+    return render_template("cambiar_clave.html", titulo_pagina="Cambiar contrasena",
+                           obligatorio=bool(fila["cambio_obligatorio"]))
+
+
+# ------------------------------------------------------------------- panel --
+@web.route("/")
+@auth.requiere("ver")
+def panel():
+    hoy = date.today()
+    ajustes = repositorio.ajustes()
+    avisos = []
+    if not anthropic_cliente.hay_clave():
+        avisos.append("No hay clave de API de Anthropic: las publicaciones se guardan sin analisis.")
+    if not correo.smtp_configurado():
+        avisos.append("No hay servidor SMTP configurado: no se puede enviar el correo diario.")
+    if not repositorio.destinatarios(solo_activos=True):
+        avisos.append("No hay destinatarios activos.")
+
+    if request.args.get("aviso") == "sin_permiso":
+        flash("Tu rol no tiene permiso para esa pantalla", "error")
+
+    return render_template(
+        "panel.html", titulo_pagina="Panel",
+        kpis=repositorio.kpis(hoy.strftime("%Y-%m-%d")),
+        fecha_larga=correo.fecha_larga(hoy),
+        boletines=repositorio.boletines(),
+        ajustes=ajustes,
+        proxima=_proxima_ejecucion(),
+        destinatarios=len(repositorio.destinatarios(solo_activos=True)),
+        recientes=repositorio.publicaciones({}, limite=25),
+        avisos_configuracion=avisos,
+    )
+
+
+# ------------------------------------------------------------- ejecuciones --
+@web.route("/ejecuciones")
+@auth.requiere("ver")
+def ejecuciones():
+    return render_template(
+        "ejecuciones.html", titulo_pagina="Ejecuciones",
+        ejecuciones=repositorio.ejecuciones(),
+        hoy=date.today().strftime("%Y-%m-%d"),
+        detalle=None, logs=[])
+
+
+@web.route("/ejecuciones/<int:ejecucion_id>")
+@auth.requiere("ver")
+def ejecucion(ejecucion_id: int):
+    detalle = repositorio.ejecucion(ejecucion_id)
+    if detalle is None:
+        flash("Esa ejecucion no existe", "error")
+        return redirect(url_for("web.ejecuciones"))
+    return render_template(
+        "ejecuciones.html", titulo_pagina=f"Ejecucion {ejecucion_id}",
+        ejecuciones=repositorio.ejecuciones(),
+        hoy=date.today().strftime("%Y-%m-%d"),
+        detalle=detalle, logs=repositorio.logs_scraping(ejecucion_id))
+
+
+@web.route("/ejecuciones/lanzar", methods=["POST"])
+@auth.requiere("ejecutar")
+def lanzar():
+    texto_fecha = request.form.get("fecha") or ""
+    try:
+        objetivo = datetime.strptime(texto_fecha, "%Y-%m-%d").date() if texto_fecha else date.today()
+    except ValueError:
+        flash("La fecha indicada no es valida", "error")
+        return redirect(url_for("web.ejecuciones"))
+
+    usuario = auth.usuario_actual()
+    aceptada, mensaje = orquestador.lanzar(
+        objetivo, "manual", usuario["usuario"],
+        enviar_correo=request.form.get("enviar", "1") == "1")
+    flash(mensaje, "ok" if aceptada else "error")
+    return redirect(url_for("web.ejecuciones"))
+
+
+@web.route("/ejecuciones/cancelar", methods=["POST"])
+@auth.requiere("ejecutar")
+def cancelar():
+    if not orquestador.hay_ejecucion():
+        flash("No hay ninguna ejecucion en curso", "error")
+    else:
+        orquestador.cancelar()
+        flash("Cancelacion solicitada", "warn")
+    return redirect(url_for("web.ejecuciones"))
+
+
+@web.route("/api/progreso")
+@auth.requiere("ver")
+def api_progreso():
+    return orquestador.progreso.instantanea()
+
+
+# ----------------------------------------------------------- publicaciones --
+@web.route("/publicaciones")
+@auth.requiere("ver")
+def publicaciones():
+    filtros = {
+        "codigo_boletin": request.args.get("boletin", "").strip().upper() or None,
+        "relevancia": request.args.get("relevancia", "").strip() or None,
+        "fecha": request.args.get("fecha", "").strip() or None,
+        "texto": request.args.get("texto", "").strip() or None,
+    }
+    limpios = {clave: valor for clave, valor in filtros.items() if valor}
+    return render_template(
+        "publicaciones.html", titulo_pagina="Publicaciones",
+        publicaciones=repositorio.publicaciones(limpios, limite=400),
+        boletines=repositorio.boletines(),
+        filtros=filtros,
+        puede_editar=auth.tiene_permiso("editar"),
+        puede_descartar=auth.tiene_permiso("descartar"))
+
+
+@web.route("/publicaciones/<int:publicacion_id>/descartar")
+@auth.requiere("descartar")
+def descartar_manual(publicacion_id: int):
+    usuario = auth.usuario_actual()
+    if repositorio.descartar(publicacion_id, "interfaz", usuario=usuario["usuario"],
+                             ip=auth.ip_peticion()):
+        repositorio.registrar_auditoria(usuario["usuario"], "descarte_manual",
+                                        str(publicacion_id), "", auth.ip_peticion())
+        flash("Publicacion descartada", "ok")
+    else:
+        flash("No se encontro la publicacion", "error")
+    return redirect(request.referrer or url_for("web.publicaciones"))
+
+
+@web.route("/publicaciones/reenviar", methods=["POST"])
+@auth.requiere("editar")
+def reenviar():
+    ids = [int(valor) for valor in request.form.getlist("ids") if valor.isdigit()]
+    if not ids:
+        flash("No has seleccionado ninguna publicacion", "error")
+        return redirect(url_for("web.publicaciones"))
+    usuario = auth.usuario_actual()
+    exito, detalle = orquestador.reenviar(ids, usuario["usuario"])
+    flash(detalle, "ok" if exito else "error")
+    return redirect(url_for("web.publicaciones"))
+
+
+# ---------------------------------------------------------------- descartes --
+@web.route("/descartes")
+@auth.requiere("ver")
+def descartes():
+    return render_template("descartes.html", titulo_pagina="Descartes",
+                           descartes=repositorio.descartes(),
+                           puede_descartar=auth.tiene_permiso("descartar"))
+
+
+@web.route("/descartes/<int:descarte_id>/recuperar")
+@auth.requiere("descartar")
+def recuperar_descarte(descarte_id: int):
+    usuario = auth.usuario_actual()
+    if repositorio.recuperar_descarte(descarte_id):
+        repositorio.registrar_auditoria(usuario["usuario"], "recuperar_descarte",
+                                        str(descarte_id), "", auth.ip_peticion())
+        flash("Publicacion recuperada", "ok")
+    else:
+        flash("No se encontro ese descarte", "error")
+    return redirect(url_for("web.descartes"))
+
+
+# -------------------------------- ruta publica de descarte (unica sin sesion) --
+@web.route("/descartar/<token>")
+def descartar_por_token(token: str):
+    ip = auth.ip_peticion()
+    repositorio.registrar_intento_ip(ip, "descarte")
+    if repositorio.intentos_recientes(ip, VENTANA_INTENTOS, "descarte") > INTENTOS_MAX_IP:
+        repositorio.registrar_auditoria("anonimo", "descarte_token", token[:12],
+                                        "Demasiados intentos desde la misma IP", ip, "error")
+        return render_template("descarte_ok.html", titulo_pagina="Descarte",
+                               titulo_resultado="Demasiados intentos", clase="error",
+                               mensaje="Se han hecho demasiadas peticiones desde esta direccion. "
+                                       "Espera unos minutos.", publicacion=""), 429
+
+    fila = repositorio.token_descarte(token)
+    if fila is None:
+        repositorio.registrar_auditoria("anonimo", "descarte_token", token[:12],
+                                        "Token inexistente", ip, "error")
+        return render_template("descarte_ok.html", titulo_pagina="Descarte",
+                               titulo_resultado="Enlace no valido", clase="error",
+                               mensaje="Este enlace de descarte no es valido.",
+                               publicacion=""), 404
+
+    if fila["usado"]:
+        return render_template("descarte_ok.html", titulo_pagina="Descarte",
+                               titulo_resultado="Enlace ya utilizado", clase="warn",
+                               mensaje="Esta publicacion ya se habia descartado con este enlace.",
+                               publicacion="")
+
+    if fila["caduca_en"] <= datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"):
+        return render_template("descarte_ok.html", titulo_pagina="Descarte",
+                               titulo_resultado="Enlace caducado", clase="warn",
+                               mensaje="Este enlace ha caducado. Puedes descartar la publicacion "
+                                       "desde la herramienta.", publicacion="")
+
+    publicacion = repositorio.publicacion(fila["publicacion_id"])
+    repositorio.descartar(fila["publicacion_id"], "correo", destinatario=fila["destinatario"], ip=ip)
+    repositorio.consumir_token(token, ip)
+    repositorio.registrar_auditoria(fila["destinatario"] or "anonimo", "descarte_token",
+                                    str(fila["publicacion_id"]), "Descarte desde el correo", ip)
+    return render_template("descarte_ok.html", titulo_pagina="Descarte",
+                           titulo_resultado="Publicacion descartada", clase="ok",
+                           mensaje="Hecho: no volvera a aparecer en los correos diarios.",
+                           publicacion=publicacion["titulo"] if publicacion else "")
+
+
+# ---------------------------------------------------------------- boletines --
+@web.route("/boletines")
+@auth.requiere("ver")
+def boletines():
+    return render_template("boletines.html", titulo_pagina="Boletines",
+                           boletines=repositorio.boletines(),
+                           fichas={ficha["codigo"]: ficha for ficha in fichas()},
+                           puede_editar=auth.tiene_permiso("editar"))
+
+
+@web.route("/boletines/<codigo>/cambiar")
+@auth.requiere("editar")
+def cambiar_boletin(codigo: str):
+    ficha = repositorio.boletin(codigo.upper())
+    if ficha is None:
+        flash("Ese boletin no existe", "error")
+    else:
+        repositorio.activar_boletin(ficha["codigo"], not ficha["activo"])
+        usuario = auth.usuario_actual()
+        repositorio.registrar_auditoria(usuario["usuario"], "cambiar_boletin", ficha["codigo"],
+                                        f"activo={not ficha['activo']}", auth.ip_peticion())
+        flash(f"Boletin {ficha['codigo']} actualizado", "ok")
+    return redirect(url_for("web.boletines"))
+
+
+# ----------------------------------------------------------- palabras clave --
+@web.route("/palabras-clave", methods=["GET", "POST"])
+@auth.requiere("ver")
+def palabras():
+    if request.method == "POST":
+        if not auth.tiene_permiso("editar"):
+            flash("Tu rol no puede editar las palabras clave", "error")
+            return redirect(url_for("web.palabras"))
+        termino = (request.form.get("termino") or "").strip()
+        if not termino:
+            flash("Escribe un termino", "error")
+        else:
+            refuerzo = request.form.get("tipo") == "refuerzo"
+            repositorio.anadir_palabra(termino, refuerzo)
+            usuario = auth.usuario_actual()
+            repositorio.registrar_auditoria(usuario["usuario"], "anadir_palabra", termino,
+                                            f"refuerzo={refuerzo}", auth.ip_peticion())
+            flash(f"Termino '{termino}' anadido", "ok")
+        return redirect(url_for("web.palabras"))
+
+    return render_template("palabras_clave.html", titulo_pagina="Palabras clave",
+                           palabras=repositorio.palabras_clave(solo_activas=False),
+                           puede_editar=auth.tiene_permiso("editar"))
+
+
+@web.route("/palabras-clave/<int:palabra_id>/cambiar")
+@auth.requiere("editar")
+def cambiar_palabra(palabra_id: int):
+    actuales = {fila["id"]: fila for fila in repositorio.palabras_clave(solo_activas=False)}
+    fila = actuales.get(palabra_id)
+    if fila is None:
+        flash("Ese termino no existe", "error")
+    else:
+        repositorio.activar_palabra(palabra_id, not fila["activa"])
+        flash("Termino actualizado", "ok")
+    return redirect(url_for("web.palabras"))
+
+
+@web.route("/palabras-clave/<int:palabra_id>/borrar")
+@auth.requiere("editar")
+def borrar_palabra(palabra_id: int):
+    repositorio.borrar_palabra(palabra_id)
+    usuario = auth.usuario_actual()
+    repositorio.registrar_auditoria(usuario["usuario"], "borrar_palabra", str(palabra_id), "",
+                                    auth.ip_peticion())
+    flash("Termino borrado", "ok")
+    return redirect(url_for("web.palabras"))
+
+
+# ------------------------------------------------------------ destinatarios --
+@web.route("/destinatarios", methods=["GET", "POST"])
+@auth.requiere("ver")
+def destinatarios():
+    if request.method == "POST":
+        if not auth.tiene_permiso("editar"):
+            flash("Tu rol no puede editar los destinatarios", "error")
+            return redirect(url_for("web.destinatarios"))
+        direccion = (request.form.get("correo") or "").strip().lower()
+        if "@" not in direccion or "." not in direccion.split("@")[-1]:
+            flash("Esa direccion de correo no es valida", "error")
+        else:
+            repositorio.anadir_destinatario(direccion, (request.form.get("nombre") or "").strip())
+            usuario = auth.usuario_actual()
+            repositorio.registrar_auditoria(usuario["usuario"], "anadir_destinatario", direccion,
+                                            "", auth.ip_peticion())
+            flash("Destinatario anadido", "ok")
+        return redirect(url_for("web.destinatarios"))
+
+    return render_template("destinatarios.html", titulo_pagina="Destinatarios",
+                           destinatarios=repositorio.destinatarios(solo_activos=False),
+                           puede_editar=auth.tiene_permiso("editar"))
+
+
+@web.route("/destinatarios/<int:destinatario_id>/cambiar")
+@auth.requiere("editar")
+def cambiar_destinatario(destinatario_id: int):
+    actuales = {fila["id"]: fila for fila in repositorio.destinatarios(solo_activos=False)}
+    fila = actuales.get(destinatario_id)
+    if fila is None:
+        flash("Ese destinatario no existe", "error")
+    else:
+        repositorio.activar_destinatario(destinatario_id, not fila["activo"])
+        flash("Destinatario actualizado", "ok")
+    return redirect(url_for("web.destinatarios"))
+
+
+@web.route("/destinatarios/<int:destinatario_id>/borrar")
+@auth.requiere("editar")
+def borrar_destinatario(destinatario_id: int):
+    repositorio.borrar_destinatario(destinatario_id)
+    usuario = auth.usuario_actual()
+    repositorio.registrar_auditoria(usuario["usuario"], "borrar_destinatario",
+                                    str(destinatario_id), "", auth.ip_peticion())
+    flash("Destinatario borrado", "ok")
+    return redirect(url_for("web.destinatarios"))
+
+
+# ----------------------------------------------------------------- usuarios --
+@web.route("/usuarios", methods=["GET", "POST"])
+@auth.requiere("administrar")
+def usuarios():
+    if request.method == "POST":
+        nombre_usuario = (request.form.get("usuario") or "").strip().lower()
+        clave = request.form.get("clave") or ""
+        rol = request.form.get("rol") or "consulta"
+        if not nombre_usuario or len(clave) < 10:
+            flash("Hace falta usuario y una contrasena de al menos 10 caracteres", "error")
+        elif rol not in config.ROLES:
+            flash("Rol no valido", "error")
+        elif repositorio.usuario_por_nombre(nombre_usuario):
+            flash("Ya existe un usuario con ese nombre", "error")
+        else:
+            repositorio.crear_usuario(nombre_usuario, clave, rol,
+                                      (request.form.get("nombre") or "").strip(),
+                                      (request.form.get("correo") or "").strip(),
+                                      cambio_obligatorio=True)
+            actual = auth.usuario_actual()
+            repositorio.registrar_auditoria(actual["usuario"], "crear_usuario", nombre_usuario,
+                                            f"rol={rol}", auth.ip_peticion())
+            flash(f"Usuario {nombre_usuario} creado; debera cambiar la contrasena al entrar", "ok")
+        return redirect(url_for("web.usuarios"))
+
+    return render_template("usuarios.html", titulo_pagina="Usuarios",
+                           usuarios=repositorio.usuarios(),
+                           roles=config.ROLES,
+                           descripcion_roles=auth.DESCRIPCION_ROLES,
+                           auditoria=repositorio.auditoria(150))
+
+
+@web.route("/usuarios/<int:usuario_id>/cambiar", methods=["POST"])
+@auth.requiere("administrar")
+def cambiar_usuario(usuario_id: int):
+    fila = repositorio.usuario_por_id(usuario_id)
+    if fila is None:
+        flash("Ese usuario no existe", "error")
+        return redirect(url_for("web.usuarios"))
+
+    rol = request.form.get("rol") or fila["rol"]
+    activo = request.form.get("activo") == "1"
+    if rol not in config.ROLES:
+        flash("Rol no valido", "error")
+        return redirect(url_for("web.usuarios"))
+
+    quedaria_sin_admin = (fila["rol"] == "administrador" and fila["activo"]
+                          and (rol != "administrador" or not activo)
+                          and repositorio.administradores_activos(excluyendo=usuario_id) == 0)
+    if quedaria_sin_admin:
+        flash("No se puede dejar el sistema sin el ultimo administrador activo", "error")
+        return redirect(url_for("web.usuarios"))
+
+    repositorio.actualizar_usuario(usuario_id, fila["nombre"], fila["correo"], rol, activo)
+    actual = auth.usuario_actual()
+    repositorio.registrar_auditoria(actual["usuario"], "cambiar_usuario", fila["usuario"],
+                                    f"rol={rol}; activo={activo}", auth.ip_peticion())
+    flash("Usuario actualizado", "ok")
+    return redirect(url_for("web.usuarios"))
+
+
+@web.route("/usuarios/<int:usuario_id>/reiniciar-clave", methods=["POST"])
+@auth.requiere("administrar")
+def reiniciar_clave(usuario_id: int):
+    fila = repositorio.usuario_por_id(usuario_id)
+    if fila is None:
+        flash("Ese usuario no existe", "error")
+        return redirect(url_for("web.usuarios"))
+    provisional = secrets.token_urlsafe(9)
+    repositorio.cambiar_clave(usuario_id, provisional)
+    repositorio.actualizar_usuario(usuario_id, fila["nombre"], fila["correo"], fila["rol"],
+                                   bool(fila["activo"]))
+    repositorio.forzar_cambio_clave(usuario_id)
+    actual = auth.usuario_actual()
+    repositorio.registrar_auditoria(actual["usuario"], "reiniciar_clave", fila["usuario"], "",
+                                    auth.ip_peticion())
+    flash(f"Contrasena provisional de {fila['usuario']}: {provisional}", "warn")
+    return redirect(url_for("web.usuarios"))
+
+
+# ------------------------------------------------------------------ ajustes --
+_AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extraccion",
+                  "max_tokens_relevancia", "hilos_modelo", "smtp_servidor", "smtp_puerto",
+                  "smtp_seguridad", "smtp_usuario", "smtp_remitente", "smtp_nombre_remitente",
+                  "url_publica", "hora_ejecucion", "dias_ejecucion", "planificador_activo",
+                  "umbral_difuso", "dias_dedup", "dias_token_descarte", "reintentos_boletin",
+                  "copias_max", "terminos_refuerzo")
+
+
+@web.route("/ajustes", methods=["GET", "POST"])
+@auth.requiere("administrar")
+def ajustes():
+    if request.method == "POST":
+        for clave in _AJUSTES_TEXTO:
+            if clave in request.form:
+                repositorio.guardar_ajuste(clave, (request.form.get(clave) or "").strip())
+
+        for clave in ("anthropic_api_key", "smtp_clave"):
+            valor = (request.form.get(clave) or "").strip()
+            if valor:  # vacio = no tocar lo ya guardado
+                repositorio.guardar_ajuste(clave, valor)
+
+        if (request.form.get("modelo_extraccion") not in config.MODELOS_DISPONIBLES
+                or request.form.get("modelo_relevancia") not in config.MODELOS_DISPONIBLES):
+            flash("El modelo elegido no esta en la lista admitida", "warn")
+
+        usuario = auth.usuario_actual()
+        repositorio.registrar_auditoria(usuario["usuario"], "guardar_ajustes", "",
+                                        "Ajustes actualizados", auth.ip_peticion())
+        reprogramar = current_app.config.get("reprogramar")
+        if reprogramar:
+            reprogramar()
+        flash("Ajustes guardados", "ok")
+        return redirect(url_for("web.ajustes"))
+
+    guardados = repositorio.ajustes()
+    clave = anthropic_cliente.clave_api()
+    return render_template(
+        "ajustes.html", titulo_pagina="Ajustes", ajustes=guardados,
+        modelos=config.MODELOS_DISPONIBLES,
+        pista_api=(clave[:7] + "..." + clave[-4:]) if clave else "",
+        smtp_clave_guardada=repositorio.ajuste_esta_definido("smtp_clave"),
+        hay_api=anthropic_cliente.hay_clave(),
+        smtp_ok=correo.smtp_configurado(),
+        hay_ocr=tesseract_disponible(),
+        url_publica_efectiva=correo.url_publica(),
+        ruta_clave=str(config.RUTA_CLAVE),
+        proxima=_proxima_ejecucion())
+
+
+@web.route("/ajustes/probar-api", methods=["POST"])
+@auth.requiere("administrar")
+def probar_api():
+    modelo = repositorio.ajuste("modelo_relevancia", "claude-haiku-4-5-20251001")
+    correcto, mensaje = anthropic_cliente.probar_clave(modelo)
+    flash(mensaje, "ok" if correcto else "error")
+    return redirect(url_for("web.ajustes"))
+
+
+@web.route("/ajustes/probar-correo", methods=["POST"])
+@auth.requiere("administrar")
+def probar_correo():
+    direcciones = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
+    html = correo.componer([], date.today(), {"consultados": [], "fallidos": []})
+    exito, detalle, intentos = correo.enviar(direcciones, "[MOVA Boletines] Correo de prueba", html)
+    repositorio.registrar_envio(None, ", ".join(direcciones), "Correo de prueba",
+                                "enviado" if exito else "error", intentos, detalle, 0, "")
+    flash(detalle, "ok" if exito else "error")
+    return redirect(url_for("web.ajustes"))
+
+
+# ------------------------------------------------------------------- copias --
+@web.route("/copias", methods=["GET", "POST"])
+@auth.requiere("administrar")
+def copias():
+    if request.method == "POST":
+        usuario = auth.usuario_actual()
+        try:
+            destino = copias_datos.crear_copia("manual", usuario["usuario"])
+            flash(f"Copia creada: {destino.name}", "ok")
+        except Exception as error:  # noqa: BLE001
+            flash(f"No se pudo crear la copia: {error}", "error")
+        return redirect(url_for("web.copias"))
+
+    return render_template("copias.html", titulo_pagina="Copias de seguridad",
+                           copias=copias_datos.listar(),
+                           maximo=repositorio.ajuste_int("copias_max", 10))
+
+
+@web.route("/copias/restaurar", methods=["POST"])
+@auth.requiere("administrar")
+def restaurar():
+    nombre = (request.form.get("nombre") or "").strip()
+    usuario = auth.usuario_actual()
+    correcto, mensaje = copias_datos.restaurar(nombre, usuario["usuario"])
+    flash(mensaje, "ok" if correcto else "error")
+    return redirect(url_for("web.copias"))
+
+
+@web.route("/exportar/<formato>")
+@auth.requiere("ver")
+def exportar(formato: str):
+    usuario = auth.usuario_actual()
+    try:
+        if formato == "xlsx":
+            destino = copias_datos.exportar_excel()
+        elif formato == "json":
+            destino = copias_datos.exportar_json()
+        else:
+            flash("Formato no admitido", "error")
+            return redirect(url_for("web.publicaciones"))
+    except Exception as error:  # noqa: BLE001
+        flash(f"No se pudo exportar: {error}", "error")
+        return redirect(url_for("web.publicaciones"))
+
+    repositorio.registrar_auditoria(usuario["usuario"], "exportar", formato, destino.name,
+                                    auth.ip_peticion())
+    return send_file(destino, as_attachment=True, download_name=destino.name)
+
+
+@web.route("/salud")
+def salud():
+    """Comprobacion para el servidor o el balanceador; no expone datos."""
+    return Response("ok", mimetype="text/plain")

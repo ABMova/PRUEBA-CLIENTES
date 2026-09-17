@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+<div class="card">
+  <h2>Filtros</h2>
+  <form method="get" action="{{ url_for('web.publicaciones') }}" class="campo-linea">
+    <div class="campo">
+      <label for="boletin">Comunidad / boletin</label>
+      <select id="boletin" name="boletin">
+        <option value="">Todos</option>
+        {% for b in boletines %}
+        <option value="{{ b.codigo }}" {% if filtros.codigo_boletin == b.codigo %}selected{% endif %}>{{ b.comunidad }} ({{ b.codigo }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label for="relevancia">Relevancia</label>
+      <select id="relevancia" name="relevancia">
+        <option value="">Todas</option>
+        {% for valor in ['alta', 'media', 'baja'] %}
+        <option value="{{ valor }}" {% if filtros.relevancia == valor %}selected{% endif %}>{{ valor }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label for="fecha">Fecha de publicacion</label>
+      <input type="date" id="fecha" name="fecha" value="{{ filtros.fecha|default('') }}">
+    </div>
+    <div class="campo">
+      <label for="texto">Texto en titulo u organismo</label>
+      <input type="text" id="texto" name="texto" value="{{ filtros.texto|default('') }}">
+    </div>
+    <button type="submit">Filtrar</button>
+    <a class="boton" href="{{ url_for('web.publicaciones') }}">Limpiar</a>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('web.reenviar') }}">
+<div class="card">
+  <h2>Publicaciones ({{ publicaciones|length }})</h2>
+  <div class="campo-linea" style="margin-bottom:10px;">
+    <label class="etiqueta" style="margin:0;"><input type="checkbox" id="seleccionar-todo" style="width:auto;"> Seleccionar todo</label>
+    <button type="submit" {% if not puede_editar %}disabled{% endif %}>Reenviar seleccionadas por correo</button>
+    <a class="boton" href="{{ url_for('web.exportar', formato='xlsx') }}">Exportar Excel</a>
+    <a class="boton" href="{{ url_for('web.exportar', formato='json') }}">Exportar JSON</a>
+  </div>
+
+  <div class="tabla-desplazable">
+    <table class="datos">
+      <thead>
+        <tr>
+          <th></th><th>Comunidad</th><th>Boletin</th><th>Fecha</th><th>Titulo</th>
+          <th>Organismo</th><th>Plazo</th><th>Beneficiarios</th><th>Importe</th>
+          <th>Relevancia</th><th>Estado</th><th>Enlaces</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in publicaciones %}
+        <tr class="{% if p.relevancia == 'alta' %}destacada{% endif %}">
+          <td class="celda-estrecha"><input type="checkbox" name="ids" value="{{ p.id }}" style="width:auto;"></td>
+          <td class="celda-estrecha">{{ p.comunidad }}</td>
+          <td class="celda-estrecha">{{ p.codigo_boletin }}</td>
+          <td class="celda-estrecha">{{ p.fecha_publicacion }}</td>
+          <td>
+            {{ p.titulo }}
+            {% if p.revision_manual %}<br><span class="pildora aviso">{{ marcador_revision }}</span>
+            <span class="apoyo">{{ p.motivo_revision[:120] }}</span>{% endif %}
+            {% if p.resumen and p.resumen != marcador %}<br><span class="apoyo">{{ p.resumen[:220] }}</span>{% endif %}
+          </td>
+          <td>{% if p.organismo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.organismo }}{% endif %}</td>
+          <td>{% if p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo }}{% endif %}</td>
+          <td>{% if p.beneficiarios == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.beneficiarios[:160] }}{% endif %}</td>
+          <td>{% if p.importe == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.importe }}{% endif %}</td>
+          <td class="celda-estrecha">
+            {% if p.relevancia == 'alta' %}<span class="pildora alta">ALTA</span>{% else %}<span class="pildora pendiente">{{ p.relevancia }}</span>{% endif %}
+          </td>
+          <td class="celda-estrecha">
+            <span class="pildora {{ 'ok' if p.estado == 'enviada' else ('error' if p.estado == 'descartada' else 'proceso') }}">{{ p.estado }}</span>
+          </td>
+          <td class="celda-estrecha">
+            {% if p.url_oficial %}<a href="{{ p.url_oficial }}" target="_blank" rel="noopener">Oficial</a>{% endif %}
+            {% if p.url_pdf %}<br><a href="{{ p.url_pdf }}" target="_blank" rel="noopener">PDF</a>{% endif %}
+          </td>
+          <td class="celda-estrecha">
+            {% if puede_descartar and p.estado != 'descartada' %}
+            <a class="boton boton-pequeno boton-destructivo"
+               href="{{ url_for('web.descartar_manual', publicacion_id=p.id) }}"
+               data-confirmar="Descartar esta publicacion? Dejara de aparecer en los correos.">Descartar</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not publicaciones %}
+        <tr><td colspan="13" class="apoyo">No hay publicaciones que cumplan el filtro.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</form>
+
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="login-caja">
+  <div class="card">
+    <h2>Cambio de contrasena</h2>
+    {% if obligatorio %}
+    <div class="aviso warn">Es obligatorio cambiar la contrasena provisional antes de usar la herramienta.</div>
+    {% endif %}
+    <form method="post" action="{{ url_for('web.cambiar_clave') }}">
+      <div class="campo"><label for="actual">Contrasena actual</label>
+        <input type="password" id="actual" name="actual" autocomplete="current-password" required></div>
+      <div class="campo"><label for="nueva">Contrasena nueva (minimo 10 caracteres)</label>
+        <input type="password" id="nueva" name="nueva" autocomplete="new-password" minlength="10" required></div>
+      <div class="campo"><label for="repetida">Repite la contrasena nueva</label>
+        <input type="password" id="repetida" name="repetida" autocomplete="new-password" minlength="10" required></div>
+      <button type="submit" class="principal">Cambiar contrasena</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

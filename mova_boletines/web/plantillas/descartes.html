@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="card">
+  <h2>Publicaciones descartadas ({{ descartes|length }})</h2>
+  <p class="apoyo">Lo descartado no vuelve a aparecer en los correos, ni siquiera si el
+     boletin lo republica. Se puede recuperar.</p>
+  <div class="tabla-desplazable">
+    <table class="datos">
+      <thead><tr><th>Fecha</th><th>Boletin</th><th>Titulo</th><th>Origen</th><th>Quien</th><th>IP</th><th></th></tr></thead>
+      <tbody>
+        {% for d in descartes %}
+        <tr>
+          <td class="celda-estrecha apoyo">{{ d.creado_en }}</td>
+          <td class="celda-estrecha">{{ d.codigo_boletin }}</td>
+          <td>{{ d.titulo[:170] }}</td>
+          <td class="celda-estrecha"><span class="pildora pendiente">{{ d.origen }}</span></td>
+          <td class="celda-estrecha apoyo">{{ d.destinatario or d.usuario or '-' }}</td>
+          <td class="celda-estrecha apoyo">{{ d.ip or '-' }}</td>
+          <td class="celda-estrecha">
+            {% if puede_descartar %}
+            <a class="boton boton-pequeno" href="{{ url_for('web.recuperar_descarte', descarte_id=d.id) }}"
+               data-confirmar="Recuperar esta publicacion? Volvera a aparecer como nueva.">Recuperar</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not descartes %}
+        <tr><td colspan="7" class="apoyo">No hay descartes registrados.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

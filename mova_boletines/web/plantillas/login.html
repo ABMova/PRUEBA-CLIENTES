@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="login-caja">
+  <div class="card">
+    <h2>Acceso</h2>
+    <form method="post" action="{{ url_for('web.login') }}">
+      <input type="hidden" name="siguiente" value="{{ siguiente|default('') }}">
+      <div class="campo">
+        <label for="usuario">Usuario</label>
+        <input type="text" id="usuario" name="usuario" autocomplete="username" autofocus required>
+      </div>
+      <div class="campo">
+        <label for="clave">Contrasena</label>
+        <input type="password" id="clave" name="clave" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="principal">Entrar</button>
+    </form>
+  </div>
+
+  {% if clave_provisional %}
+  <div class="aviso warn">
+    Instalacion recien creada. Usuario <strong>admin</strong> con contrasena provisional
+    <strong class="mono">{{ clave_provisional }}</strong>. La aplicacion obligara a cambiarla al entrar.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

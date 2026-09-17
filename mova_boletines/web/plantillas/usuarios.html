@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="fila">
+  <div class="card">
+    <h2>Usuarios y roles</h2>
+    <div class="tabla-desplazable">
+      <table class="datos">
+        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol y estado</th><th>Situacion</th><th>Ultimo acceso</th><th></th></tr></thead>
+        <tbody>
+          {% for u in usuarios %}
+          <tr>
+            <td><strong>{{ u.usuario }}</strong></td>
+            <td>{{ u.nombre or '-' }}</td>
+            <td>
+              <form method="post" action="{{ url_for('web.cambiar_usuario', usuario_id=u.id) }}" class="campo-linea" style="gap:6px;">
+                <select name="rol" style="width:auto;">
+                  {% for rol in roles %}<option value="{{ rol }}" {% if u.rol == rol %}selected{% endif %}>{{ rol }}</option>{% endfor %}
+                </select>
+                <select name="activo" style="width:auto;">
+                  <option value="1" {% if u.activo %}selected{% endif %}>activo</option>
+                  <option value="0" {% if not u.activo %}selected{% endif %}>desactivado</option>
+                </select>
+                <button type="submit" class="boton-pequeno">Guardar</button>
+              </form>
+            </td>
+            <td class="celda-estrecha">
+              {% if u.activo %}<span class="pildora ok">activo</span>{% else %}<span class="pildora pendiente">desactivado</span>{% endif %}
+              {% if u.cambio_obligatorio %}<span class="pildora aviso">debe cambiar clave</span>{% endif %}
+            </td>
+            <td class="celda-estrecha apoyo">{{ u.ultimo_acceso or 'nunca' }}</td>
+            <td class="celda-estrecha">
+              <form method="post" action="{{ url_for('web.reiniciar_clave', usuario_id=u.id) }}">
+                <button type="submit" class="boton-pequeno"
+                        data-confirmar="Generar una contrasena provisional para {{ u.usuario }}?">Reiniciar clave</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="apoyo" style="margin-top:10px;">
+      {% for rol, descripcion in descripcion_roles.items() %}<strong>{{ rol }}</strong>: {{ descripcion }}.<br>{% endfor %}
+      El sistema no permite quedarse sin el ultimo administrador activo.
+    </p>
+  </div>
+
+  <div class="card" style="flex:0 1 320px;">
+    <h2>Nuevo usuario</h2>
+    <form method="post" action="{{ url_for('web.usuarios') }}">
+      <div class="campo"><label for="usuario">Usuario</label><input type="text" id="usuario" name="usuario" required></div>
+      <div class="campo"><label for="nombre">Nombre</label><input type="text" id="nombre" name="nombre"></div>
+      <div class="campo"><label for="correo">Correo</label><input type="email" id="correo" name="correo"></div>
+      <div class="campo"><label for="clave">Contrasena provisional</label><input type="password" id="clave" name="clave" minlength="10" required></div>
+      <div class="campo">
+        <label for="rol">Rol</label>
+        <select id="rol" name="rol">{% for rol in roles %}<option value="{{ rol }}">{{ rol }}</option>{% endfor %}</select>
+      </div>
+      <button type="submit" class="principal">Crear usuario</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Auditoria</h2>
+  <p class="apoyo">Registro de todo lo que pasa en el sistema. No se puede borrar desde la interfaz.</p>
+  <div class="tabla-desplazable">
+    <table class="datos">
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Accion</th><th>Objeto</th><th>Resultado</th><th>Detalle</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for a in auditoria %}
+        <tr>
+          <td class="celda-estrecha apoyo">{{ a.creado_en }}</td>
+          <td class="celda-estrecha">{{ a.usuario }}</td>
+          <td class="celda-estrecha">{{ a.accion }}</td>
+          <td class="celda-estrecha apoyo">{{ a.objeto }}</td>
+          <td class="celda-estrecha"><span class="pildora {{ 'ok' if a.resultado == 'ok' else 'error' }}">{{ a.resultado }}</span></td>
+          <td class="apoyo">{{ a.detalle[:180] }}</td>
+          <td class="celda-estrecha apoyo">{{ a.ip }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

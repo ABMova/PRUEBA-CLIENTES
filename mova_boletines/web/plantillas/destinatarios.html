@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="fila">
+  <div class="card">
+    <h2>Destinatarios del correo diario</h2>
+    <table class="datos">
+      <thead><tr><th>Correo</th><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for d in destinatarios %}
+        <tr>
+          <td>{{ d.correo }}</td>
+          <td>{{ d.nombre or '-' }}</td>
+          <td class="celda-estrecha">
+            {% if d.activo %}<span class="pildora ok">activo</span>
+            {% else %}<span class="pildora pendiente">inactivo</span>{% endif %}
+          </td>
+          <td class="celda-estrecha">
+            {% if puede_editar %}
+            <a class="boton boton-pequeno" href="{{ url_for('web.cambiar_destinatario', destinatario_id=d.id) }}">{{ 'Desactivar' if d.activo else 'Activar' }}</a>
+            <a class="boton boton-pequeno boton-destructivo" href="{{ url_for('web.borrar_destinatario', destinatario_id=d.id) }}"
+               data-confirmar="Borrar a {{ d.correo }} de la lista de envio?">Borrar</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="flex:0 1 320px;">
+    <h2>Anadir destinatario</h2>
+    <form method="post" action="{{ url_for('web.destinatarios') }}">
+      <div class="campo">
+        <label for="correo">Direccion de correo</label>
+        <input type="email" id="correo" name="correo" required {% if not puede_editar %}disabled{% endif %}>
+      </div>
+      <div class="campo">
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" name="nombre" {% if not puede_editar %}disabled{% endif %}>
+      </div>
+      <button type="submit" class="principal" {% if not puede_editar %}disabled{% endif %}>Anadir</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

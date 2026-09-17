@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="card">
+  <h2>Boletines vigilados</h2>
+  <p class="apoyo">Cada boletin tiene su propio adaptador. Si una web de origen cambia, solo
+     hay que reparar ese modulo: aqui figuran la URL en uso y la fecha en que se comprobo.</p>
+  <div class="tabla-desplazable">
+    <table class="datos">
+      <thead>
+        <tr><th>Codigo</th><th>Comunidad</th><th>Boletin</th><th>Via de acceso</th>
+            <th>URL comprobada</th><th>Comprobado</th><th>Ultimo resultado</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in boletines %}
+        <tr>
+          <td><strong>{{ b.codigo }}</strong></td>
+          <td>{{ b.comunidad }}</td>
+          <td>{{ b.nombre }}</td>
+          <td class="apoyo">{{ b.via_acceso }}</td>
+          <td class="apoyo mono" style="max-width:300px; overflow-wrap:anywhere;">{{ fichas[b.codigo].url }}</td>
+          <td class="celda-estrecha apoyo">{{ fichas[b.codigo].comprobado }}</td>
+          <td class="apoyo">{{ b.ultimo_resultado or '-' }}<br>{{ b.ultima_ejecucion or '' }}</td>
+          <td class="celda-estrecha">
+            {% if not b.activo %}<span class="pildora pendiente">desactivado</span>
+            {% elif b.ultimo_estado == 'correcto' %}<span class="pildora ok">correcto</span>
+            {% elif b.ultimo_estado == 'vacio' %}<span class="pildora aviso">sin boletin</span>
+            {% elif b.ultimo_estado == 'error' %}<span class="pildora error">error</span>
+            {% else %}<span class="pildora pendiente">pendiente</span>{% endif %}
+          </td>
+          <td class="celda-estrecha">
+            {% if puede_editar %}
+            <a class="boton boton-pequeno" href="{{ url_for('web.cambiar_boletin', codigo=b.codigo) }}">
+              {{ 'Desactivar' if b.activo else 'Activar' }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

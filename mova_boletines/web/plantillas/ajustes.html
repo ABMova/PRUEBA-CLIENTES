@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+<form method="post" action="{{ url_for('web.ajustes') }}">
+<div class="fila">
+
+  <div class="card">
+    <h2>Claves y modelos</h2>
+    <div class="campo">
+      <label for="anthropic_api_key">Clave de API de Anthropic</label>
+      <input type="password" id="anthropic_api_key" name="anthropic_api_key"
+             placeholder="{{ 'Guardada: ' ~ pista_api if pista_api else 'sin configurar' }}">
+      <span class="apoyo">Se guarda cifrada con Fernet. Nunca se muestra entera ni se escribe en los registros.</span>
+    </div>
+    <div class="campo">
+      <label for="modelo_extraccion">Modelo de extraccion (fase 3)</label>
+      <select id="modelo_extraccion" name="modelo_extraccion">
+        {% for modelo in modelos %}<option value="{{ modelo }}" {% if ajustes.modelo_extraccion == modelo %}selected{% endif %}>{{ modelo }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="campo">
+      <label for="modelo_relevancia">Modelo de relevancia (fase 4)</label>
+      <select id="modelo_relevancia" name="modelo_relevancia">
+        {% for modelo in modelos %}<option value="{{ modelo }}" {% if ajustes.modelo_relevancia == modelo %}selected{% endif %}>{{ modelo }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="campo-linea">
+      <div class="campo"><label for="max_tokens_extraccion">Tokens fase 3</label>
+        <input type="number" id="max_tokens_extraccion" name="max_tokens_extraccion" value="{{ ajustes.max_tokens_extraccion }}"></div>
+      <div class="campo"><label for="max_tokens_relevancia">Tokens fase 4</label>
+        <input type="number" id="max_tokens_relevancia" name="max_tokens_relevancia" value="{{ ajustes.max_tokens_relevancia }}"></div>
+      <div class="campo"><label for="hilos_modelo">Llamadas simultaneas</label>
+        <input type="number" id="hilos_modelo" name="hilos_modelo" value="{{ ajustes.hilos_modelo }}" min="1" max="8"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Correo saliente (SMTP)</h2>
+    <div class="campo-linea">
+      <div class="campo"><label for="smtp_servidor">Servidor</label>
+        <input type="text" id="smtp_servidor" name="smtp_servidor" value="{{ ajustes.smtp_servidor }}"></div>
+      <div class="campo" style="flex:0 1 110px;"><label for="smtp_puerto">Puerto</label>
+        <input type="number" id="smtp_puerto" name="smtp_puerto" value="{{ ajustes.smtp_puerto }}"></div>
+      <div class="campo" style="flex:0 1 140px;">
+        <label for="smtp_seguridad">Seguridad</label>
+        <select id="smtp_seguridad" name="smtp_seguridad">
+          {% for valor in ['starttls', 'ssl', 'ninguna'] %}
+          <option value="{{ valor }}" {% if ajustes.smtp_seguridad == valor %}selected{% endif %}>{{ valor }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="campo"><label for="smtp_usuario">Usuario</label>
+      <input type="text" id="smtp_usuario" name="smtp_usuario" value="{{ ajustes.smtp_usuario }}"></div>
+    <div class="campo"><label for="smtp_clave">Contrasena</label>
+      <input type="password" id="smtp_clave" name="smtp_clave"
+             placeholder="{{ 'Guardada (cifrada)' if smtp_clave_guardada else 'sin configurar' }}"></div>
+    <div class="campo-linea">
+      <div class="campo"><label for="smtp_remitente">Remitente</label>
+        <input type="email" id="smtp_remitente" name="smtp_remitente" value="{{ ajustes.smtp_remitente }}"></div>
+      <div class="campo"><label for="smtp_nombre_remitente">Nombre visible</label>
+        <input type="text" id="smtp_nombre_remitente" name="smtp_nombre_remitente" value="{{ ajustes.smtp_nombre_remitente }}"></div>
+    </div>
+    <div class="campo"><label for="url_publica">URL publica para los enlaces de descarte</label>
+      <input type="text" id="url_publica" name="url_publica" value="{{ ajustes.url_publica }}" placeholder="{{ url_publica_efectiva }}"></div>
+  </div>
+
+</div>
+
+<div class="fila">
+  <div class="card">
+    <h2>Horario de la vigilancia</h2>
+    <div class="campo-linea">
+      <div class="campo"><label for="hora_ejecucion">Hora (HH:MM)</label>
+        <input type="time" id="hora_ejecucion" name="hora_ejecucion" value="{{ ajustes.hora_ejecucion }}"></div>
+      <div class="campo"><label for="dias_ejecucion">Dias</label>
+        <select id="dias_ejecucion" name="dias_ejecucion">
+          <option value="mon-fri" {% if ajustes.dias_ejecucion == 'mon-fri' %}selected{% endif %}>Lunes a viernes</option>
+          <option value="mon-sat" {% if ajustes.dias_ejecucion == 'mon-sat' %}selected{% endif %}>Lunes a sabado</option>
+          <option value="mon,tue,wed,thu,fri,sat,sun" {% if ajustes.dias_ejecucion == 'mon,tue,wed,thu,fri,sat,sun' %}selected{% endif %}>Todos los dias</option>
+        </select>
+      </div>
+      <div class="campo"><label for="planificador_activo">Disparo automatico</label>
+        <select id="planificador_activo" name="planificador_activo">
+          <option value="1" {% if ajustes.planificador_activo == '1' %}selected{% endif %}>Activado</option>
+          <option value="0" {% if ajustes.planificador_activo != '1' %}selected{% endif %}>Desactivado</option>
+        </select>
+      </div>
+    </div>
+    <p class="apoyo">Zona horaria: {{ ajustes.zona_horaria }}. Proxima ejecucion: <strong>{{ proxima or 'sin programar' }}</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h2>Umbrales y limites</h2>
+    <div class="campo-linea">
+      <div class="campo"><label for="umbral_difuso">Umbral de duplicado (%)</label>
+        <input type="number" id="umbral_difuso" name="umbral_difuso" value="{{ ajustes.umbral_difuso }}" min="50" max="100"></div>
+      <div class="campo"><label for="dias_dedup">Dias de comparacion</label>
+        <input type="number" id="dias_dedup" name="dias_dedup" value="{{ ajustes.dias_dedup }}" min="1" max="365"></div>
+      <div class="campo"><label for="dias_token_descarte">Caducidad enlaces (dias)</label>
+        <input type="number" id="dias_token_descarte" name="dias_token_descarte" value="{{ ajustes.dias_token_descarte }}" min="1" max="365"></div>
+    </div>
+    <div class="campo-linea">
+      <div class="campo"><label for="reintentos_boletin">Reintentos por boletin</label>
+        <input type="number" id="reintentos_boletin" name="reintentos_boletin" value="{{ ajustes.reintentos_boletin }}" min="1" max="10"></div>
+      <div class="campo"><label for="copias_max">Copias que se conservan</label>
+        <input type="number" id="copias_max" name="copias_max" value="{{ ajustes.copias_max }}" min="1" max="100"></div>
+    </div>
+    <div class="campo">
+      <label for="terminos_refuerzo">Terminos de refuerzo de alta relevancia (separados por comas)</label>
+      <textarea id="terminos_refuerzo" name="terminos_refuerzo" class="mono">{{ ajustes.terminos_refuerzo }}</textarea>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <button type="submit" class="principal">Guardar ajustes</button>
+</div>
+</form>
+
+<div class="fila">
+  <div class="card">
+    <h2>Comprobaciones</h2>
+    <form method="post" action="{{ url_for('web.probar_api') }}" style="display:inline-block; margin-right:8px;">
+      <button type="submit">Probar la clave de Anthropic</button>
+    </form>
+    <form method="post" action="{{ url_for('web.probar_correo') }}" style="display:inline-block;">
+      <button type="submit">Enviar correo de prueba</button>
+    </form>
+    <p class="apoyo" style="margin-top:10px;">
+      Datos que salen del sistema: solo el texto publico de las publicaciones oficiales.
+      Nunca credenciales, nunca datos de usuarios.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Estado del entorno</h2>
+    <ul class="lista-limpia">
+      <li>Carpeta de datos: <span class="mono apoyo">{{ carpeta_datos }}</span></li>
+      <li>Clave de cifrado: <span class="mono apoyo">{{ ruta_clave }}</span></li>
+      <li>Clave de API: {% if hay_api %}<span class="pildora ok">configurada</span>{% else %}<span class="pildora error">sin configurar</span>{% endif %}</li>
+      <li>SMTP: {% if smtp_ok %}<span class="pildora ok">configurado</span>{% else %}<span class="pildora error">sin configurar</span>{% endif %}</li>
+      <li>OCR (Tesseract): {% if hay_ocr %}<span class="pildora ok">disponible</span>{% else %}<span class="pildora aviso">no instalado (los PDF escaneados se marcan incompletos)</span>{% endif %}</li>
+    </ul>
+  </div>
+</div>
+
+{% endblock %}

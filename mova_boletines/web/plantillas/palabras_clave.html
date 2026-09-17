@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="fila">
+  <div class="card">
+    <h2>Palabras clave del filtro</h2>
+    <p class="apoyo">Filtro determinista, sin IA: solo las publicaciones con al menos una
+       coincidencia pasan al modelo. Es lo que mantiene acotado el coste.</p>
+    <div class="tabla-desplazable">
+      <table class="datos">
+        <thead><tr><th>Termino</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+          {% for p in palabras %}
+          <tr>
+            <td>{{ p.termino }}</td>
+            <td class="celda-estrecha">
+              {% if p.refuerzo %}<span class="pildora alta">refuerzo</span>
+              {% else %}<span class="pildora pendiente">filtro</span>{% endif %}
+            </td>
+            <td class="celda-estrecha">
+              {% if p.activa %}<span class="pildora ok">activa</span>
+              {% else %}<span class="pildora pendiente">inactiva</span>{% endif %}
+            </td>
+            <td class="celda-estrecha">
+              {% if puede_editar %}
+              <a class="boton boton-pequeno" href="{{ url_for('web.cambiar_palabra', palabra_id=p.id) }}">{{ 'Desactivar' if p.activa else 'Activar' }}</a>
+              <a class="boton boton-pequeno boton-destructivo" href="{{ url_for('web.borrar_palabra', palabra_id=p.id) }}"
+                 data-confirmar="Borrar el termino {{ p.termino }}?">Borrar</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="flex:0 1 320px;">
+    <h2>Anadir termino</h2>
+    <form method="post" action="{{ url_for('web.palabras') }}">
+      <div class="campo">
+        <label for="termino">Termino</label>
+        <input type="text" id="termino" name="termino" required {% if not puede_editar %}disabled{% endif %}>
+      </div>
+      <div class="campo">
+        <label for="tipo">Tipo</label>
+        <select id="tipo" name="tipo" {% if not puede_editar %}disabled{% endif %}>
+          <option value="filtro">Filtro (fase 2)</option>
+          <option value="refuerzo">Refuerzo de alta relevancia (fase 4)</option>
+        </select>
+      </div>
+      <button type="submit" class="principal" {% if not puede_editar %}disabled{% endif %}>Anadir</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

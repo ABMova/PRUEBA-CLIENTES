@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="login-caja">
+  <div class="card">
+    <h2>{{ titulo_resultado }}</h2>
+    <div class="aviso {{ clase }}">{{ mensaje }}</div>
+    {% if publicacion %}
+    <p class="apoyo">Publicacion afectada:</p>
+    <p>{{ publicacion }}</p>
+    {% endif %}
+    <p class="apoyo">Puedes cerrar esta pagina. Si te has equivocado, un administrador puede
+       recuperar la publicacion desde la pantalla Descartes.</p>
+  </div>
+</div>
+{% endblock %}

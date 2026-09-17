@@ -52,8 +52,17 @@ class Progreso:
             self.cancelar = False
             self.terminado_en: str | None = None
 
-    def iniciar(self, ejecucion_id: int) -> None:
+    def preparar(self) -> None:
+        """Marca la ejecucion como activa ANTES de arrancar el hilo.
+
+        Si se dejara para el hilo, una consulta de progreso inmediata (o un
+        segundo clic en Ejecutar ahora) veria el sistema libre.
+        """
         self.reiniciar()
+        with self._lock:
+            self.activo = True
+
+    def iniciar(self, ejecucion_id: int) -> None:
         with self._lock:
             self.activo = True
             self.ejecucion_id = ejecucion_id
@@ -127,10 +136,15 @@ def lanzar(fecha: date | None = None, tipo: str = "manual", usuario: str = "sist
         if hay_ejecucion():
             return False, "Ya hay una ejecucion en curso"
         objetivo = fecha or date.today()
+        progreso.preparar()
         _hilo = threading.Thread(
             target=_ejecutar, args=(objetivo, tipo, usuario, enviar_correo),
             name="pipeline-boletines", daemon=True)
-        _hilo.start()
+        try:
+            _hilo.start()
+        except RuntimeError as error:
+            progreso.terminar(f"No se pudo arrancar el hilo: {error}")
+            return False, f"No se pudo arrancar la ejecucion: {error}"
         return True, f"Ejecucion lanzada para el {objetivo:%d/%m/%Y}"
 
 
@@ -326,7 +340,18 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
         else:
             extraccion = relevancia.extraer(publicacion, modelo_extraccion, tokens_extraccion)
             if not extraccion.datos.get("es_convocatoria_ayuda", True):
-                return None
+                # No es una convocatoria (nombramiento, licitacion, correccion...).
+                # Se guarda igualmente con estado 'no_convocatoria' para que su hash
+                # quede registrado y no se vuelva a pagar al modelo por lo mismo.
+                return {
+                    "publicacion": publicacion,
+                    "extraccion": extraccion,
+                    "clasificacion": {"relevancia": "baja", "sectores": [],
+                                      "justificacion": "El modelo la descarta: no es una "
+                                                       "convocatoria de ayudas", "llamadas": 0},
+                    "es_ayuda": False,
+                    "indice": indice,
+                }
             clasificacion = relevancia.clasificar(publicacion, extraccion.datos,
                                                  modelo_relevancia, tokens_relevancia, refuerzos)
 
@@ -334,6 +359,7 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
             "publicacion": publicacion,
             "extraccion": extraccion,
             "clasificacion": clasificacion,
+            "es_ayuda": True,
             "indice": indice,
         }
 
@@ -382,7 +408,7 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
             "revision_manual": int(salida["extraccion"].revision_manual),
             "motivo_revision": salida["extraccion"].motivo,
             "duplicado_de": publicacion.get("duplicado_de"),
-            "estado": "nueva",
+            "estado": "nueva" if salida.get("es_ayuda", True) else "no_convocatoria",
             "json_modelo": relevancia.json_crudo(datos, clasificacion),
         }
         try:
@@ -390,6 +416,8 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
         except Exception as error:  # noqa: BLE001 - un choque de hash no tumba la ejecucion
             progreso.anotar(f"No se pudo guardar '{fila['titulo'][:50]}': {error}")
             continue
+        if fila["estado"] == "no_convocatoria":
+            continue  # queda trazada, pero no va al correo ni cuenta como novedad
         guardadas.append(fila)
         if fila["relevancia"] == "alta":
             contadores["alta_relevancia"] += 1

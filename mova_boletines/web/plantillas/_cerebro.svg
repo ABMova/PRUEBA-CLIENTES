@@ -1,0 +1,22 @@
+{# Icono de marca: cerebro geometrico dorado, dibujado en SVG en linea para
+   que no dependa de ningun fichero externo ni de conexion a internet. #}
+<svg class="icono-cerebro" viewBox="0 0 64 64" role="img" aria-label="MOVA IA" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="oroCerebro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f0d98c"/>
+      <stop offset="100%" stop-color="#b8892f"/>
+    </linearGradient>
+  </defs>
+  <path d="M26 8c-5 0-9 3.4-9.7 8-3.6.9-6.3 4-6.3 7.8 0 2 .8 3.9 2 5.3-1.2 1.4-2 3.3-2 5.3 0 3.6 2.4 6.7 5.8 7.7.3 4.8 4.4 8.6 9.4 8.6 2 0 3.9-.6 5.4-1.7V9.7C29.4 8.6 27.8 8 26 8z"
+        fill="none" stroke="url(#oroCerebro)" stroke-width="2.1" stroke-linejoin="round"/>
+  <path d="M38 8c5 0 9 3.4 9.7 8 3.6.9 6.3 4 6.3 7.8 0 2-.8 3.9-2 5.3 1.2 1.4 2 3.3 2 5.3 0 3.6-2.4 6.7-5.8 7.7-.3 4.8-4.4 8.6-9.4 8.6-2 0-3.9-.6-5.4-1.7V9.7C34.6 8.6 36.2 8 38 8z"
+        fill="none" stroke="url(#oroCerebro)" stroke-width="2.1" stroke-linejoin="round"/>
+  <path d="M32 46v10M24 56h16" fill="none" stroke="url(#oroCerebro)" stroke-width="2.1" stroke-linecap="round"/>
+  <circle cx="22" cy="20" r="2" fill="#d9b45b"/>
+  <circle cx="42" cy="20" r="2" fill="#d9b45b"/>
+  <circle cx="19" cy="32" r="2" fill="#d9b45b"/>
+  <circle cx="45" cy="32" r="2" fill="#d9b45b"/>
+  <circle cx="26" cy="40" r="2" fill="#d9b45b"/>
+  <circle cx="38" cy="40" r="2" fill="#d9b45b"/>
+  <path d="M22 20l-3 12 7 8M42 20l3 12-7 8" fill="none" stroke="#b8892f" stroke-width="1.1" opacity=".75"/>
+</svg>

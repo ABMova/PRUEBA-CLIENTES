@@ -1,0 +1,88 @@
+{#
+  Plantilla base: cabecera MOVA y navegacion por pasos numerados.
+  Las dos imagenes de marca van embebidas (data URI) para que se vean igual
+  sin conexion: el icono del cerebro es un SVG y el logotipo es tipografico.
+#}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ titulo_pagina|default(nombre_app) }} - {{ nombre_app }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='mova.css') }}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0c0e'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='16' fill='%23d9b45b' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+</head>
+<body{% if aviso_flotante %} data-aviso="{{ aviso_flotante }}"{% endif %}>
+
+<header class="cabecera">
+  <div class="cabecera-interior">
+    <div class="cabecera-izquierda">
+      {% include "_cerebro.svg" %}
+      <div>
+        <h1 class="titulo-app">{{ nombre_app }}</h1>
+        <p class="lema-app">{{ lema }}</p>
+      </div>
+    </div>
+    <div class="logotipo">
+      <span class="marca">MOVA</span><span class="ia">IA</span>
+    </div>
+  </div>
+</header>
+
+{% if usuario %}
+<nav class="navegacion">
+  <div class="navegacion-interior">
+    {% set pasos = [
+      ('web.panel', 'Panel'),
+      ('web.ejecuciones', 'Ejecuciones'),
+      ('web.publicaciones', 'Publicaciones'),
+      ('web.descartes', 'Descartes'),
+      ('web.boletines', 'Boletines'),
+      ('web.palabras', 'Palabras clave'),
+      ('web.destinatarios', 'Destinatarios')
+    ] %}
+    {% for destino, rotulo in pasos %}
+    <a class="paso {% if request.endpoint == destino %}activo{% endif %}" href="{{ url_for(destino) }}">
+      <span class="numero">{{ loop.index }}</span>{{ rotulo }}
+    </a>
+    {% endfor %}
+
+    <span class="separador-navegacion"></span>
+
+    {% set pasos_admin = [
+      ('web.usuarios', 'Usuarios'),
+      ('web.ajustes', 'Ajustes'),
+      ('web.copias', 'Copias')
+    ] %}
+    {% for destino, rotulo in pasos_admin %}
+    <a class="paso {% if request.endpoint == destino %}activo{% endif %}" href="{{ url_for(destino) }}">
+      <span class="numero">{{ loop.index + 7 }}</span>{{ rotulo }} <span class="candado">&#128274;</span>
+    </a>
+    {% endfor %}
+
+    <span style="flex:1"></span>
+    <span class="apoyo">{{ usuario.usuario }} &middot; {{ usuario.rol }}</span>
+    <a class="paso" href="{{ url_for('web.salir') }}">Salir</a>
+  </div>
+</nav>
+{% endif %}
+
+<main class="contenido">
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for categoria, mensaje in mensajes %}
+      <div class="aviso {{ categoria }}">{{ mensaje }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% block contenido %}{% endblock %}
+</main>
+
+<footer class="pie">
+  {{ nombre_app }} v{{ version }} &middot; datos en {{ carpeta_datos }} &middot;
+  los campos sin dato se muestran como <span class="dato-pendiente">{{ marcador }}</span>
+</footer>
+
+<div class="flotante" id="aviso-flotante"></div>
+<script src="{{ url_for('static', filename='mova.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

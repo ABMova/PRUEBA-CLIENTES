@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+<div class="card" id="panel-progreso">
+  <h2>Ejecucion en curso</h2>
+  <p id="progreso-fase" class="apoyo">Consultando estado...</p>
+  <div class="barra-progreso"><div class="relleno" id="progreso-relleno"></div></div>
+
+  <div class="campo-linea" style="margin-top:14px;">
+    <form method="post" action="{{ url_for('web.lanzar') }}" class="campo-linea">
+      <div class="campo">
+        <label for="fecha">Fecha a vigilar</label>
+        <input type="date" id="fecha" name="fecha" value="{{ hoy }}">
+      </div>
+      <div class="campo" style="flex:0 0 auto;">
+        <label for="enviar">Correo</label>
+        <select id="enviar" name="enviar">
+          <option value="1">Generar y enviar</option>
+          <option value="0">Solo generar (sin enviar)</option>
+        </select>
+      </div>
+      <button type="submit" class="principal" id="boton-lanzar">Ejecutar ahora</button>
+    </form>
+    <form method="post" action="{{ url_for('web.cancelar') }}">
+      <button type="submit" id="boton-cancelar" class="destructivo">Cancelar</button>
+    </form>
+  </div>
+
+  <h3>Registro en vivo</h3>
+  <div class="registro-vivo" id="registro-vivo">Sin actividad.</div>
+</div>
+
+<div class="card">
+  <h2>Historico de ejecuciones</h2>
+  <div class="tabla-desplazable">
+    <table class="datos">
+      <thead>
+        <tr>
+          <th>#</th><th>Fecha objetivo</th><th>Tipo</th><th>Estado</th>
+          <th>Boletines</th><th>Brutas</th><th>Candidatas</th><th>Nuevas</th>
+          <th>Alta</th><th>Llamadas IA</th><th>Inicio</th><th>Fin</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in ejecuciones %}
+        <tr>
+          <td>{{ e.id }}</td>
+          <td class="celda-estrecha">{{ e.fecha_objetivo }}</td>
+          <td class="celda-estrecha">{{ e.tipo }}</td>
+          <td class="celda-estrecha">
+            <span class="pildora {{ 'ok' if e.estado == 'correcta' else ('proceso' if e.estado == 'en_curso' else ('aviso' if e.estado in ('con_avisos','interrumpida','cancelada') else 'error')) }}">{{ e.estado }}</span>
+          </td>
+          <td class="celda-estrecha">{{ e.boletines_ok }} ok / {{ e.boletines_fallidos }} fallo</td>
+          <td>{{ e.publicaciones_brutas }}</td>
+          <td>{{ e.candidatas }}</td>
+          <td>{{ e.nuevas }}</td>
+          <td>{{ e.alta_relevancia }}</td>
+          <td>{{ e.llamadas_modelo }}</td>
+          <td class="celda-estrecha apoyo">{{ e.iniciado_en }}</td>
+          <td class="celda-estrecha apoyo">{{ e.terminado_en or '-' }}</td>
+          <td class="celda-estrecha"><a class="boton boton-pequeno" href="{{ url_for('web.ejecucion', ejecucion_id=e.id) }}">Detalle</a></td>
+        </tr>
+        {% endfor %}
+        {% if not ejecuciones %}
+        <tr><td colspan="13" class="apoyo">Sin ejecuciones registradas.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if detalle %}
+<div class="card">
+  <h2>Ejecucion {{ detalle.id }} &middot; {{ detalle.fecha_objetivo }}</h2>
+  <p class="apoyo">{{ detalle.detalle }}</p>
+  <h3>Resultado por boletin</h3>
+  <table class="datos">
+    <thead><tr><th>Boletin</th><th>Estado</th><th>Recuperadas</th><th>Intentos</th><th>ms</th><th>Detalle</th></tr></thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.codigo_boletin }}</td>
+        <td><span class="pildora {{ 'ok' if log.estado == 'correcto' else ('aviso' if log.estado == 'vacio' else 'error') }}">{{ log.estado }}</span></td>
+        <td>{{ log.recuperadas }}</td>
+        <td>{{ log.intentos }}</td>
+        <td>{{ log.duracion_ms }}</td>
+        <td class="apoyo">{{ log.detalle }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h3>Registro</h3>
+  <div class="registro-vivo">{{ detalle.registro }}</div>
+</div>
+{% endif %}
+
+{% endblock %}
