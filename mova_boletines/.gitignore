@@ -1,4 +1,6 @@
-DATOS/
+# Datos de ejecucion. OJO: no poner "DATOS/" a secas: en Windows git ignora
+# sin distinguir mayusculas y tambien excluiria el paquete de codigo datos/.
+_DATOS/
 .env
 *.key
 *.db

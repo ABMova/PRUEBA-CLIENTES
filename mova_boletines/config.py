@@ -42,10 +42,19 @@ load_dotenv(_env if _env.exists() else None)
 
 
 def _ruta_datos() -> Path:
+    """Carpeta de datos: DATOS junto al ejecutable, _DATOS al ejecutar el codigo.
+
+    Windows no distingue mayusculas en los nombres de carpeta, asi que en el
+    repositorio DATOS/ y el paquete datos/ serian la MISMA carpeta y los datos
+    acabarian mezclados con el codigo. Empaquetado no hay paquete datos/ al
+    lado del .exe, asi que ahi si se usa DATOS tal y como se especifico.
+    """
     personalizada = os.getenv("MOVA_DATOS", "").strip()
     if personalizada:
         return Path(personalizada).expanduser().resolve()
-    return raiz_ejecutable() / "DATOS"
+    if _empaquetado():
+        return raiz_ejecutable() / "DATOS"
+    return raiz_ejecutable() / "_DATOS"
 
 
 DATOS = _ruta_datos()
