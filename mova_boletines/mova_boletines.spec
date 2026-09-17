@@ -36,7 +36,15 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # La carpeta de datos jamas se empaqueta.
-    excludes=['DATOS', '_DATOS', 'tkinter', 'matplotlib', 'numpy', 'pytest'],
+    #
+    # setuptools y pkg_resources se excluyen a proposito: nada de la aplicacion
+    # los usa, pero si entran en el paquete PyInstaller activa su gancho de
+    # arranque pyi_rth_pkgres, que importa setuptools._vendor.jaraco.context y
+    # revienta con "No module named 'backports'" antes de ejecutar una sola
+    # linea nuestra. Si algun dia una dependencia los necesitase de verdad,
+    # quitarlos de aqui e instalar backports.tarfile.
+    excludes=['DATOS', '_DATOS', 'setuptools', 'pkg_resources',
+              'tkinter', 'matplotlib', 'numpy', 'pytest'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

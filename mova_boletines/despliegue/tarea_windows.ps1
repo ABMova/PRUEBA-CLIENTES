@@ -34,6 +34,7 @@ param(
     [ValidateSet("Diaria", "Laborables")]
     [string]$Dias = "Laborables",
     [int]$Puerto = 0,
+    [string]$Programa = "",
     [switch]$Quitar
 )
 
@@ -61,23 +62,38 @@ if ($Quitar) {
 }
 
 # ------------------------------------------------- que se ejecuta y con que --
-$exe = Join-Path $raiz "dist\MOVA Boletines Oficiales.exe"
+# Orden de busqueda: lo que diga -Programa, el .exe instalado al lado, el .exe
+# recien compilado en dist\, y por ultimo el codigo fuente con su entorno.
+$exeInstalado = Join-Path $raiz "MOVA Boletines Oficiales.exe"
+$exeCompilado = Join-Path $raiz "dist\MOVA Boletines Oficiales.exe"
 $pythonw = Join-Path $raiz ".venv\Scripts\pythonw.exe"
 $appPy = Join-Path $raiz "app.py"
 
 $argumentos = @("--sin-navegador")
 if ($Puerto -gt 0) { $argumentos += @("--puerto", "$Puerto") }
 
-if (Test-Path $exe) {
-    $programa = $exe
-    $modo = "ejecutable compilado"
+if ($Programa) {
+    if (-not (Test-Path $Programa)) {
+        Escribir "No existe el programa indicado: $Programa" "Red"
+        exit 1
+    }
+    $programa = (Resolve-Path $Programa).Path
+    $raiz = Split-Path -Parent $programa
+    $modo = "ejecutable indicado a mano"
+} elseif (Test-Path $exeInstalado) {
+    $programa = $exeInstalado
+    $modo = "ejecutable instalado"
+} elseif (Test-Path $exeCompilado) {
+    $programa = $exeCompilado
+    $raiz = Split-Path -Parent $exeCompilado
+    $modo = "ejecutable recien compilado (dist)"
 } elseif ((Test-Path $pythonw) -and (Test-Path $appPy)) {
     $programa = $pythonw
     $argumentos = @("`"$appPy`"") + $argumentos
     $modo = "codigo fuente con el entorno virtual"
 } else {
-    Escribir "No encuentro ni dist\MOVA Boletines Oficiales.exe ni .venv\Scripts\pythonw.exe" "Red"
-    Escribir "Compila primero con construir.bat, o crea el entorno virtual." "Red"
+    Escribir "No encuentro el ejecutable ni .venv\Scripts\pythonw.exe" "Red"
+    Escribir "Compila con construir.bat, o pasa la ruta con -Programa." "Red"
     exit 1
 }
 

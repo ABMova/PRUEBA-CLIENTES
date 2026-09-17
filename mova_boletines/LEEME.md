@@ -85,6 +85,7 @@ Opciones:
 instalar_tarea.bat -Hora 06:45          cambia la hora del disparo de respaldo
 instalar_tarea.bat -Dias Diaria         tambien fines de semana
 instalar_tarea.bat -Puerto 8880         si el 8770 esta ocupado
+instalar_tarea.bat -Programa "C:uta\MOVA Boletines Oficiales.exe"
 desinstalar_tarea.bat                   quita la tarea (no borra ningun dato)
 ```
 
@@ -95,9 +96,11 @@ Get-ScheduledTaskInfo -TaskName "MOVA Boletines Oficiales"
 Start-ScheduledTask   -TaskName "MOVA Boletines Oficiales"
 ```
 
-> Después de compilar con `construir.bat`, vuelve a ejecutar
-> `instalar_tarea.bat`: el script detecta el `.exe` y apunta la tarea a él en
-> lugar de al código fuente.
+El script busca qué arrancar en este orden: lo que le digas con `-Programa`, el
+`.exe` que esté a su lado, el `.exe` recién compilado en `dist\`, y por último el
+código fuente con su entorno virtual. Así que después de compilar e instalar,
+basta con volver a ejecutar `instalar_tarea.bat` desde la carpeta de instalación
+para que la tarea apunte al ejecutable.
 
 **Si el equipo está apagado a las 07:45**, la vigilancia se hace al encenderlo:
 la tarea arranca la herramienta al iniciar sesión y el planificador interno
