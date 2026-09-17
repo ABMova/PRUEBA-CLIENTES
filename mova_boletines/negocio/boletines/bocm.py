@@ -50,29 +50,42 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
     if sopa.find("sumario") is None:
         raise ErrorBoletin("El XML de sumario del BOCM no tiene la estructura esperada")
 
+    # Se recorren las disposiciones UNA vez y se sube por el arbol a buscar su
+    # organismo, apartado y seccion. Con bucles anidados (seccion > apartado >
+    # organismo > disposicion) y el find_all recursivo de BeautifulSoup, cada
+    # disposicion salia repetida decenas de veces: 61 reales se convertian en
+    # 1891. El identificador (BOCM-AAAAMMDD-N) evita cualquier repeticion.
     publicaciones: list[PublicacionCruda] = []
-    for seccion in sopa.find_all("seccion"):
-        nombre_seccion = seccion.get("nombre", "")
-        for apartado in seccion.find_all("apartado"):
-            nombre_apartado = apartado.get("nombre", "")
-            for organismo in apartado.find_all("organismo"):
-                nombre_organismo = organismo.get("nombre", "").strip()
-                for disposicion in organismo.find_all("disposicion"):
-                    titulo = _texto(disposicion, "titulo")
-                    if not titulo:
-                        continue
-                    publicaciones.append(PublicacionCruda(
-                        codigo_boletin=CODIGO,
-                        titulo=titulo,
-                        organismo=nombre_organismo,
-                        seccion=f"{nombre_seccion} / {nombre_apartado}".strip(" /"),
-                        url_oficial=_texto(disposicion, "url_html"),
-                        url_pdf=_texto(disposicion, "url_pdf"),
-                        fecha=iso(fecha),
-                        texto=_texto(disposicion, "texto") or titulo,
-                        identificador=_texto(disposicion, "identificador"),
-                        extra={"numero_bocm": numero, "rango": _texto(disposicion, "rango")},
-                    ))
+    vistos: set[str] = set()
+
+    for disposicion in sopa.find_all("disposicion"):
+        titulo = _texto(disposicion, "titulo")
+        if not titulo:
+            continue
+        identificador = _texto(disposicion, "identificador")
+        if identificador and identificador in vistos:
+            continue
+        if identificador:
+            vistos.add(identificador)
+
+        organismo = disposicion.find_parent("organismo")
+        apartado = disposicion.find_parent("apartado")
+        seccion = disposicion.find_parent("seccion")
+        nombre_seccion = seccion.get("nombre", "") if seccion else ""
+        nombre_apartado = apartado.get("nombre", "") if apartado else ""
+
+        publicaciones.append(PublicacionCruda(
+            codigo_boletin=CODIGO,
+            titulo=titulo,
+            organismo=organismo.get("nombre", "").strip() if organismo else "",
+            seccion=f"{nombre_seccion} / {nombre_apartado}".strip(" /"),
+            url_oficial=_texto(disposicion, "url_html"),
+            url_pdf=_texto(disposicion, "url_pdf"),
+            fecha=iso(fecha),
+            texto=_texto(disposicion, "texto") or titulo,
+            identificador=identificador,
+            extra={"numero_bocm": numero, "rango": _texto(disposicion, "rango")},
+        ))
     return publicaciones
 
 

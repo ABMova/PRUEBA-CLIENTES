@@ -1,0 +1,56 @@
+; Unidad systemd para el servidor interno Linux.
+;
+; ATENCION: UN SOLO PROCESO. La aplicacion guarda el progreso de la ejecucion
+; en memoria, asi que NO se puede arrancar con varios workers ni replicar el
+; servicio: dos procesos mostrarian estados distintos y podrian lanzar la
+; vigilancia dos veces el mismo dia. El paralelismo interno son hilos.
+;
+; Instalacion:
+;   sudo cp despliegue/mova-boletines.service /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now mova-boletines
+;   sudo journalctl -u mova-boletines -f
+
+[Unit]
+Description=MOVA Boletines Oficiales (vigilancia diaria de ayudas y subvenciones)
+Documentation=file:/opt/mova-boletines/LEEME.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mova
+Group=mova
+WorkingDirectory=/opt/mova-boletines
+
+Environment=MOVA_HOST=127.0.0.1
+Environment=MOVA_PUERTO=8770
+Environment=MOVA_ABRIR_NAVEGADOR=0
+Environment=MOVA_URL_PUBLICA=https://boletines.miempresa.local
+Environment=MOVA_DATOS=/var/lib/mova-boletines
+Environment=MOVA_LOG_NIVEL=INFO
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/mova-boletines/.venv/bin/python /opt/mova-boletines/app.py
+
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+
+; La carpeta de datos es lo unico que la aplicacion necesita escribir.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mova-boletines
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mova-boletines
+
+[Install]
+WantedBy=multi-user.target

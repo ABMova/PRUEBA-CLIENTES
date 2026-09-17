@@ -260,6 +260,14 @@ def _fase1(fecha: date, ejecucion_id: int, contadores: dict):
 
 
 def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
+    """Filtro determinista. Pasa lo que tenga al menos una palabra clave.
+
+    Un boletin como el BOCM publica su texto integro y terminos como "orden" o
+    "empleo" aparecen en casi todo: un dia corriente deja mas de mil candidatas.
+    Por eso hay un tope configurable (max_candidatas_ejecucion) que se aplica
+    despues de ordenar por fuerza de la coincidencia, para que el presupuesto
+    de modelo se gaste primero en lo que de verdad parece una convocatoria.
+    """
     progreso.fijar_fase(2, porcentaje=32)
     terminos = [fila["termino"] for fila in repositorio.palabras_clave(solo_activas=True)]
     candidatas: list[dict] = []
@@ -271,11 +279,24 @@ def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
         if coincidencia.hay:
             publicacion["terminos"] = ", ".join(coincidencia.terminos)
             publicacion["contextos"] = repositorio.json_seguro(coincidencia.contextos)
+            publicacion["_puntuacion"] = coincidencia.puntuacion
             candidatas.append(publicacion)
+
+    encontradas = len(candidatas)
+    tope = repositorio.ajuste_int("max_candidatas_ejecucion", 150)
+    if tope > 0 and encontradas > tope:
+        candidatas.sort(key=lambda p: p.get("_puntuacion", 0), reverse=True)
+        descartadas = encontradas - tope
+        candidatas = candidatas[:tope]
+        progreso.anotar(
+            f"AVISO: {encontradas} candidatas superan el tope de {tope}. Se analizan las "
+            f"{tope} con coincidencias mas fuertes y quedan {descartadas} sin analizar. "
+            f"Sube el tope en Ajustes o afina las palabras clave si quieres cubrirlas.")
 
     contadores["candidatas"] = len(candidatas)
     progreso.fijar_fase(2, porcentaje=38)
-    progreso.anotar(f"Fase 2 terminada: {len(candidatas)} candidatas de {len(crudas)}")
+    progreso.anotar(f"Fase 2 terminada: {len(candidatas)} candidatas de {len(crudas)} "
+                    f"({encontradas} con coincidencia)")
     return candidatas
 
 

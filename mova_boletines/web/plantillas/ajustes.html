@@ -105,6 +105,13 @@
         <input type="number" id="reintentos_boletin" name="reintentos_boletin" value="{{ ajustes.reintentos_boletin }}" min="1" max="10"></div>
       <div class="campo"><label for="copias_max">Copias que se conservan</label>
         <input type="number" id="copias_max" name="copias_max" value="{{ ajustes.copias_max }}" min="1" max="100"></div>
+      <div class="campo"><label for="max_candidatas_ejecucion">Tope de candidatas por ejecucion</label>
+        <input type="number" id="max_candidatas_ejecucion" name="max_candidatas_ejecucion"
+               value="{{ ajustes.max_candidatas_ejecucion }}" min="0" max="5000">
+        <span class="apoyo">Es el freno de coste: cuantas publicaciones se mandan al modelo cada dia.
+        0 = sin tope. Con las 25 palabras iniciales un dia corriente deja mas de mil
+        coincidencias (el BOCM publica su texto integro), de ahi el valor inicial de 150,
+        que se reparte por fuerza de la coincidencia.</span></div>
     </div>
     <div class="campo">
       <label for="terminos_refuerzo">Terminos de refuerzo de alta relevancia (separados por comas)</label>

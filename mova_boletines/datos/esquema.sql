@@ -261,6 +261,7 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('dias_token_descarte',   '90',      'Caducidad de los enlaces de descarte del correo'),
  ('reintentos_boletin',    '3',       'Reintentos por boletin ante fallo de red'),
  ('copias_max',            '10',      'Numero de copias de seguridad que se conservan'),
+ ('max_candidatas_ejecucion', '150',   'Tope de publicaciones que se mandan al modelo por ejecucion (0 = sin tope)'),
  ('smtp_servidor',         '',        'Servidor SMTP'),
  ('smtp_puerto',           '587',     'Puerto SMTP'),
  ('smtp_seguridad',        'starttls','starttls | ssl | ninguna'),
