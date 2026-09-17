@@ -1,0 +1,12 @@
+DATOS/
+.env
+*.key
+*.db
+*.db-wal
+*.db-shm
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
