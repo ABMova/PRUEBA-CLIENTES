@@ -5,9 +5,13 @@ en memoria, asi que con varios workers la interfaz veria estados distintos.
 """
 from __future__ import annotations
 
+import argparse
+import importlib
 import logging
 import logging.handlers
+import os
 import secrets
+import socket
 import sys
 import threading
 import webbrowser
@@ -158,8 +162,67 @@ def abrir_navegador(url: str) -> None:
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
 
 
-def main() -> None:
+# --------------------------------------------------------- instancia unica --
+def ya_hay_instancia(host: str, puerto: int) -> tuple[bool, str]:
+    """Comprueba si la herramienta ya esta corriendo en ese puerto.
+
+    Es imprescindible con la tarea programada de Windows: la tarea se dispara
+    al iniciar sesion y otra vez antes de la vigilancia, asi que puede intentar
+    arrancar una segunda copia. Dos procesos sobre la misma base de datos se
+    pisarian: el segundo marcaria como 'interrumpida' la ejecucion que el
+    primero esta haciendo y ambos programarian la vigilancia del dia.
+    """
+    import urllib.error
+    import urllib.request
+
+    destino = "127.0.0.1" if host == "0.0.0.0" else host
+    try:
+        with socket.create_connection((destino, puerto), timeout=2):
+            pass
+    except OSError:
+        return False, ""  # puerto libre: no hay nadie
+
+    try:
+        with urllib.request.urlopen(f"http://{destino}:{puerto}/salud", timeout=3) as respuesta:
+            if respuesta.read(16).strip() == b"ok":
+                return True, f"MOVA Boletines Oficiales ya esta en marcha en http://{destino}:{puerto}"
+    except (urllib.error.URLError, OSError):
+        pass
+    return True, (f"El puerto {puerto} esta ocupado por otro programa. Cambia MOVA_PUERTO "
+                  f"o para el programa que lo ocupa.")
+
+
+def leer_argumentos(argumentos: list[str] | None = None):
+    analizador = argparse.ArgumentParser(
+        prog="MOVA Boletines Oficiales",
+        description="Vigilancia diaria de ayudas y subvenciones en boletines autonomicos.")
+    analizador.add_argument("--sin-navegador", action="store_true",
+                            help="no abre el navegador al arrancar (tarea programada y servidor)")
+    analizador.add_argument("--puerto", type=int, default=None,
+                            help=f"puerto del servidor web (por defecto {config.PUERTO})")
+    analizador.add_argument("--datos", default=None,
+                            help="carpeta de datos alternativa (equivale a MOVA_DATOS)")
+    return analizador.parse_args(argumentos)
+
+
+def main(argumentos: list[str] | None = None) -> int:
     from waitress import serve
+
+    opciones = leer_argumentos(argumentos)
+    if opciones.datos:
+        os.environ["MOVA_DATOS"] = opciones.datos
+        importlib.reload(config)
+    if opciones.puerto:
+        config.PUERTO = opciones.puerto
+    if opciones.sin_navegador:
+        config.ABRIR_NAVEGADOR = False
+
+    ocupado, motivo = ya_hay_instancia(config.HOST, config.PUERTO)
+    if ocupado:
+        # Salida 0 a proposito: para la tarea programada esto NO es un fallo,
+        # significa que la herramienta ya estaba levantada.
+        print(motivo)
+        return 0
 
     aplicacion = crear_aplicacion()
     url = f"http://{'127.0.0.1' if config.HOST == '0.0.0.0' else config.HOST}:{config.PUERTO}"
@@ -171,7 +234,8 @@ def main() -> None:
     # threads=8: suficiente para la interfaz mientras el pipeline usa su hilo.
     serve(aplicacion, host=config.HOST, port=config.PUERTO, threads=8,
           channel_timeout=600, ident="MOVA Boletines")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

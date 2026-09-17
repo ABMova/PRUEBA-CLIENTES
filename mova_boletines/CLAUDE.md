@@ -33,6 +33,27 @@ solo proceso con hilos.
 Las cuatro primeras no salen a internet ni gastan API. Cada una devuelve 0 si
 pasa y 1 si falla, así que sirven tal cual en un gancho de integración.
 
+## Tarea programada de Windows
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File despliegue/tarea_windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File despliegue/tarea_windows.ps1 -Quitar
+```
+
+O doble clic en `instalar_tarea.bat` / `desinstalar_tarea.bat`. La tarea solo
+mantiene la herramienta encendida; la vigilancia la dispara el planificador
+interno a la hora de Ajustes. El script detecta si hay `.exe` compilado y, si
+no, usa `.venv\Scripts\pythonw.exe app.py`.
+
+Arrancar como lo hace la tarea (sin ventana ni navegador):
+
+```bash
+.venv/Scripts/pythonw.exe app.py --sin-navegador
+```
+
+Un segundo arranque sobre el mismo puerto no hace nada y sale con codigo 0: lo
+comprueba `ya_hay_instancia()` pidiendo `/salud` antes de tocar la base de datos.
+
 ## Empaquetar
 
 ```bash

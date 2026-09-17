@@ -61,6 +61,8 @@ echo  Para instalarlo: copia ese .exe a su carpeta definitiva y
 echo  haz doble clic. Creara DATOS\ a su lado con la base de
 echo  datos, la clave de cifrado, los registros y las copias.
 echo.
+echo  Para que se encienda sola: instalar_tarea.bat
+echo.
 echo  Para actualizar: sustituye SOLO el .exe. No toques DATOS\.
 echo ============================================================
 echo.

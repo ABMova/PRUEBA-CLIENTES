@@ -28,8 +28,9 @@ enviado y sin mostrar lo descartado.
    (servidor, puerto, usuario, contraseña y remitente). Ambas cosas se guardan
    cifradas. Usa los botones *Probar la clave* y *Enviar correo de prueba*.
 3. **Lanza una ejecución manual** desde *Ejecuciones* con la fecha de ayer y
-   revisa el correo que genera. Si te convence, ya está: a las 07:45 del
-   siguiente día laborable se dispara sola.
+   revisa el correo que genera. Si te convence, doble clic en
+   `instalar_tarea.bat` para que la herramienta se encienda sola, y a las 07:45
+   del siguiente día laborable la vigilancia se dispara sin que hagas nada.
 
 Mientras no haya clave de API, la herramienta sigue funcionando: recoge las
 publicaciones y las guarda marcadas como `[REVISIÓN MANUAL]`, pero no las
@@ -53,6 +54,57 @@ de cifrado, los registros y las copias de seguridad.
 > **Compila desde una ruta corta y fuera de OneDrive** (por ejemplo
 > `C:\build\mova_boletines`). PyInstaller falla con rutas largas y OneDrive
 > puede bloquear ficheros a medio escribir.
+
+### Windows: que se encienda sola (tarea programada)
+
+La vigilancia la dispara el planificador interno de la herramienta, así que
+para que salte a las 07:45 la herramienta tiene que estar encendida. De eso se
+ocupa una tarea programada de Windows:
+
+```
+instalar_tarea.bat
+```
+
+No necesita permisos de administrador: la tarea es del usuario actual. Registra
+dos disparos:
+
+- **Al iniciar sesión**: arranca la herramienta minimizada y sin abrir el
+  navegador.
+- **Cada día laborable a las 07:30**: la vuelve a levantar por si el equipo se
+  encendió tarde o la herramienta se cerró. Son quince minutos de margen antes
+  de la vigilancia.
+
+Si la herramienta ya está en marcha, el segundo arranque se detecta solo y no
+hace nada: antes de tocar nada comprueba si su puerto ya responde. Esto importa,
+porque dos procesos sobre la misma base de datos se pisarían (el segundo
+marcaría como «interrumpida» la ejecución que el primero está haciendo).
+
+Opciones:
+
+```
+instalar_tarea.bat -Hora 06:45          cambia la hora del disparo de respaldo
+instalar_tarea.bat -Dias Diaria         tambien fines de semana
+instalar_tarea.bat -Puerto 8880         si el 8770 esta ocupado
+desinstalar_tarea.bat                   quita la tarea (no borra ningun dato)
+```
+
+Comprobar o forzar desde PowerShell:
+
+```powershell
+Get-ScheduledTaskInfo -TaskName "MOVA Boletines Oficiales"
+Start-ScheduledTask   -TaskName "MOVA Boletines Oficiales"
+```
+
+> Después de compilar con `construir.bat`, vuelve a ejecutar
+> `instalar_tarea.bat`: el script detecta el `.exe` y apunta la tarea a él en
+> lugar de al código fuente.
+
+**Si el equipo está apagado a las 07:45**, la vigilancia se hace al encenderlo:
+la tarea arranca la herramienta al iniciar sesión y el planificador interno
+recupera el disparo perdido si han pasado menos de 60 minutos. Más allá de esa
+hora, ese día se salta y hay que lanzarla a mano desde *Ejecuciones* con la
+fecha correspondiente. Si necesitas que corra siempre, sin depender de que
+alguien encienda el equipo, el sitio es el servidor Linux.
 
 ### Linux (servicio interno)
 
@@ -87,6 +139,8 @@ config.py               configuración y rutas (compatible con PyInstaller)
 requirements.txt        dependencias con versión fijada
 .env.ejemplo            variables de entorno comentadas
 construir.bat           compila el .exe de Windows
+instalar_tarea.bat      registra la tarea programada de Windows
+desinstalar_tarea.bat   quita la tarea programada
 mova_boletines.spec     receta de PyInstaller (incluye recursos, excluye datos)
 
 web/rutas.py            rutas: validan entrada, comprueban permisos, eligen plantilla
@@ -106,7 +160,7 @@ integraciones/anthropic_cliente.py  única puerta a la API de Anthropic
 datos/repositorio.py    ÚNICO módulo que habla con la base de datos
 datos/esquema.sql       esquema completo e idempotente, con semillas
 datos/copias.py         copias automáticas, manuales y restauración
-despliegue/             unidad systemd y ejemplo de Nginx
+despliegue/             tarea de Windows, unidad systemd y ejemplo de Nginx
 pruebas/                comprobaciones ejecutables
 
 DATOS/                  (en ejecución, junto al .exe) mova.db, clave.key,
@@ -275,6 +329,10 @@ diez veces más) y el registro dice cuántas quedaron fuera.
 - **Coste.** Con 107 candidatas al día y Sonnet en la fase 3, el gasto ronda
   1–2 $ diarios. Cambiar el modelo de extracción a Haiku en *Ajustes* lo
   reduce mucho a cambio de resúmenes más pobres.
+- **Equipo apagado.** En Windows la vigilancia depende de que alguien encienda
+  el equipo e inicie sesión. La tarea programada y el margen de 60 minutos del
+  planificador cubren los retrasos normales, pero un día de vacaciones con el
+  equipo apagado no se vigila. El servidor Linux no tiene este problema.
 
 ---
 
