@@ -361,6 +361,87 @@ def regenerar_documento(publicacion_id: int):
     return redirect(url_for("web.documento", publicacion_id=publicacion_id, tipo="corto"))
 
 
+# --------------------- botones del correo: acceso con clave, sin iniciar sesion --
+# Quien recibe el correo puede generar y ver los tres documentos de ESA
+# publicacion. La clave no da acceso a nada mas de la herramienta, no permite
+# regenerar (la IA se paga una vez por publicacion) y caduca a los 90 dias.
+INTENTOS_MAX_DOCUMENTO = 200  # por IP y ventana: la pagina de espera se refresca sola
+
+
+def _publicacion_por_clave(token: str, tipo: str):
+    """Devuelve (fila, None) si la clave vale, o (None, respuesta de error)."""
+    ip = auth.ip_peticion()
+    repositorio.registrar_intento_ip(ip, "documento")
+    if repositorio.intentos_recientes(ip, VENTANA_INTENTOS, "documento") > INTENTOS_MAX_DOCUMENTO:
+        return None, (render_template("descarte_ok.html", titulo_pagina="Documentos",
+                                      titulo_resultado="Demasiadas peticiones", clase="error",
+                                      mensaje="Espera unos minutos y vuelve a intentarlo.",
+                                      publicacion=""), 429)
+    clave = repositorio.token_documento(token)
+    valida = (clave is not None and tipo in documentos.TIPOS
+              and clave["caduca_en"] > datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
+    fila = repositorio.publicacion(clave["publicacion_id"]) if valida else None
+    if fila is None:
+        repositorio.registrar_auditoria("anonimo", "documento_clave", token[:12],
+                                        "Clave inexistente o caducada", ip, "error")
+        return None, (render_template("descarte_ok.html", titulo_pagina="Documentos",
+                                      titulo_resultado="Enlace no valido", clase="error",
+                                      mensaje="Este enlace no es valido o ha caducado. Pide a "
+                                              "alguien de MOVA que te reenvie la publicacion.",
+                                      publicacion=""), 404)
+    repositorio.usar_token_documento(token, ip)
+    return fila, None
+
+
+@web.route("/d/<token>/<tipo>")
+def documento_por_clave(token: str, tipo: str):
+    fila, error = _publicacion_por_clave(token, tipo)
+    if error:
+        return error
+
+    doc = repositorio.documento(fila["id"])
+    if doc is not None and doc["estado"] == "listo":
+        barra = {
+            "volver": "",
+            "url_tipo": {t: url_for("web.documento_por_clave", token=token, tipo=t)
+                         for t in documentos.TIPOS},
+            "descargar": url_for("web.descargar_por_clave", token=token, tipo=tipo),
+            "regenerar": "",
+            "nota": f"{doc['paginas']} pag. analizadas",
+        }
+        return documentos.renderizar(tipo, json.loads(doc["datos_json"] or "{}"), dict(fila), barra)
+
+    def estado(nombre: str, mensaje: str = ""):
+        return render_template(
+            "documento_estado.html", titulo_pagina=documentos.TIPOS[tipo][0],
+            rotulo=documentos.TIPOS[tipo][0], publicacion=fila, estado=nombre, mensaje=mensaje,
+            refrescar=(nombre == "generando"), puede_generar=True,
+            url_reintentar=url_for("web.documento_por_clave", token=token, tipo=tipo,
+                                   reintentar=1))
+
+    if documentos.generando(fila["id"]):
+        return estado("generando")
+    if doc is not None and doc["estado"] == "error" and not request.args.get("reintentar"):
+        return estado("error", doc["error"])
+
+    aceptada, mensaje = documentos.lanzar(fila["id"], f"correo ({auth.ip_peticion()})")
+    return estado("generando") if aceptada else estado("error", mensaje)
+
+
+@web.route("/d/<token>/<tipo>/descargar")
+def descargar_por_clave(token: str, tipo: str):
+    fila, error = _publicacion_por_clave(token, tipo)
+    if error:
+        return error
+    doc = repositorio.documento(fila["id"])
+    if doc is None or doc["estado"] != "listo":
+        return redirect(url_for("web.documento_por_clave", token=token, tipo=tipo))
+    html = documentos.renderizar(tipo, json.loads(doc["datos_json"] or "{}"), dict(fila))
+    nombre = documentos.nombre_fichero(tipo, dict(fila))
+    return Response(html, mimetype="text/html",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
 @web.route("/publicaciones/<int:publicacion_id>/descartar")
 @auth.requiere("descartar")
 def descartar_manual(publicacion_id: int):

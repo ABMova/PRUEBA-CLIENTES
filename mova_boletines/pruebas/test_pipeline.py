@@ -567,9 +567,11 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     html_dia = diario[0]["html"] if diario else ""
     for campo in (">Resumen<", ">Plazo<", ">Beneficiarios<", ">Importe<"):
         comprobar(campo not in html_dia, f"sin el campo {campo.strip('><')}")
-    comprobar(html_dia.count("/documento/corto") >= 1 and html_dia.count("/documento/ampliado") >= 1
-              and html_dia.count("/documento/infografia") >= 1,
-              "cada ficha lleva los botones Resumen corto, Resumen ampliado e Infografia")
+    import re as _re
+    comprobar(all(_re.search(rf"/d/[A-Za-z0-9_-]{{20,}}/{tipo}\"", html_dia)
+                  for tipo in ("corto", "ampliado", "infografia")),
+              "cada ficha lleva los botones Resumen corto, Resumen ampliado e Infografia "
+              "con enlace de clave (no piden iniciar sesion)")
 
     print("\n18) Resumen corto, ampliado e infografia")
     from negocio import documentos
@@ -688,6 +690,39 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "la tabla de publicaciones muestra los botones y que ya estan generados")
     comprobar(">Plazo<" not in tabla and ">Beneficiarios<" not in tabla and ">Importe<" not in tabla,
               "y ya no tiene las columnas de plazo, beneficiarios e importe")
+    print("\n20) Quien recibe el correo genera los documentos sin iniciar sesion")
+    anonimo = web.test_client()
+    otra = next(p for p in repositorio.publicaciones({}, limite=100) if "DANA" in p["titulo"])
+    clave = repositorio.token_documento_para(otra["id"], 90)
+    comprobar(repositorio.token_documento_para(otra["id"], 90) == clave,
+              "la misma publicacion reutiliza su enlace (diario, alerta y semanal coinciden)")
+    PETICIONES_DOC.clear()
+    primera = anonimo.get(f"/d/{clave}/ampliado").get_data(as_text=True)
+    comprobar("Analizando la publicacion" in primera,
+              "sin sesion, el boton del correo lanza el analisis")
+    for _ in range(50):
+        if not documentos.generando(otra["id"]):
+            break
+        _time.sleep(0.1)
+    listo = anonimo.get(f"/d/{clave}/ampliado").get_data(as_text=True)
+    comprobar("Criterios de valoración:" in listo and "barra-mova" in listo,
+              "y luego muestra el documento")
+    comprobar("Regenerar" not in listo and "&larr; Publicaciones" not in listo,
+              "sin boton de regenerar ni acceso a la aplicacion")
+    anonimo.get(f"/d/{clave}/corto")
+    anonimo.get(f"/d/{clave}/infografia")
+    comprobar(len(PETICIONES_DOC) == 1, "los tres documentos cuestan una sola llamada")
+    descarga = anonimo.get(f"/d/{clave}/corto/descargar")
+    comprobar("attachment" in descarga.headers.get("Content-Disposition", ""),
+              "puede descargarlos")
+    comprobar(anonimo.get("/publicaciones").status_code == 302,
+              "la clave no abre el resto de la herramienta")
+    falsa = anonimo.get("/d/claveInventadaQueNoExiste1234567/corto")
+    comprobar(falsa.status_code == 404 and "no es valido" in falsa.get_data(as_text=True),
+              "un enlace inventado no abre nada")
+    comprobar(repositorio.token_documento(clave)["usos"] >= 4,
+              "cada uso queda registrado")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)

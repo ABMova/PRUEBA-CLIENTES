@@ -803,3 +803,35 @@ def documentos_generando_huerfanos() -> int:
         "UPDATE documentos_publicacion SET estado='error', "
         "error='La generacion se interrumpio al reiniciar la aplicacion. Vuelve a pulsar el boton.', "
         "actualizado_en=datetime('now') WHERE estado='generando'")
+
+
+# ------------------------------------------ enlaces de documentos del correo --
+def token_documento_para(publicacion_id: int, dias: int) -> str | None:
+    """Enlace reutilizable de los documentos de una publicacion.
+
+    Si ya tiene uno vigente con al menos una semana de margen se reutiliza (asi
+    el correo diario, la alerta y el resumen semanal comparten enlace). Devuelve
+    None si la publicacion no existe.
+    """
+    if publicacion(publicacion_id) is None:
+        return None
+    fila = _uno(
+        "SELECT token FROM tokens_documento WHERE publicacion_id=? "
+        "AND caduca_en > datetime('now', '+7 day') ORDER BY caduca_en DESC LIMIT 1",
+        (publicacion_id,))
+    if fila:
+        return fila["token"]
+    token = secrets.token_urlsafe(24)[:32]
+    caduca = (datetime.utcnow() + timedelta(days=dias)).strftime("%Y-%m-%d %H:%M:%S")
+    _escribir("INSERT INTO tokens_documento (token, publicacion_id, caduca_en) VALUES (?,?,?)",
+              (token, publicacion_id, caduca))
+    return token
+
+
+def token_documento(token: str) -> sqlite3.Row | None:
+    return _uno("SELECT * FROM tokens_documento WHERE token=?", (token,))
+
+
+def usar_token_documento(token: str, ip: str) -> None:
+    _escribir("UPDATE tokens_documento SET usos=usos+1, ultimo_uso=datetime('now'), ultima_ip=?, "
+              "actualizado_en=datetime('now') WHERE token=?", (ip, token))

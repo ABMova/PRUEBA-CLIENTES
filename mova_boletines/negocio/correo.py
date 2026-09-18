@@ -70,12 +70,21 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
     fila["dias_restantes"] = restantes
     fila["plazo_fin_texto"] = fecha_corta(fila.get("plazo_fin"))
     fila["plazo_estimado"] = fila.get("plazo_fin_origen") in ("calculado", "modelo")
-    # Botones Resumen corto / Resumen ampliado / Infografia: abren la aplicacion,
-    # que genera el documento la primera vez y despues lo sirve guardado.
+    # Botones Resumen corto / Resumen ampliado / Infografia. Llevan un enlace
+    # con clave propia de la publicacion (/d/<token>/...): quien recibe el correo
+    # puede generarlos y verlos sin tener usuario en la herramienta.
     identificador = fila.get("id")
-    fila["url_documentos"] = ({tipo: f"{url_publica()}/publicaciones/{identificador}/documento/{tipo}"
-                               for tipo in ("corto", "ampliado", "infografia")}
-                              if identificador else None)
+    token = (repositorio.token_documento_para(
+        identificador, repositorio.ajuste_int("dias_token_documento", 90))
+        if identificador else None)
+    if token:
+        fila["url_documentos"] = {tipo: f"{url_publica()}/d/{token}/{tipo}"
+                                  for tipo in ("corto", "ampliado", "infografia")}
+    elif identificador:
+        fila["url_documentos"] = {tipo: f"{url_publica()}/publicaciones/{identificador}/documento/{tipo}"
+                                  for tipo in ("corto", "ampliado", "infografia")}
+    else:
+        fila["url_documentos"] = None
     return fila
 
 

@@ -157,6 +157,22 @@ CREATE TABLE IF NOT EXISTS documentos_publicacion (
     actualizado_en  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Enlaces de los botones del correo (resumen corto, ampliado e infografia).
+-- Uno por publicacion, reutilizable y con caducidad: da acceso SOLO a los tres
+-- documentos de esa publicacion, sin iniciar sesion, para que los destinatarios
+-- del correo puedan generarlos aunque no tengan usuario en la herramienta.
+CREATE TABLE IF NOT EXISTS tokens_documento (
+    token          TEXT PRIMARY KEY,
+    publicacion_id INTEGER NOT NULL REFERENCES publicaciones(id) ON DELETE CASCADE,
+    usos           INTEGER NOT NULL DEFAULT 0,
+    ultimo_uso     TEXT,
+    ultima_ip      TEXT NOT NULL DEFAULT '',
+    caduca_en      TEXT NOT NULL,
+    creado_en      TEXT NOT NULL DEFAULT (datetime('now')),
+    actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_tokens_doc_pub ON tokens_documento(publicacion_id, caduca_en);
+
 -- Cada llamada al modelo, con sus tokens y su coste. Alimenta el panel de
 -- coste y el tope de gasto mensual.
 CREATE TABLE IF NOT EXISTS consumo_modelo (
@@ -324,7 +340,8 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('tope_mensual_usd',      '30',      'Tope de gasto mensual en la API en dolares (0 = sin tope)'),
  ('cambio_usd_eur',        '0.86',    'Tipo de cambio para mostrar el gasto en euros (editable)'),
  ('modelo_documentos',     'claude-sonnet-5', 'Modelo para resumen corto, ampliado e infografia'),
- ('max_tokens_documentos', '16000',   'Limite de tokens de la extraccion para los documentos');
+ ('max_tokens_documentos', '16000',   'Limite de tokens de la extraccion para los documentos'),
+ ('dias_token_documento',  '90',      'Caducidad de los botones de documentos del correo (dias)');
 
 INSERT OR IGNORE INTO ajustes (clave, valor, cifrado, descripcion) VALUES
  ('anthropic_api_key', '', 1, 'Clave de API de Anthropic (cifrada con Fernet)'),

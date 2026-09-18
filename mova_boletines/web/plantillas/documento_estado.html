@@ -24,7 +24,7 @@
   {% endif %}
 
   <p style="margin-top:14px;">
-    <a class="boton" href="{{ url_for('web.publicaciones') }}">&larr; Publicaciones</a>
+    {% if usuario %}<a class="boton" href="{{ url_for('web.publicaciones') }}">&larr; Publicaciones</a>{% endif %}
     {% if publicacion.url_pdf %}<a class="boton" href="{{ publicacion.url_pdf }}" target="_blank" rel="noopener">PDF oficial</a>{% endif %}
   </p>
 </div>

@@ -13,7 +13,7 @@
 @media print{.barra-mova{display:none}}
 </style>
 <div class="barra-mova">
-  <a href="{{ barra.volver }}">&larr; Publicaciones</a>
+  {% if barra.volver %}<a href="{{ barra.volver }}">&larr; Publicaciones</a>{% endif %}
   {% for clave, (rotulo, detalle) in tipos.items() %}
   <a href="{{ barra.url_tipo[clave] }}" class="{{ 'on' if clave == tipo else '' }}">{{ rotulo }}</a>
   {% endfor %}
