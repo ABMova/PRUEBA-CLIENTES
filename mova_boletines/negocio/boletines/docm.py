@@ -17,7 +17,7 @@ from datetime import date
 
 from bs4 import BeautifulSoup
 
-from negocio.boletines.base import PublicacionCruda, iso, pedir
+from negocio.boletines.base import PublicacionCruda, iso, iso_desde, pedir
 
 CODIGO = "DOCM"
 NOMBRE = "Diario Oficial de Castilla-La Mancha"
@@ -60,7 +60,7 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
                 seccion=seccion,
                 url_oficial=_url_html(nodo) or url,
                 url_pdf=url_pdf,
-                fecha=iso(fecha),
+                fecha=_fecha_de_ruta(url_pdf, fecha),
                 texto=titulo,
                 identificador=_identificador(url_pdf),
             ))
@@ -82,6 +82,12 @@ def _url_html(nodo) -> str:
         if encontrado:
             return f"{_BASE}verArchivoHtml.do?ruta={encontrado.group(1)}&tipo=rutaDocm"
     return ""
+
+
+def _fecha_de_ruta(url_pdf: str, respaldo: date) -> str:
+    """La ruta del PDF lleva la fecha: ruta=AAAA/MM/DD/pdf/..."""
+    encontrado = re.search(r"ruta=(\d{4}/\d{2}/\d{2})/", url_pdf)
+    return iso_desde(encontrado.group(1) if encontrado else "", "%Y/%m/%d", respaldo)
 
 
 def _identificador(url_pdf: str) -> str:

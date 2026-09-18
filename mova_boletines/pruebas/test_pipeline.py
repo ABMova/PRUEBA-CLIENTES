@@ -533,6 +533,36 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "y aun asi con titulo resumido (respaldo sin IA)")
     repositorio.guardar_ajuste("tope_mensual_usd", "30")
 
+    print("\n16) Solo entra lo publicado el dia vigilado")
+    del_dia_anterior = PublicacionCruda(
+        codigo_boletin="DOGV",
+        titulo="ORDEN 30/2026 por la que se convocan ayudas a pymes publicada el dia anterior",
+        organismo="Conselleria de Economia", seccion="I. DISPOSICIONES GENERALES",
+        url_oficial="https://dogv.gva.es/es/disposicio-canonica?sig=999040", url_pdf="",
+        fecha=(FECHA - timedelta(days=1)).isoformat(),
+        texto="Ayudas a pymes.", identificador="999040")
+    del_dia = PublicacionCruda(
+        codigo_boletin="DOGV",
+        titulo="ORDEN 31/2026 por la que se convocan ayudas a la innovacion de pymes del dia",
+        organismo="Conselleria de Economia", seccion="I. DISPOSICIONES GENERALES",
+        url_oficial="https://dogv.gva.es/es/disposicio-canonica?sig=999041", url_pdf="",
+        fecha=FECHA.isoformat(), texto="Ayudas a la innovacion de pymes.", identificador="999041")
+    _guion["publicaciones"] = [del_dia_anterior, del_dia]
+    ENVIADOS.clear()
+    orquestador.lanzar(FECHA, "manual", "prueba", enviar_correo=True)
+    _esperar_fin()
+    diario = [e for e in ENVIADOS if not e["urgente"]]
+    comprobar(bool(diario) and "innovacion de pymes del dia" in diario[0]["html"],
+              "la publicacion del dia llega al correo")
+    comprobar(bool(diario) and "publicada el dia anterior" not in diario[0]["html"],
+              "la de un dia anterior NO llega al correo")
+    comprobar(not any("publicada el dia anterior" in p["titulo"]
+                      for p in repositorio.publicaciones({}, limite=100)),
+              "ni se guarda en el historico como si fuera de hoy")
+    registro_ejecucion = repositorio.ejecuciones(1)[0]["registro"]
+    comprobar("de otra fecha" in registro_ejecucion and "descartadas" in registro_ejecucion,
+              "y el descarte queda anotado en el registro de la ejecucion")
+
     print(f"\n{'TODAS LAS COMPROBACIONES PASAN' if not fallos else 'FALLOS: ' + str(fallos)}")
     print(f"Llamadas simuladas al modelo: {LLAMADAS['n']}")
     return 1 if fallos else 0

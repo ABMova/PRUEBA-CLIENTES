@@ -50,16 +50,22 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
     respuesta = pedir(_FEED)
     feed = BeautifulSoup(respuesta.content, "lxml-xml")
 
-    entrada_dia = None
+    # Un mismo dia puede tener el boletin ordinario y varios extraordinarios
+    # (el 16/09/2026 hubo tres). Cada uno es una <entry>: se recorren todas.
+    entradas_dia = []
     for entrada in feed.find_all("entry"):
         titulo = entrada.find("title").get_text(strip=True) if entrada.find("title") else ""
         if _fecha_de_titulo(titulo) == fecha:
-            entrada_dia = entrada
-            break
-    if entrada_dia is None:
-        return []
+            entradas_dia.append(entrada)
 
-    contenido = entrada_dia.find("content")
+    publicaciones: list[PublicacionCruda] = []
+    for entrada in entradas_dia:
+        publicaciones.extend(_publicaciones_de(entrada, fecha))
+    return publicaciones
+
+
+def _publicaciones_de(entrada, fecha: date) -> list[PublicacionCruda]:
+    contenido = entrada.find("content")
     if contenido is None:
         return []
 

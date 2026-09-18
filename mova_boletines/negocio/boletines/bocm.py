@@ -17,7 +17,7 @@ from datetime import date
 
 from bs4 import BeautifulSoup
 
-from negocio.boletines.base import ErrorBoletin, PublicacionCruda, iso, pedir
+from negocio.boletines.base import ErrorBoletin, PublicacionCruda, iso, iso_desde, pedir
 
 CODIGO = "BOCM"
 NOMBRE = "Boletin Oficial de la Comunidad de Madrid"
@@ -81,7 +81,8 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
             seccion=f"{nombre_seccion} / {nombre_apartado}".strip(" /"),
             url_oficial=_texto(disposicion, "url_html"),
             url_pdf=_texto(disposicion, "url_pdf"),
-            fecha=iso(fecha),
+            # El identificador lleva la fecha: BOCM-AAAAMMDD-N.
+            fecha=iso_desde(identificador[5:13], "%Y%m%d", fecha),
             texto=_texto(disposicion, "texto") or titulo,
             identificador=identificador,
             extra={"numero_bocm": numero, "rango": _texto(disposicion, "rango")},

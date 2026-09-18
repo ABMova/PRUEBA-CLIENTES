@@ -17,7 +17,7 @@ from datetime import date
 
 from bs4 import BeautifulSoup
 
-from negocio.boletines.base import PublicacionCruda, iso, pedir
+from negocio.boletines.base import PublicacionCruda, iso, iso_desde, pedir
 
 CODIGO = "BOCYL"
 NOMBRE = "Boletin Oficial de Castilla y Leon"
@@ -75,6 +75,10 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
                 if not destino.startswith("http"):
                     destino = f"{_BASE}/{destino.lstrip('/')}"
                 publicaciones[-1].url_pdf = destino
+                fecha_pdf = re.search(r"BOCYL-D-(\d{8})-", destino)
+                if fecha_pdf:
+                    # La fecha del PDF manda: si fuera de otro dia, el orquestador la descarta.
+                    publicaciones[-1].fecha = iso_desde(fecha_pdf.group(1), "%d%m%Y", fecha)
                 identificador = re.search(rf"(BOCYL-D-{marca_dia}-[\d-]+)", destino)
                 if identificador:
                     publicaciones[-1].identificador = identificador.group(1)

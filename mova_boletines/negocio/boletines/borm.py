@@ -20,7 +20,7 @@ from datetime import date
 from bs4 import BeautifulSoup
 
 from negocio.boletines.base import (ErrorBoletin, PublicacionCruda, detectar_anti_bot, iso,
-                                    pedir)
+                                    iso_desde, pedir)
 
 CODIGO = "BORM"
 NOMBRE = "Boletin Oficial de la Region de Murcia"
@@ -33,7 +33,10 @@ _BASE = "https://www.borm.es"
 
 def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
     url = f"{_BASE}/services/boletin/fecha/{fecha:%d-%m-%Y}/sumario"
-    respuesta = pedir(url, navegador=True, cabeceras={"Referer": f"{_BASE}/"})
+    respuesta = pedir(url, navegador=True, cabeceras={"Referer": f"{_BASE}/"},
+                      permitir_404=True)
+    if respuesta.status_code == 404:
+        return []  # ese dia no hay BORM (fines de semana y festivos)
     texto = respuesta.text
     if detectar_anti_bot(texto):
         raise ErrorBoletin(
@@ -62,7 +65,7 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
             seccion=seccion,
             url_oficial=f"{_BASE}/#/home/anuncio/{fecha:%d-%m-%Y}/{identificador}",
             url_pdf=f"{_BASE}/services/anuncio/pdf/{ano}/{numero}" if ano and numero else "",
-            fecha=iso(fecha),
+            fecha=iso_desde(_texto(anuncio, "fechaPublicacion"), "%d-%m-%Y", fecha),
             texto=titulo,
             identificador=identificador,
         ))

@@ -87,8 +87,13 @@ def _sesion(tls_legado: bool) -> requests.Session | requests:
 def pedir(url: str, *, metodo: str = "GET", datos: dict | None = None,
           cabeceras: dict | None = None, navegador: bool = False,
           reintentos: int | None = None, permitir_redirecciones: bool = True,
-          tls_legado: bool = False) -> requests.Response:
-    """Descarga con reintentos y retroceso exponencial (1s, 2s, 4s)."""
+          tls_legado: bool = False, permitir_404: bool = False) -> requests.Response:
+    """Descarga con reintentos y retroceso exponencial (1s, 2s, 4s).
+
+    permitir_404: algunos boletines responden 404 cuando ese dia no hay
+    boletin. Con este indicador el 404 se devuelve tal cual, sin reintentar,
+    para que el adaptador lo trate como "sin boletin" y no como un fallo.
+    """
     intentos = reintentos if reintentos is not None else config.REINTENTOS_BOLETIN
     cab = dict(_CABECERAS_NAVEGADOR if navegador else _CABECERAS)
     if cabeceras:
@@ -103,6 +108,8 @@ def pedir(url: str, *, metodo: str = "GET", datos: dict | None = None,
                 allow_redirects=permitir_redirecciones)
             if respuesta.status_code >= 500:
                 raise ErrorBoletin(f"HTTP {respuesta.status_code} en {url}")
+            if permitir_404 and respuesta.status_code == 404:
+                return respuesta
             respuesta.raise_for_status()
             return respuesta
         except (requests.RequestException, ErrorBoletin) as error:
@@ -122,3 +129,18 @@ def detectar_anti_bot(texto: str) -> bool:
 
 def iso(fecha: date) -> str:
     return fecha.strftime("%Y-%m-%d")
+
+
+def iso_desde(texto: str, formato: str, respaldo: date) -> str:
+    """Convierte la fecha que da la fuente a ISO. Si no se puede, la pedida.
+
+    Cada adaptador rellena PublicacionCruda.fecha con la fecha que dice LA
+    FUENTE, no con la que se le pidio. Asi el orquestador puede comprobar que
+    todo lo que llega al correo es del dia vigilado.
+    """
+    from datetime import datetime
+
+    try:
+        return datetime.strptime((texto or "").strip(), formato).strftime("%Y-%m-%d")
+    except ValueError:
+        return iso(respaldo)

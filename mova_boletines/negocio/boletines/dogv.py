@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from negocio.boletines.base import ErrorBoletin, PublicacionCruda, iso, pedir
+from negocio.boletines.base import ErrorBoletin, PublicacionCruda, iso, iso_desde, pedir
 
 CODIGO = "DOGV"
 NOMBRE = "Diari Oficial de la Generalitat Valenciana"
@@ -87,7 +87,7 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
             url_oficial=f"https://dogv.gva.es/es/disposicio-canonica?sig={identificador}"
                         if identificador else f"https://dogv.gva.es/es/inici",
             url_pdf=url_pdf,
-            fecha=iso(fecha),
+            fecha=iso_desde(disposicion.get("fechaPublicacion") or "", "%d/%m/%Y", fecha),
             texto=titulo,
             identificador=identificador,
             extra={"numero_dogv": numero},

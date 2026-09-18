@@ -225,6 +225,17 @@ def _fase1(fecha: date, ejecucion_id: int, contadores: dict):
         try:
             publicaciones = ADAPTADORES[codigo].obtener_publicaciones(fecha)
             duracion = int((datetime.now() - inicio).total_seconds() * 1000)
+
+            # Filtro de fecha: solo entra lo publicado el dia vigilado. Si un
+            # boletin devolviera el ultimo numero disponible en lugar de nada,
+            # o mezclara dias, aqui se para y queda anotado.
+            objetivo = fecha.strftime("%Y-%m-%d")
+            de_otro_dia = [p for p in publicaciones if p.fecha and p.fecha != objetivo]
+            if de_otro_dia:
+                fechas_ajenas = ", ".join(sorted({p.fecha for p in de_otro_dia}))
+                progreso.anotar(f"{codigo}: {len(de_otro_dia)} publicacion(es) de otra fecha "
+                                f"({fechas_ajenas}) descartadas: solo cuenta el {fecha:%d/%m/%Y}")
+                publicaciones = [p for p in publicaciones if not p.fecha or p.fecha == objetivo]
             for publicacion in publicaciones:
                 crudas.append({
                     "codigo_boletin": codigo,

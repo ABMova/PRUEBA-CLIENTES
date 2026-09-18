@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from negocio.boletines.base import ErrorBoletin, PublicacionCruda, iso, pedir
+from negocio.boletines.base import ErrorBoletin, PublicacionCruda, iso, iso_desde, pedir
 
 CODIGO = "DOGC"
 NOMBRE = "Diari Oficial de la Generalitat de Catalunya"
@@ -63,6 +63,7 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
 
     publicaciones: list[PublicacionCruda] = []
     for sumario in datos.get("sumaris") or []:
+        fecha_sumario = iso_desde(sumario.get("dateDOGC") or "", "%d/%m/%Y", fecha)
         for seccion in sumario.get("section") or []:
             nombre_seccion = (seccion.get("title") or "").strip()
             for cabecera in seccion.get("header") or []:
@@ -84,7 +85,7 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
                                      f"?documentId={identificador}" if identificador
                                      else f"https://dogc.gencat.cat/ca/sumari-del-dogc/?numDOGC={numero}"),
                         url_pdf=url_pdf,
-                        fecha=iso(fecha),
+                        fecha=fecha_sumario,
                         texto=titulo,
                         identificador=identificador,
                         extra={"num_dogc": numero},
