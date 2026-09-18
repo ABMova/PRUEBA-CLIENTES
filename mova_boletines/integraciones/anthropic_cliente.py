@@ -226,13 +226,55 @@ def interpretar_json(bruto: str) -> dict:
         raise ErrorModelo("El modelo no devolvio JSON")
 
 
+def normalizar_clave(valor: str) -> tuple[str, str]:
+    """Limpia la clave pegada en Ajustes. Devuelve (clave, aviso).
+
+    El campo oculta lo que se escribe, y es facil pegar dos veces: el
+    18/09/2026 una clave valida quedo guardada duplicada y la API la rechazaba.
+    Si son dos copias identicas se deja una; si son dos claves distintas, error.
+    """
+    limpia = "".join((valor or "").split()).strip("'\"")
+    apariciones = limpia.count("sk-ant-")
+    if apariciones <= 1:
+        return limpia, ""
+    mitad = len(limpia) // apariciones
+    trozos = {limpia[i * mitad:(i + 1) * mitad] for i in range(apariciones)}
+    if len(limpia) % apariciones == 0 and len(trozos) == 1:
+        return trozos.pop(), f"La clave estaba pegada {apariciones} veces seguidas; se ha guardado una sola."
+    raise ErrorModelo("Parece que has pegado varias claves distintas juntas. Pega solo una.")
+
+
 def probar_clave(modelo: str = "claude-haiku-4-5-20251001") -> tuple[bool, str]:
-    """Comprobacion desde la pantalla de Ajustes."""
+    """Comprobacion desde Ajustes. Consulta la lista de modelos: no tiene coste."""
+    del modelo  # se mantiene la firma; la comprobacion ya no gasta tokens
     try:
-        # 256 y no menos: si el modelo de relevancia es uno que razona, parte de
-        # los tokens se van en ese razonamiento aunque la respuesta sea "OK".
-        llamar("Responde unicamente con la palabra OK.", "Di OK.", modelo, 256, reintentos=1,
-               fase="prueba")
-        return True, "Clave valida: la API responde"
+        disponibles = {m.id for m in _cliente().models.list(limit=100)}
     except ErrorModelo as error:
         return False, str(error)
+    except Exception as error:  # noqa: BLE001 - se traduce igual que en llamar()
+        return False, _traducir(error)
+    configurados = {repositorio.ajuste("modelo_extraccion", "claude-sonnet-5"),
+                    repositorio.ajuste("modelo_relevancia", "claude-haiku-4-5-20251001"),
+                    repositorio.ajuste("modelo_documentos", "claude-sonnet-5")}
+    faltan = sorted(m for m in configurados if m not in disponibles)
+    if faltan:
+        return False, (f"La clave es valida, pero tu cuenta no tiene acceso a: {', '.join(faltan)}. "
+                       f"Elige otro modelo en Ajustes.")
+    return True, "Clave valida: la API responde y los modelos elegidos estan disponibles."
+
+
+def corregir_clave_guardada() -> bool:
+    """Al arrancar: repara una clave guardada duplicada (ver normalizar_clave)."""
+    guardada = repositorio.ajuste("anthropic_api_key", "")
+    if not guardada:
+        return False
+    try:
+        limpia, aviso = normalizar_clave(guardada)
+    except ErrorModelo:
+        return False
+    if aviso and limpia != guardada:
+        repositorio.guardar_ajuste("anthropic_api_key", limpia)
+        repositorio.registrar_auditoria("sistema", "corregir_clave_api", "",
+                                        aviso + " (al arrancar)")
+        return True
+    return False

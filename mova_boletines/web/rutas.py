@@ -148,6 +148,11 @@ def panel():
         avisos.append("No hay servidor SMTP configurado: no se puede enviar el correo diario.")
     if not repositorio.destinatarios(solo_activos=True):
         avisos.append("No hay destinatarios activos.")
+    if "onedrive" in str(config.DATOS).lower():
+        avisos.append(f"Esta copia guarda sus datos dentro de OneDrive ({config.DATOS}). "
+                      f"La sincronizacion puede corromper la base de datos y sube las claves "
+                      f"cifradas a la nube. Usa la version instalada en C:\\MOVA\\Boletines "
+                      f"Oficiales y no abras el .exe desde la carpeta de ejecutables.")
 
     if request.args.get("aviso") == "sin_permiso":
         flash("Tu rol no tiene permiso para esa pantalla", "error")
@@ -759,10 +764,20 @@ def ajustes():
             if clave in request.form:
                 repositorio.guardar_ajuste(clave, (request.form.get(clave) or "").strip())
 
-        for clave in ("anthropic_api_key", "smtp_clave"):
-            valor = (request.form.get(clave) or "").strip()
-            if valor:  # vacio = no tocar lo ya guardado
-                repositorio.guardar_ajuste(clave, valor)
+        clave_api_nueva = (request.form.get("anthropic_api_key") or "").strip()
+        if clave_api_nueva:  # vacio = no tocar lo ya guardado
+            try:
+                clave_api_nueva, aviso_clave = anthropic_cliente.normalizar_clave(clave_api_nueva)
+                repositorio.guardar_ajuste("anthropic_api_key", clave_api_nueva)
+                if aviso_clave:
+                    flash(aviso_clave, "warn")
+                correcta, mensaje_clave = anthropic_cliente.probar_clave()
+                flash(mensaje_clave, "ok" if correcta else "error")
+            except anthropic_cliente.ErrorModelo as error:
+                flash(str(error), "error")
+        clave_smtp_nueva = (request.form.get("smtp_clave") or "").strip()
+        if clave_smtp_nueva:
+            repositorio.guardar_ajuste("smtp_clave", clave_smtp_nueva)
 
         if (request.form.get("modelo_extraccion") not in config.MODELOS_DISPONIBLES
                 or request.form.get("modelo_relevancia") not in config.MODELOS_DISPONIBLES):

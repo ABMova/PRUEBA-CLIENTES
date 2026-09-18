@@ -204,6 +204,13 @@ def crear_aplicacion() -> Flask:
     repositorio.limpiar_sesiones_caducadas()
     repositorio.limpiar_intentos_antiguos()
     repositorio.documentos_generando_huerfanos()
+    from integraciones import anthropic_cliente
+    if anthropic_cliente.corregir_clave_guardada():
+        registro.warning("La clave de API estaba guardada duplicada: corregida")
+    if "onedrive" in str(config.DATOS).lower():
+        registro.warning("La carpeta de datos esta dentro de OneDrive (%s): la sincronizacion "
+                         "puede corromper la base de datos y sube las claves cifradas a la nube",
+                         config.DATOS)
 
     try:
         destino = copias.crear_copia("arranque")

@@ -723,6 +723,21 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(repositorio.token_documento(clave)["usos"] >= 4,
               "cada uso queda registrado")
 
+    print("\n21) Clave de API pegada dos veces")
+    buena = "sk-ant-api03-" + "Q" * 95
+    limpia, aviso = anthropic_cliente.normalizar_clave(buena + buena)
+    comprobar(limpia == buena and "2 veces" in aviso, "al guardar se deja una sola copia y se avisa")
+    try:
+        anthropic_cliente.normalizar_clave(buena + "sk-ant-api03-" + "Z" * 95)
+        distintas = False
+    except anthropic_cliente.ErrorModelo:
+        distintas = True
+    comprobar(distintas, "dos claves distintas juntas se rechazan")
+    repositorio.guardar_ajuste("anthropic_api_key", buena + buena)
+    comprobar(anthropic_cliente.corregir_clave_guardada()
+              and repositorio.ajuste("anthropic_api_key") == buena,
+              "una clave ya guardada duplicada se corrige sola al arrancar")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)
