@@ -109,7 +109,6 @@ def main() -> int:
     comprobar(texto.count("Descartar esta publicacion") == 3, "tres enlaces de descarte")
     comprobar(all(f"/descartar/{t}" in texto for t in tokens.values()),
               "cada enlace lleva su token")
-    comprobar(texto.count(PENDIENTE) >= 2, f"los datos ausentes salen como {PENDIENTE}")
     comprobar("BORM" in texto and "anti-bot" in texto, "dice que el BORM ha fallado")
     comprobar("Enlace" in texto or "Publicacion oficial" in texto, "enlaces a la publicacion")
     comprobar("PDF" in texto, "enlaces al PDF")
@@ -118,10 +117,14 @@ def main() -> int:
               "sin flexbox ni grid (compatible con Outlook)")
     comprobar("<table" in texto, "maquetado con tablas")
     comprobar("#b8892f" in texto, "acento dorado de la paleta MOVA")
-    for campo in ("Comunidad", "Boletin", "Fecha publicacion", "Titulo completo", "Resumen",
-                  "Organismo",
-                  "Plazo", "Beneficiarios", "Importe", "Enlaces"):
+    for campo in ("Comunidad", "Boletin", "Fecha publicacion", "Titulo completo", "Organismo",
+                  "Enlaces"):
         comprobar(f">{campo}<" in texto, f"campo '{campo}' presente")
+    for campo in ("Resumen", "Plazo", "Beneficiarios", "Importe"):
+        comprobar(f">{campo}<" not in texto, f"campo '{campo}' retirado")
+    for tipo in ("corto", "ampliado", "infografia"):
+        comprobar(texto.count(f"/documento/{tipo}") == 3,
+                  f"boton '{tipo}' en las tres publicaciones")
 
     print(f"\n{'TODAS LAS COMPROBACIONES PASAN' if not fallos else 'FALLOS: ' + str(fallos)}")
     return 1 if fallos else 0

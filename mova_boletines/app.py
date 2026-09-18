@@ -164,6 +164,7 @@ def crear_aplicacion() -> Flask:
 
     repositorio.limpiar_sesiones_caducadas()
     repositorio.limpiar_intentos_antiguos()
+    repositorio.documentos_generando_huerfanos()
 
     try:
         destino = copias.crear_copia("arranque")

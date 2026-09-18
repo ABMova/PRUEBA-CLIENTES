@@ -1,0 +1,30 @@
+{# Barra de la aplicacion sobre el documento. No se imprime ni va en la descarga. #}
+{% if barra %}
+<style>
+.barra-mova{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  background:#0b0c0e;border-bottom:1px solid #2a2d33;padding:8px 16px;font-family:system-ui,"Segoe UI",Arial,sans-serif;font-size:13px}
+.barra-mova a,.barra-mova button{display:inline-flex;align-items:center;gap:6px;background:#141518;color:#f3f4f6;
+  border:1px solid #2a2d33;border-radius:8px;padding:6px 12px;text-decoration:none;cursor:pointer;font:inherit}
+.barra-mova a:hover,.barra-mova button:hover{border-color:#b8892f}
+.barra-mova .on{background:#241f12;border-color:#b8892f;color:#f0d98c}
+.barra-mova .principal{background:linear-gradient(90deg,#f0d98c,#d9b45b);color:#1a1405;border-color:#b8892f;font-weight:600}
+.barra-mova .hueco{flex:1}
+.barra-mova .nota{color:#9aa0a6;font-size:12px}
+@media print{.barra-mova{display:none}}
+</style>
+<div class="barra-mova">
+  <a href="{{ barra.volver }}">&larr; Publicaciones</a>
+  {% for clave, (rotulo, detalle) in tipos.items() %}
+  <a href="{{ barra.url_tipo[clave] }}" class="{{ 'on' if clave == tipo else '' }}">{{ rotulo }}</a>
+  {% endfor %}
+  <span class="hueco"></span>
+  <span class="nota">{{ barra.nota }}</span>
+  <button type="button" class="principal" onclick="window.print()">Imprimir / guardar PDF</button>
+  <a href="{{ barra.descargar }}">Descargar</a>
+  {% if barra.regenerar %}
+  <form method="post" action="{{ barra.regenerar }}" style="display:inline" onsubmit="return confirm('Volver a analizar la publicacion con la IA? Tiene coste.');">
+    <button type="submit">Regenerar</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}

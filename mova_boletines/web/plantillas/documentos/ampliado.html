@@ -1,0 +1,52 @@
+{% import "_macros.html" as m %}<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Resumen ampliado — {{ v('nombre_ayuda', 'Subvención') }}</title>
+{% include "_membrete.html" %}
+</head><body>
+{% include "_barra.html" %}
+<div class="page">
+<img class="wm" src="{{ edificio }}" alt="">
+<div class="doc">
+<header class="head"><img class="logo" src="{{ logo_negro }}" alt="MOVA"></header>
+<h2>Nombre/objeto del trámite:</h2>
+<p>{{ v('nombre_ayuda', '—') }}</p>
+{% if d.objeto and d.objeto != 'null' %}<p>{{ v('objeto') }}</p>{% endif %}
+<h2>Beneficiarios:</h2>
+<p>{{ v('beneficiarios') }}</p>
+{% if d.exclusiones and d.exclusiones != 'null' %}<h2>Exclusiones:</h2><p>{{ v('exclusiones') }}</p>{% endif %}
+<h2>Actuaciones Apoyables:</h2>
+{{ m.vinetas(lista('actuaciones'), 'dot') }}
+<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>
+<h2>Costes Apoyables:</h2>
+{{ m.vinetas(lista('gastos_elegibles'), 'chk') }}
+<h2>Tipo de Ayuda y Cuantía:</h2>
+<ul>
+<li class="dot"><strong>Cuantía máxima:</strong> {{ v('cuantia_max') }}</li>
+<li class="dot"><strong>Intensidad:</strong> {{ v('intensidad') }}</li>
+<li class="dot"><strong>Inversión mínima:</strong> {{ v('inversion_min') }}</li>
+<li class="dot"><strong>Inversión máxima:</strong> {{ v('inversion_max') }}</li>
+<li class="dot"><strong>Régimen:</strong> {{ v('regimen') }}</li>
+<li class="dot"><strong>Compatibilidades:</strong> {{ v('compatibilidades') }}</li>
+<li class="dot"><strong>Incompatibilidades:</strong> {{ v('incompatibilidades') }}</li>
+</ul>
+<h2>Criterios de valoración:</h2>
+{% if criterios %}<ul>{% for c in criterios %}<li class="dot"><strong>{{ c.criterio }}</strong>{% if c.puntos %} ({{ c.puntos }}){% endif %}{% if c.descripcion %}: {{ c.descripcion }}{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="nd">No especificados o concesión directa sin baremo.</p>{% endif %}
+<h2>Documentación con la solicitud:</h2>
+{{ m.vinetas(lista('doc_solicitud'), 'dot') }}
+<h2>Documentación de justificación:</h2>
+{{ m.vinetas(lista('doc_justificacion'), 'dot') }}
+<h2>Plazos de ejecución y justificación:</h2>
+<ul>
+<li class="dot"><strong>Ejecución:</strong> {{ v('plazo_ejecucion') }}</li>
+<li class="dot"><strong>Justificación:</strong> {{ v('plazo_justificacion') }}</li>
+</ul>
+<h2>Crédito presupuestario:</h2>
+<p>{{ v('credito') }}</p>
+<h2>Plazo de presentación:</h2>
+<p>{{ plazo_txt }}</p>
+<h2>Referencias y enlaces:</h2>
+{{ m.vinetas(lista('referencias'), 'dot') }}
+{% for enlace in enlaces %}<p style="margin-top:4px"><a href="{{ enlace }}" target="_blank" rel="noopener noreferrer">{{ enlace }}</a></p>{% endfor %}
+{% if d.alertas %}<h2>Avisos del análisis:</h2>{{ m.vinetas(lista('alertas'), 'dot') }}{% endif %}
+{{ m.pie() }}
+</div></div></body></html>

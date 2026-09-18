@@ -2,8 +2,11 @@
 
 VIA DE ACCESO: API REST XML que consume la sede electronica (AngularJS).
   Sumario del dia: GET https://www.borm.es/services/boletin/fecha/DD-MM-AAAA/sumario
-  PDF del anuncio: https://www.borm.es/services/anuncio/pdf/AAAA/NNNN  (NPE)
-COMPROBADO: 17/09/2026 (boletin 215, sumario con todos los anuncios).
+  PDF del anuncio: https://www.borm.es/services/anuncio/{id}/pdf   (id interno del anuncio)
+  Texto plano:     https://www.borm.es/services/anuncio/{id}/txt
+  Pagina publica:  https://www.borm.es/#/home/anuncio/DD-MM-AAAA/{numero}
+COMPROBADO: 17/09/2026 (boletin 215). Enlaces de PDF y pagina publica
+  corregidos y comprobados el 18/09/2026 (la version anterior los construia mal).
 AVISO IMPORTANTE: borm.es esta detras de un anti-bot comercial (Radware). Las
   peticiones con agente de robot reciben una pagina de captcha. Por eso este
   adaptador se identifica como navegador y anade la cabecera From con el
@@ -57,14 +60,18 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
         sub = _texto(anuncio, "subAnunciante")
         organismo = f"{anunciante} - {sub}".strip(" -") if sub else anunciante
         seccion = f"{_texto(anuncio, 'apartado')} / {_texto(anuncio, 'subApartado')}".strip(" /")
-        identificador = f"{ano}{numero}" if ano and numero else _texto(anuncio, "id")
+        id_anuncio = _texto(anuncio, "id")
+        fecha_anuncio = _texto(anuncio, "fechaPublicacion") or f"{fecha:%d-%m-%Y}"
+        identificador = f"{ano}{numero}" if ano and numero else id_anuncio
         publicaciones.append(PublicacionCruda(
             codigo_boletin=CODIGO,
             titulo=titulo,
             organismo=organismo,
             seccion=seccion,
-            url_oficial=f"{_BASE}/#/home/anuncio/{fecha:%d-%m-%Y}/{identificador}",
-            url_pdf=f"{_BASE}/services/anuncio/pdf/{ano}/{numero}" if ano and numero else "",
+            # Rutas sacadas de scripts/app.js y anuncioFactory.js de la sede del BORM.
+            url_oficial=(f"{_BASE}/#/home/anuncio/{fecha_anuncio}/{numero}" if numero
+                         else f"{_BASE}/#/home/sumario/{fecha:%d-%m-%Y}"),
+            url_pdf=f"{_BASE}/services/anuncio/{id_anuncio}/pdf" if id_anuncio else "",
             fecha=iso_desde(_texto(anuncio, "fechaPublicacion"), "%d-%m-%Y", fecha),
             texto=titulo,
             identificador=identificador,

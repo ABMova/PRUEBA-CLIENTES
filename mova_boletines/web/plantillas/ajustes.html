@@ -24,6 +24,14 @@
         {% for modelo in modelos %}<option value="{{ modelo }}" {% if ajustes.modelo_relevancia == modelo %}selected{% endif %}>{{ modelo }}</option>{% endfor %}
       </select>
     </div>
+    <div class="campo">
+      <label for="modelo_documentos">Modelo de los documentos (resumen corto, ampliado e infografia)</label>
+      <select id="modelo_documentos" name="modelo_documentos">
+        {% for modelo in modelos %}<option value="{{ modelo }}" {% if ajustes.modelo_documentos == modelo %}selected{% endif %}>{{ modelo }}</option>{% endfor %}
+      </select>
+      <span class="apoyo">Lee el PDF entero de la publicacion. Sonnet 5 da buen resultado; Opus 5
+      es mas fino en bases largas y cuesta mas del doble.</span>
+    </div>
     <div class="campo-linea">
       <div class="campo"><label for="max_tokens_extraccion">Tokens fase 3</label>
         <input type="number" id="max_tokens_extraccion" name="max_tokens_extraccion" value="{{ ajustes.max_tokens_extraccion }}"></div>

@@ -5,6 +5,7 @@ Nada de logica de dominio ni de SQL: eso vive en negocio/ y en datos/.
 """
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from datetime import date, datetime, timedelta
@@ -16,7 +17,7 @@ import config
 from datos import copias as copias_datos
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio import correo, orquestador
+from negocio import correo, documentos, orquestador
 from negocio.boletines import fichas
 from negocio.extraccion import tesseract_disponible
 from web import auth
@@ -273,13 +274,91 @@ def publicaciones():
         "texto": request.args.get("texto", "").strip() or None,
     }
     limpios = {clave: valor for clave, valor in filtros.items() if valor}
+    filas = repositorio.publicaciones(limpios, limite=400)
     return render_template(
         "publicaciones.html", titulo_pagina="Publicaciones",
-        publicaciones=repositorio.publicaciones(limpios, limite=400),
+        publicaciones=filas,
+        documentos=repositorio.documentos_de([fila["id"] for fila in filas]),
         boletines=repositorio.boletines(),
         filtros=filtros,
         puede_editar=auth.tiene_permiso("editar"),
         puede_descartar=auth.tiene_permiso("descartar"))
+
+
+# ------------------------------------------ resumen corto, ampliado, infografia --
+def _pagina_estado(fila, tipo: str, estado: str, mensaje: str = "", codigo: int = 200):
+    return render_template(
+        "documento_estado.html", titulo_pagina=documentos.TIPOS[tipo][0],
+        rotulo=documentos.TIPOS[tipo][0], publicacion=fila, estado=estado, mensaje=mensaje,
+        refrescar=(estado == "generando"),
+        puede_generar=auth.tiene_permiso("ejecutar"),
+        url_reintentar=url_for("web.documento", publicacion_id=fila["id"], tipo=tipo,
+                               reintentar=1)), codigo
+
+
+@web.route("/publicaciones/<int:publicacion_id>/documento/<tipo>")
+@auth.requiere("ver")
+def documento(publicacion_id: int, tipo: str):
+    """Muestra el documento; si aun no existe, lo genera (una vez para los tres)."""
+    if tipo not in documentos.TIPOS:
+        return redirect(url_for("web.publicaciones"))
+    fila = repositorio.publicacion(publicacion_id)
+    if fila is None:
+        flash("Esa publicacion no existe", "error")
+        return redirect(url_for("web.publicaciones"))
+
+    doc = repositorio.documento(publicacion_id)
+    if doc is not None and doc["estado"] == "listo" and not request.args.get("reintentar"):
+        datos = json.loads(doc["datos_json"] or "{}")
+        barra = {
+            "volver": url_for("web.publicaciones"),
+            "url_tipo": {t: url_for("web.documento", publicacion_id=publicacion_id, tipo=t)
+                         for t in documentos.TIPOS},
+            "descargar": url_for("web.descargar_documento", publicacion_id=publicacion_id,
+                                 tipo=tipo),
+            "regenerar": (url_for("web.regenerar_documento", publicacion_id=publicacion_id)
+                          if auth.tiene_permiso("ejecutar") else ""),
+            "nota": f"{doc['paginas']} pag. analizadas con {doc['modelo']}",
+        }
+        return documentos.renderizar(tipo, datos, dict(fila), barra)
+
+    if documentos.generando(publicacion_id):
+        return _pagina_estado(fila, tipo, "generando")
+
+    if doc is not None and doc["estado"] == "error" and not request.args.get("reintentar"):
+        return _pagina_estado(fila, tipo, "error", doc["error"])
+
+    if not auth.tiene_permiso("ejecutar"):
+        return _pagina_estado(fila, tipo, "sin_permiso", codigo=403)
+
+    usuario = auth.usuario_actual()
+    aceptada, mensaje = documentos.lanzar(publicacion_id, usuario["usuario"])
+    if not aceptada:
+        return _pagina_estado(fila, tipo, "error", mensaje)
+    return _pagina_estado(fila, tipo, "generando")
+
+
+@web.route("/publicaciones/<int:publicacion_id>/documento/<tipo>/descargar")
+@auth.requiere("ver")
+def descargar_documento(publicacion_id: int, tipo: str):
+    fila = repositorio.publicacion(publicacion_id)
+    doc = repositorio.documento(publicacion_id)
+    if tipo not in documentos.TIPOS or fila is None or doc is None or doc["estado"] != "listo":
+        flash("El documento todavia no esta generado", "error")
+        return redirect(url_for("web.publicaciones"))
+    html = documentos.renderizar(tipo, json.loads(doc["datos_json"] or "{}"), dict(fila))
+    nombre = documentos.nombre_fichero(tipo, dict(fila))
+    return Response(html, mimetype="text/html",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+@web.route("/publicaciones/<int:publicacion_id>/documento/regenerar", methods=["POST"])
+@auth.requiere("ejecutar")
+def regenerar_documento(publicacion_id: int):
+    usuario = auth.usuario_actual()
+    aceptada, mensaje = documentos.lanzar(publicacion_id, usuario["usuario"])
+    flash(mensaje, "ok" if aceptada else "error")
+    return redirect(url_for("web.documento", publicacion_id=publicacion_id, tipo="corto"))
 
 
 @web.route("/publicaciones/<int:publicacion_id>/descartar")
@@ -587,7 +666,8 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "copias_max", "max_candidatas_ejecucion", "terminos_refuerzo",
                   "tarde_activa", "hora_tarde", "alerta_activa", "dias_alerta",
                   "semanal_activo", "dia_semanal", "hora_semanal", "dias_vencimiento_semanal",
-                  "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur")
+                  "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur",
+                  "modelo_documentos", "max_tokens_documentos")
 
 
 @web.route("/ajustes", methods=["GET", "POST"])

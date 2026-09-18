@@ -140,6 +140,23 @@ CREATE INDEX IF NOT EXISTS ix_pub_fecha ON publicaciones(fecha_publicacion);
 CREATE INDEX IF NOT EXISTS ix_pub_boletin ON publicaciones(codigo_boletin, fecha_publicacion);
 CREATE INDEX IF NOT EXISTS ix_pub_estado ON publicaciones(estado, relevancia);
 
+-- Datos para el resumen corto, el ampliado y la infografia de una publicacion.
+-- Se extraen UNA vez del PDF con la IA y de ellos salen los tres documentos.
+CREATE TABLE IF NOT EXISTS documentos_publicacion (
+    publicacion_id  INTEGER PRIMARY KEY REFERENCES publicaciones(id) ON DELETE CASCADE,
+    estado          TEXT NOT NULL DEFAULT 'pendiente',
+    datos_json      TEXT NOT NULL DEFAULT '',
+    modelo          TEXT NOT NULL DEFAULT '',
+    fuente          TEXT NOT NULL DEFAULT '',
+    paginas         INTEGER NOT NULL DEFAULT 0,
+    caracteres      INTEGER NOT NULL DEFAULT 0,
+    recortado       INTEGER NOT NULL DEFAULT 0,
+    error           TEXT NOT NULL DEFAULT '',
+    solicitado_por  TEXT NOT NULL DEFAULT '',
+    creado_en       TEXT NOT NULL DEFAULT (datetime('now')),
+    actualizado_en  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Cada llamada al modelo, con sus tokens y su coste. Alimenta el panel de
 -- coste y el tope de gasto mensual.
 CREATE TABLE IF NOT EXISTS consumo_modelo (
@@ -305,7 +322,9 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('dias_vencimiento_semanal', '30',   'El resumen semanal lista los plazos que vencen en estos dias'),
  ('esfuerzo_modelo',       'low',     'Esfuerzo de razonamiento en Sonnet 5 / Opus 5 / Opus 4.8 (low, medium, high)'),
  ('tope_mensual_usd',      '30',      'Tope de gasto mensual en la API en dolares (0 = sin tope)'),
- ('cambio_usd_eur',        '0.86',    'Tipo de cambio para mostrar el gasto en euros (editable)');
+ ('cambio_usd_eur',        '0.86',    'Tipo de cambio para mostrar el gasto en euros (editable)'),
+ ('modelo_documentos',     'claude-sonnet-5', 'Modelo para resumen corto, ampliado e infografia'),
+ ('max_tokens_documentos', '16000',   'Limite de tokens de la extraccion para los documentos');
 
 INSERT OR IGNORE INTO ajustes (clave, valor, cifrado, descripcion) VALUES
  ('anthropic_api_key', '', 1, 'Clave de API de Anthropic (cifrada con Fernet)'),

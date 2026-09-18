@@ -70,6 +70,12 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
     fila["dias_restantes"] = restantes
     fila["plazo_fin_texto"] = fecha_corta(fila.get("plazo_fin"))
     fila["plazo_estimado"] = fila.get("plazo_fin_origen") in ("calculado", "modelo")
+    # Botones Resumen corto / Resumen ampliado / Infografia: abren la aplicacion,
+    # que genera el documento la primera vez y despues lo sirve guardado.
+    identificador = fila.get("id")
+    fila["url_documentos"] = ({tipo: f"{url_publica()}/publicaciones/{identificador}/documento/{tipo}"
+                               for tipo in ("corto", "ampliado", "infografia")}
+                              if identificador else None)
     return fila
 
 

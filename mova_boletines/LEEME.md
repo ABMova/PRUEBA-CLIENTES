@@ -16,6 +16,36 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.2: resumen corto, ampliado e infografía
+
+Las fichas del correo y de la aplicación ya **no muestran Resumen, Plazo,
+Beneficiarios ni Importe**. En su lugar, cada publicación tiene tres botones,
+como en la aplicación Resumen Ayudas:
+
+| Botón | Qué genera |
+|---|---|
+| **Resumen corto** | Documento con membrete MOVA: objeto, beneficiarios, actuaciones, costes, cuantía y plazo. |
+| **Resumen ampliado** | Lo anterior más exclusiones, criterios de valoración, documentación de solicitud y de justificación, plazos de ejecución y justificación, crédito y referencias. |
+| **Infografía** | Ficha oscura de datos clave: ayuda máxima, intensidad, fin de plazo, beneficiarios, régimen, crédito y ámbito. |
+
+Al pulsar cualquiera de los tres, la herramienta descarga el PDF oficial, lo lee
+entero y la IA extrae los datos **una sola vez** con las mismas instrucciones que
+Resumen Ayudas. Los tres documentos salen de esa extracción y quedan guardados:
+abrir los otros dos, o volver a abrirlos, no tiene coste. Se pueden imprimir o
+guardar en PDF desde el navegador, o descargar como HTML.
+
+- Los botones del correo abren la aplicación, que pide iniciar sesión. Solo
+  funcionan desde este equipo mientras la URL pública sea `127.0.0.1`.
+- Generarlos requiere rol de editor o administrador (tiene coste). Un usuario de
+  consulta puede ver los que ya estén generados.
+- Coste orientativo con Sonnet 5: de 0,05 a 0,30 $ por publicación según la
+  longitud del PDF. Se contabiliza en la pantalla *Coste* (fase «documentos») y
+  respeta el tope mensual. El modelo se elige en *Ajustes*.
+- Resumen, plazo, beneficiarios e importe se siguen extrayendo por dentro: los
+  usan la clasificación de relevancia, las alertas de plazo corto y el resumen
+  semanal. El correo de **alerta** mantiene la fecha de vencimiento, porque es el
+  motivo del aviso.
+
 ### Novedades de la versión 1.1
 
 | Qué | Cómo funciona | Dónde se ajusta |
@@ -226,7 +256,7 @@ valor plausible.
 | BOCM | XML de sumario | `bocm.es/boletin/CM_Boletin_BOCM/AAAA/MM/DD/BOCM-AAAAMMDDNNN.xml` |
 | DOGC | API REST JSON | `portaldogc.gencat.cat/eadop-rest/api/dogc/summaryDOGC` |
 | BOJA | Feed Atom | `juntadeandalucia.es/boja/distribucion/boja.xml` |
-| BORM | API REST XML | `borm.es/services/boletin/fecha/DD-MM-AAAA/sumario` |
+| BORM | API REST XML | `borm.es/services/boletin/fecha/DD-MM-AAAA/sumario` (PDF: `services/anuncio/{id}/pdf`) |
 | DOCM | HTML de sumario | `docm.castillalamancha.es/portaldocm/sumario.do?fecha=AAAAMMDD` |
 | BOCYL | HTML de sumario | `bocyl.jcyl.es/boletin.do?fechaBoletin=DD/MM/AAAA` |
 

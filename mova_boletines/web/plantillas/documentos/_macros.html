@@ -1,0 +1,9 @@
+{# Listas con vineta o con marca, y el pie del membrete, como en Resumen Ayudas. #}
+{% macro vinetas(elementos, clase='dot') -%}
+{% if elementos %}<ul>{% for e in elementos %}<li class="{{ clase }}">{{ e }}</li>{% endfor %}</ul>
+{% else %}<p class="nd">Se establece en la correspondiente convocatoria.</p>{% endif %}
+{%- endmacro %}
+
+{% macro pie() -%}
+<footer class="pie"><div>Avenida Comunitat Valenciana nº 1<br>03201 Elche (Alicante)<br>966 092 955</div><div style="text-align:right">info@mova.es<br>www.mova.es</div></footer>
+{%- endmacro %}

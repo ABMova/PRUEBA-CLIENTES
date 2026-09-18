@@ -88,8 +88,7 @@
               <tr>
                 <th style="{{ cabecera }}">Convocatoria</th>
                 <th style="{{ cabecera }}">Comunidad</th>
-                <th style="{{ cabecera }}">Plazo</th>
-                <th style="{{ cabecera }}">Importe</th>
+                <th style="{{ cabecera }}">Documentos</th>
               </tr>
               {% for p in altas %}
               <tr>
@@ -99,8 +98,13 @@
                   {% if p.url_oficial %}<br><a href="{{ p.url_oficial }}" style="color:#b8892f;">Publicacion oficial</a>{% endif %}
                 </td>
                 <td style="{{ celda }} white-space:nowrap;">{{ p.comunidad }}</td>
-                <td style="{{ celda }}">{% if p.plazo == marcador %}<span style="color:#92400e;">{{ marcador }}</span>{% else %}{{ p.plazo }}{% endif %}</td>
-                <td style="{{ celda }}">{% if p.importe == marcador %}<span style="color:#92400e;">{{ marcador }}</span>{% else %}{{ p.importe }}{% endif %}</td>
+                <td style="{{ celda }} white-space:nowrap;">
+                  {% if p.url_documentos %}
+                  <a href="{{ p.url_documentos.corto }}" style="color:#b8892f; font-weight:600;">Resumen corto</a><br>
+                  <a href="{{ p.url_documentos.ampliado }}" style="color:#b8892f; font-weight:600;">Resumen ampliado</a><br>
+                  <a href="{{ p.url_documentos.infografia }}" style="color:#b8892f; font-weight:600;">Infografia</a>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </table>

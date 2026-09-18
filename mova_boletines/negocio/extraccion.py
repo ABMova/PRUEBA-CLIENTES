@@ -71,6 +71,39 @@ def texto_de_pdf(contenido: bytes, paginas_max: int = 12) -> tuple[str, bool]:
     return "\n".join(partes).strip(), sin_capa_texto
 
 
+def texto_con_paginas(contenido: bytes, paginas_max: int = 400) -> tuple[str, int, bool]:
+    """Texto integro del PDF con marcas [Pagina N] entre paginas.
+
+    Es el formato que usa Resumen Ayudas: las marcas permiten a la IA indicar
+    de que pagina sale cada dato. Devuelve (texto, paginas, incompleto).
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return "", 0, True
+
+    partes: list[str] = []
+    incompleto = False
+    paginas = 0
+    try:
+        with pdfplumber.open(io.BytesIO(contenido)) as pdf:
+            paginas = len(pdf.pages)
+            for numero, pagina in enumerate(pdf.pages[:paginas_max], start=1):
+                texto = pagina.extract_text() or ""
+                if not texto.strip():
+                    texto = _ocr_pagina(pagina)
+                    if not texto.strip():
+                        incompleto = True
+                        continue
+                partes.append(f"[Página {numero}]\n{texto.strip()}")
+            if paginas > paginas_max:
+                incompleto = True
+    except Exception as error:  # noqa: BLE001 - un PDF roto no tumba nada
+        registro.warning("No se pudo leer el PDF: %s", error)
+        return "\n\n".join(partes), paginas, True
+    return "\n\n".join(partes), paginas, incompleto
+
+
 def _ocr_pagina(pagina) -> str:
     if not tesseract_disponible():
         return ""

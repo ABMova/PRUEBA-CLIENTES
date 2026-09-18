@@ -124,17 +124,12 @@
               <tr><td style="{{ etiqueta }}">Boletin</td><td style="{{ valor }}">{{ p.boletin_nombre }} ({{ p.codigo_boletin }})</td></tr>
               <tr><td style="{{ etiqueta }}">Fecha publicacion</td><td style="{{ valor }}">{{ p.fecha_publicacion }}</td></tr>
               <tr><td style="{{ etiqueta }}">Titulo completo</td><td style="{{ valor }} font-size:12px; color:#3f3f46;">{{ p.titulo }}</td></tr>
-              <tr><td style="{{ etiqueta }}">Resumen</td><td style="{% if p.resumen == marcador %}{{ ambar }}{% else %}{{ valor }}{% endif %}">{{ p.resumen }}</td></tr>
               <tr><td style="{{ etiqueta }}">Organismo</td><td style="{% if p.organismo == marcador %}{{ ambar }}{% else %}{{ valor }}{% endif %}">{{ p.organismo }}</td></tr>
-              <tr><td style="{{ etiqueta }}">Plazo</td><td style="{% if p.plazo == marcador %}{{ ambar }}{% else %}{{ valor }}{% endif %}">{{ p.plazo }}
-                {% if p.dias_restantes is not none and p.dias_restantes >= 0 %}
-                <br><span style="display:inline-block; margin-top:4px; background-color:{% if p.dias_restantes <= 15 %}#dc2626{% else %}#b8892f{% endif %}; color:#ffffff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">Vence el {{ p.plazo_fin_texto }} &middot; {% if p.dias_restantes == 0 %}hoy{% elif p.dias_restantes == 1 %}manana{% else %}en {{ p.dias_restantes }} dias{% endif %}{% if p.plazo_estimado %} (estimado){% endif %}</span>
-                {% elif p.dias_restantes is not none %}
-                <br><span style="display:inline-block; margin-top:4px; background-color:#6b7280; color:#ffffff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">Plazo vencido el {{ p.plazo_fin_texto }}</span>
-                {% endif %}
+              {% if modo == 'alerta' and p.dias_restantes is not none %}
+              <tr><td style="{{ etiqueta }}">Fin de plazo</td><td style="{{ valor }}">
+                <span style="display:inline-block; background-color:{% if p.dias_restantes <= 15 %}#dc2626{% else %}#b8892f{% endif %}; color:#ffffff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">Vence el {{ p.plazo_fin_texto }} &middot; {% if p.dias_restantes == 0 %}hoy{% elif p.dias_restantes == 1 %}manana{% else %}en {{ p.dias_restantes }} dias{% endif %}{% if p.plazo_estimado %} (estimado){% endif %}</span>
               </td></tr>
-              <tr><td style="{{ etiqueta }}">Beneficiarios</td><td style="{% if p.beneficiarios == marcador %}{{ ambar }}{% else %}{{ valor }}{% endif %}">{{ p.beneficiarios }}</td></tr>
-              <tr><td style="{{ etiqueta }}">Importe</td><td style="{% if p.importe == marcador %}{{ ambar }}{% else %}{{ valor }}{% endif %}">{{ p.importe }}</td></tr>
+              {% endif %}
               <tr>
                 <td style="{{ etiqueta }}">Enlaces</td>
                 <td style="{{ valor }}">
@@ -142,6 +137,25 @@
                   {% if p.url_pdf %}&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ p.url_pdf }}" style="color:#b8892f; font-weight:600; text-decoration:underline;">PDF</a>{% endif %}
                 </td>
               </tr>
+              {% if p.url_documentos %}
+              <tr>
+                <td colspan="2" style="padding:10px 12px 4px 12px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      {% for clave, rotulo in [('corto', 'Resumen corto'), ('ampliado', 'Resumen ampliado'), ('infografia', 'Infografia')] %}
+                      <td style="padding:0 6px 6px 0;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                          <td bgcolor="{% if clave == 'infografia' %}#18181b{% else %}#b8892f{% endif %}" style="background-color:{% if clave == 'infografia' %}#18181b{% else %}#b8892f{% endif %}; border-radius:6px;">
+                            <a href="{{ p.url_documentos[clave] }}" style="display:inline-block; padding:7px 14px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:{% if clave == 'infografia' %}#e6cf97{% else %}#ffffff{% endif %}; text-decoration:none;">{{ rotulo }}</a>
+                          </td>
+                        </tr></table>
+                      </td>
+                      {% endfor %}
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              {% endif %}
               {% if p.url_descarte %}
               <tr>
                 <td colspan="2" style="padding:8px 12px 10px 12px; text-align:right; border-top:1px solid #f1f1f3;">

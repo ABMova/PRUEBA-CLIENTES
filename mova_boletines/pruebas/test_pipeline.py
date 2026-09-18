@@ -563,6 +563,135 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("de otra fecha" in registro_ejecucion and "descartadas" in registro_ejecucion,
               "y el descarte queda anotado en el registro de la ejecucion")
 
+    print("\n17) El correo ya no lleva resumen, plazo, beneficiarios ni importe")
+    html_dia = diario[0]["html"] if diario else ""
+    for campo in (">Resumen<", ">Plazo<", ">Beneficiarios<", ">Importe<"):
+        comprobar(campo not in html_dia, f"sin el campo {campo.strip('><')}")
+    comprobar(html_dia.count("/documento/corto") >= 1 and html_dia.count("/documento/ampliado") >= 1
+              and html_dia.count("/documento/infografia") >= 1,
+              "cada ficha lleva los botones Resumen corto, Resumen ampliado e Infografia")
+
+    print("\n18) Resumen corto, ampliado e infografia")
+    from negocio import documentos
+
+    DATOS_BASES = {
+        "nombre_ayuda": "Ayudas a la innovacion de pymes 2026", "organismo": "Conselleria de Economia",
+        "ambito": "Comunitat Valenciana", "regimen": "Concurrencia competitiva",
+        "claim": "Hasta 200.000 euros para innovar", "objeto": "Financiar proyectos de innovacion.",
+        "beneficiarios": "Pymes con sede en la Comunitat Valenciana <script>alert(1)</script>",
+        "benef_corto": "Pymes valencianas", "exclusiones": "Empresas en crisis",
+        "actuaciones": [{"actuacion": "Desarrollo de producto", "descripcion": "prototipos"},
+                        "Digitalizacion de procesos"],
+        "gastos_elegibles": ["Personal tecnico", "Equipos"], "gastos_excluidos": [],
+        "cuantia_max": "200.000 €", "cuantia_min": None, "intensidad": "50%",
+        "inversion_min": "20.000 €", "inversion_max": None, "credito": "3.000.000 €",
+        "criterios": [{"criterio": "Grado de innovacion", "puntos": "40", "descripcion": "novedad"}],
+        "doc_solicitud": ["Memoria tecnica"], "doc_justificacion": ["Facturas"],
+        "plazo_inicio": "01/10/2026", "plazo_fin": "30/10/2026",
+        "plazo_ejecucion": "desde 01/01/2026 hasta 31/12/2026", "plazo_justificacion": "31/01/2027",
+        "ejecucion_pago": None, "compatibilidades": None, "incompatibilidades": None,
+        "referencias": ["Orden 31/2026"], "enlaces": [], "cierre": None, "alertas": [],
+        "fuentes": {"cuantia_max": "Art. 7, pag. 3"}}
+    PETICIONES_DOC: list[dict] = []
+
+    def _texto_simulado(publicacion):
+        return ("[Página 1]\nBases reguladoras. " + "Texto de la convocatoria. " * 40,
+                "https://dogv.gva.es/datos/simulado.pdf", 3, False)
+
+    def _ia_documentos(sistema, mensaje, modelo, max_tokens, **opciones):
+        PETICIONES_DOC.append({"sistema": sistema, "mensaje": mensaje, "modelo": modelo,
+                               "max_tokens": max_tokens, **opciones})
+        return dict(DATOS_BASES)
+
+    documentos.texto_de_publicacion = _texto_simulado
+    anthropic_cliente.llamar_json = _ia_documentos
+    anthropic_cliente.hay_clave = lambda: True
+
+    publicacion_doc = next(p for p in repositorio.publicaciones({}, limite=100)
+                           if "innovacion de pymes del dia" in p["titulo"])
+    datos, meta = documentos.extraer_datos(dict(publicacion_doc))
+    comprobar(len(PETICIONES_DOC) == 1 and PETICIONES_DOC[0]["fase"] == "documentos",
+              "una sola llamada a la IA para los tres documentos")
+    comprobar("DOCUMENTACIÓN OFICIAL APORTADA" in PETICIONES_DOC[0]["sistema"]
+              and "[Página 1]" in PETICIONES_DOC[0]["sistema"],
+              "se le manda el texto integro del PDF con marcas de pagina")
+    comprobar("gastos_elegibles" in PETICIONES_DOC[0]["mensaje"]
+              and "RÉGIMEN DE MINIMIS" in PETICIONES_DOC[0]["mensaje"],
+              "con las mismas instrucciones que Resumen Ayudas")
+    comprobar(PETICIONES_DOC[0]["modelo"] == "claude-sonnet-5" and PETICIONES_DOC[0]["max_tokens"] == 16000,
+              "con Sonnet 5 y 16.000 tokens por defecto")
+    comprobar(publicacion_doc["url_oficial"] in datos["enlaces"],
+              "el enlace oficial se anade aunque la IA no lo cite")
+
+    corto = documentos.renderizar("corto", datos, dict(publicacion_doc))
+    comprobar(all(t in corto for t in ("Nombre/objeto del trámite:", "Beneficiarios:",
+                                       "Actuaciones Apoyables:", "Costes Apoyables:",
+                                       "Tipo de Ayuda y Cuantía:", "Plazo:")),
+              "resumen corto con sus apartados")
+    comprobar("Hasta el 50% con una cuantía máxima de 200.000 €." in corto
+              and "Finaliza el 30 de octubre de 2026." in corto,
+              "redacta cuantia y plazo como Resumen Ayudas")
+    comprobar("Desarrollo de producto: prototipos" in corto,
+              "las actuaciones en forma de objeto se leen bien")
+    comprobar(corto.count("data:image/png;base64,") == 2 and "info@mova.es" in corto,
+              "con logotipo, edificio de fondo y pie del membrete MOVA")
+    comprobar("<script>alert(1)</script>" not in corto and "&lt;script&gt;" in corto,
+              "el texto de la IA se escapa (no se puede inyectar HTML)")
+
+    ampliado = documentos.renderizar("ampliado", datos, dict(publicacion_doc))
+    comprobar(all(t in ampliado for t in ("Exclusiones:", "Criterios de valoración:",
+                                          "Documentación con la solicitud:",
+                                          "Documentación de justificación:",
+                                          "Plazos de ejecución y justificación:",
+                                          "Crédito presupuestario:", "Referencias y enlaces:")),
+              "resumen ampliado con sus apartados")
+    comprobar("Grado de innovacion" in ampliado and "(40)" in ampliado,
+              "los criterios salen con su puntuacion")
+
+    infografia = documentos.renderizar("infografia", datos, dict(publicacion_doc))
+    comprobar("Datos clave" in infografia and "200.000 €" in infografia and "50%" in infografia,
+              "infografia con los datos clave")
+    comprobar("barra-mova" not in infografia, "la version para descargar no lleva la barra")
+
+    print("\n19) Los botones dentro de la aplicacion")
+    import app as aplicacion_mova
+
+    web = aplicacion_mova.crear_aplicacion()
+    web.config["TESTING"] = True
+    cliente = web.test_client()
+    cliente.post("/login", data={"usuario": "admin", "clave": "MovaBoletines2026"})
+    cliente.post("/cambiar-clave", data={"actual": "MovaBoletines2026", "nueva": "PruebaDocs2026!",
+                                         "repetida": "PruebaDocs2026!"})
+    ruta = f"/publicaciones/{publicacion_doc['id']}/documento"
+    PETICIONES_DOC.clear()
+    primera = cliente.get(f"{ruta}/corto")
+    comprobar(primera.status_code == 200 and "Analizando la publicacion" in primera.get_data(as_text=True),
+              "al pulsar el boton se lanza el analisis y se muestra 'generando'")
+    import time as _time
+    for _ in range(50):
+        if not documentos.generando(publicacion_doc["id"]):
+            break
+        _time.sleep(0.1)
+    lista = cliente.get(f"{ruta}/corto").get_data(as_text=True)
+    comprobar("Nombre/objeto del trámite:" in lista and "barra-mova" in lista,
+              "despues se muestra el documento con su barra")
+    cliente.get(f"{ruta}/ampliado")
+    cliente.get(f"{ruta}/infografia")
+    comprobar(len(PETICIONES_DOC) == 1,
+              "abrir los otros dos documentos no vuelve a llamar a la IA")
+    descarga = cliente.get(f"{ruta}/infografia/descargar")
+    comprobar("attachment" in descarga.headers.get("Content-Disposition", "")
+              and "Infografia-" in descarga.headers.get("Content-Disposition", ""),
+              "se puede descargar el documento")
+    tabla = cliente.get("/publicaciones").get_data(as_text=True)
+    comprobar("Resumen corto" in tabla and ">listos<" in tabla,
+              "la tabla de publicaciones muestra los botones y que ya estan generados")
+    comprobar(">Plazo<" not in tabla and ">Beneficiarios<" not in tabla and ">Importe<" not in tabla,
+              "y ya no tiene las columnas de plazo, beneficiarios e importe")
+    aplicacion_mova_planificador = web.config.get("planificador")
+    if aplicacion_mova_planificador:
+        aplicacion_mova_planificador.shutdown(wait=False)
+
     print(f"\n{'TODAS LAS COMPROBACIONES PASAN' if not fallos else 'FALLOS: ' + str(fallos)}")
     print(f"Llamadas simuladas al modelo: {LLAMADAS['n']}")
     return 1 if fallos else 0

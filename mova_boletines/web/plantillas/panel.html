@@ -87,7 +87,7 @@
   {% if recientes %}
   <div class="tabla-desplazable">
     <table class="datos">
-      <thead><tr><th>Fecha</th><th>Comunidad</th><th>Titulo</th><th>Relevancia</th><th>Plazo</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Comunidad</th><th>Titulo</th><th>Relevancia</th><th>Documentos</th></tr></thead>
       <tbody>
         {% for p in recientes %}
         <tr class="{% if p.relevancia == 'alta' %}destacada{% endif %}">
@@ -100,8 +100,9 @@
             {% else %}<span class="pildora pendiente">baja</span>{% endif %}
           </td>
           <td class="celda-estrecha">
-            {% if p.plazo_fin %}<span class="pildora {{ 'error' if p.plazo_fin <= hoy_mas_alerta else 'pendiente' }}">vence {{ p.plazo_fin[8:10] }}/{{ p.plazo_fin[5:7] }}</span>
-            {% elif p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo[:40] }}{% endif %}
+            <a href="{{ url_for('web.documento', publicacion_id=p.id, tipo='corto') }}">Corto</a> &middot;
+            <a href="{{ url_for('web.documento', publicacion_id=p.id, tipo='ampliado') }}">Ampliado</a> &middot;
+            <a href="{{ url_for('web.documento', publicacion_id=p.id, tipo='infografia') }}">Infografia</a>
           </td>
         </tr>
         {% endfor %}

@@ -50,7 +50,7 @@
       <thead>
         <tr>
           <th></th><th>Comunidad</th><th>Boletin</th><th>Fecha</th><th>Titulo</th>
-          <th>Organismo</th><th>Plazo</th><th>Beneficiarios</th><th>Importe</th>
+          <th>Organismo</th><th>Documentos</th>
           <th>Relevancia</th><th>Estado</th><th>Enlaces</th><th></th>
         </tr>
       </thead>
@@ -66,14 +66,19 @@
             {% else %}{{ p.titulo }}{% endif %}
             {% if p.revision_manual %}<br><span class="pildora aviso">{{ marcador_revision }}</span>
             <span class="apoyo">{{ p.motivo_revision[:120] }}</span>{% endif %}
-            {% if p.resumen and p.resumen != marcador %}<br><span class="apoyo">{{ p.resumen[:220] }}</span>{% endif %}
           </td>
           <td>{% if p.organismo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.organismo }}{% endif %}</td>
-          <td>{% if p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo }}{% endif %}
-            {% if p.plazo_fin %}<br><span class="pildora {{ 'error' if p.plazo_fin <= hoy_mas_alerta else 'pendiente' }}" title="{{ 'Fecha escrita en la publicacion' if p.plazo_fin_origen == 'fecha_literal' else 'Fecha estimada a partir del texto del plazo' }}">vence {{ p.plazo_fin[8:10] }}/{{ p.plazo_fin[5:7] }}/{{ p.plazo_fin[0:4] }}{% if p.plazo_fin_origen != 'fecha_literal' %} (est.){% endif %}</span>{% endif %}
+          <td class="celda-estrecha">
+            {% set estado_doc = documentos.get(p.id) %}
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <a class="boton boton-pequeno" href="{{ url_for('web.documento', publicacion_id=p.id, tipo='corto') }}">Resumen corto</a>
+              <a class="boton boton-pequeno" href="{{ url_for('web.documento', publicacion_id=p.id, tipo='ampliado') }}">Resumen ampliado</a>
+              <a class="boton boton-pequeno" href="{{ url_for('web.documento', publicacion_id=p.id, tipo='infografia') }}">Infografia</a>
+              {% if estado_doc == 'listo' %}<span class="pildora ok" title="Ya generados: abrirlos no tiene coste">listos</span>
+              {% elif estado_doc == 'generando' %}<span class="pildora proceso">generando</span>
+              {% elif estado_doc == 'error' %}<span class="pildora error">error</span>{% endif %}
+            </div>
           </td>
-          <td>{% if p.beneficiarios == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.beneficiarios[:160] }}{% endif %}</td>
-          <td>{% if p.importe == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.importe }}{% endif %}</td>
           <td class="celda-estrecha">
             {% if p.relevancia == 'alta' %}<span class="pildora alta">ALTA</span>{% else %}<span class="pildora pendiente">{{ p.relevancia }}</span>{% endif %}
           </td>
@@ -94,7 +99,7 @@
         </tr>
         {% endfor %}
         {% if not publicaciones %}
-        <tr><td colspan="13" class="apoyo">No hay publicaciones que cumplan el filtro.</td></tr>
+        <tr><td colspan="11" class="apoyo">No hay publicaciones que cumplan el filtro.</td></tr>
         {% endif %}
       </tbody>
     </table>

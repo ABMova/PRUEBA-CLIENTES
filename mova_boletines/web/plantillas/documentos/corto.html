@@ -1,0 +1,25 @@
+{% import "_macros.html" as m %}<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Resumen — {{ v('nombre_ayuda', 'Subvención') }}</title>
+{% include "_membrete.html" %}
+</head><body>
+{% include "_barra.html" %}
+<div class="page">
+<img class="wm" src="{{ edificio }}" alt="">
+<div class="doc">
+<header class="head"><img class="logo" src="{{ logo_negro }}" alt="MOVA"></header>
+<h2>Nombre/objeto del trámite:</h2>
+<p>{{ v('nombre_ayuda', '—') }}</p>
+{% if d.objeto and d.objeto != 'null' %}<p>{{ v('objeto') }}</p>{% endif %}
+<h2>Beneficiarios:</h2>
+<p>{{ v('beneficiarios') }}</p>
+<h2>Actuaciones Apoyables:</h2>
+{{ m.vinetas(lista('actuaciones'), 'dot') }}
+<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>
+<h2>Costes Apoyables:</h2>
+{{ m.vinetas(lista('gastos_elegibles'), 'chk') }}
+<h2>Tipo de Ayuda y Cuantía:</h2>
+<p>{{ tipo_cuantia }}</p>
+<h2>Plazo:</h2>
+<p>{{ plazo_txt }}</p>
+{{ m.pie() }}
+</div></div></body></html>

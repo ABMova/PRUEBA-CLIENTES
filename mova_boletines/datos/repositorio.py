@@ -761,3 +761,45 @@ def plazos_que_vencen(desde: str, hasta: str) -> list[sqlite3.Row]:
         "SELECT * FROM publicaciones WHERE plazo_fin IS NOT NULL AND plazo_fin >= ? "
         "AND plazo_fin <= ? AND estado IN ('nueva','enviada') "
         "ORDER BY plazo_fin, relevancia='alta' DESC", (desde, hasta))
+
+
+# ------------------------------------------------ documentos de la publicacion --
+def documento(publicacion_id: int) -> sqlite3.Row | None:
+    return _uno("SELECT * FROM documentos_publicacion WHERE publicacion_id=?", (publicacion_id,))
+
+
+def documentos_de(ids: list[int]) -> dict[int, str]:
+    """Estado del documento de cada publicacion: {id: 'listo' | 'generando' | 'error'}."""
+    if not ids:
+        return {}
+    marcadores = ",".join("?" for _ in ids)
+    filas = _consulta(
+        f"SELECT publicacion_id, estado FROM documentos_publicacion "
+        f"WHERE publicacion_id IN ({marcadores})", ids)
+    return {fila["publicacion_id"]: fila["estado"] for fila in filas}
+
+
+def marcar_documento(publicacion_id: int, estado: str, usuario: str = "", error: str = "") -> None:
+    _escribir(
+        "INSERT INTO documentos_publicacion (publicacion_id, estado, solicitado_por, error) "
+        "VALUES (?,?,?,?) ON CONFLICT(publicacion_id) DO UPDATE SET estado=excluded.estado, "
+        "error=excluded.error, solicitado_por=CASE WHEN excluded.solicitado_por<>'' "
+        "THEN excluded.solicitado_por ELSE solicitado_por END, actualizado_en=datetime('now')",
+        (publicacion_id, estado, usuario, error[:1000]))
+
+
+def guardar_documento(publicacion_id: int, datos_json: str, modelo: str, fuente: str,
+                      paginas: int, caracteres: int, recortado: bool) -> None:
+    _escribir(
+        "UPDATE documentos_publicacion SET estado='listo', datos_json=?, modelo=?, fuente=?, "
+        "paginas=?, caracteres=?, recortado=?, error='', actualizado_en=datetime('now') "
+        "WHERE publicacion_id=?",
+        (datos_json, modelo, fuente, paginas, caracteres, int(recortado), publicacion_id))
+
+
+def documentos_generando_huerfanos() -> int:
+    """Al arrancar: lo que quedo a medias por un reinicio vuelve a estar disponible."""
+    return _escribir_filas(
+        "UPDATE documentos_publicacion SET estado='error', "
+        "error='La generacion se interrumpio al reiniciar la aplicacion. Vuelve a pulsar el boton.', "
+        "actualizado_en=datetime('now') WHERE estado='generando'")

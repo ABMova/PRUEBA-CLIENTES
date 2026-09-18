@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block contenido %}
+{% if refrescar %}<meta http-equiv="refresh" content="4">{% endif %}
+<div class="card" style="max-width:760px;">
+  <h2>{{ rotulo }}</h2>
+  <p><strong>{{ publicacion.titulo_resumido or publicacion.titulo[:160] }}</strong></p>
+  <p class="apoyo">{{ publicacion.boletin_nombre }} &middot; {{ publicacion.fecha_publicacion }}</p>
+
+  {% if estado == 'generando' %}
+  <div class="aviso info">
+    <strong>Analizando la publicacion con la IA.</strong> Se descarga el PDF oficial, se lee entero y
+    se extraen los datos para los tres documentos (resumen corto, ampliado e infografia). Suele tardar
+    entre medio minuto y dos minutos; esta pagina se actualiza sola.
+  </div>
+  <div class="barra-progreso"><div class="relleno" style="width:60%;"></div></div>
+  {% elif estado == 'error' %}
+  <div class="aviso error"><strong>No se ha podido generar.</strong> {{ mensaje }}</div>
+  {% if puede_generar %}
+  <p><a class="boton boton-principal" href="{{ url_reintentar }}">Reintentar</a></p>
+  {% endif %}
+  {% elif estado == 'sin_permiso' %}
+  <div class="aviso warn">Los documentos de esta publicacion aun no se han generado y tu rol no puede
+    lanzar analisis con la IA (tienen coste). Pide a un editor o administrador que pulse el boton.</div>
+  {% endif %}
+
+  <p style="margin-top:14px;">
+    <a class="boton" href="{{ url_for('web.publicaciones') }}">&larr; Publicaciones</a>
+    {% if publicacion.url_pdf %}<a class="boton" href="{{ publicacion.url_pdf }}" target="_blank" rel="noopener">PDF oficial</a>{% endif %}
+  </p>
+</div>
+{% endblock %}
