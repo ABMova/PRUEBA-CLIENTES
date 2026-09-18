@@ -44,15 +44,35 @@ def tiene_permiso(permiso: str) -> bool:
     return permiso in PERMISOS.get(fila["rol"], set())
 
 
+# Freno a quien prueba contrasenas: por IP y por usuario, en una ventana movil.
+MAX_FALLOS_IP = 10
+MAX_FALLOS_USUARIO = 5
+VENTANA_FALLOS = 15  # minutos
+MENSAJE_BLOQUEO = ("Demasiados intentos fallidos. Por seguridad, espera 15 minutos antes de "
+                   "volver a intentarlo.")
+
+
+def _registrar_fallo(usuario: str, ip: str, motivo: str) -> None:
+    repositorio.registrar_intento_ip(ip, "login_ip")
+    repositorio.registrar_intento_ip(ip, f"login_usuario:{usuario.strip().lower()}")
+    repositorio.registrar_auditoria(usuario, "inicio_sesion", usuario, motivo, ip, "error")
+
+
 def iniciar_sesion(usuario: str, clave: str, ip: str, agente: str) -> tuple[bool, str]:
+    nombre = usuario.strip().lower()
+    if (repositorio.intentos_recientes(ip, VENTANA_FALLOS, "login_ip") >= MAX_FALLOS_IP
+            or repositorio.intentos_de_recurso(f"login_usuario:{nombre}", VENTANA_FALLOS)
+            >= MAX_FALLOS_USUARIO):
+        repositorio.registrar_auditoria(usuario, "inicio_sesion", usuario,
+                                        "Bloqueado por demasiados intentos fallidos", ip, "error")
+        return False, MENSAJE_BLOQUEO
+
     fila = repositorio.usuario_por_nombre(usuario)
     if fila is None or not fila["activo"]:
-        repositorio.registrar_auditoria(usuario, "inicio_sesion", usuario,
-                                        "Usuario inexistente o desactivado", ip, "error")
+        _registrar_fallo(usuario, ip, "Usuario inexistente o desactivado")
         return False, "Usuario o contrasena incorrectos"
     if not repositorio.verificar_clave(fila, clave):
-        repositorio.registrar_auditoria(usuario, "inicio_sesion", usuario,
-                                        "Contrasena incorrecta", ip, "error")
+        _registrar_fallo(usuario, ip, "Contrasena incorrecta")
         return False, "Usuario o contrasena incorrectos"
 
     identificador = repositorio.crear_sesion(fila["id"], ip, agente)
@@ -100,7 +120,6 @@ def requiere(permiso: str = "ver"):
 
 
 def ip_peticion() -> str:
-    reenviada = request.headers.get("X-Forwarded-For", "")
-    if reenviada:
-        return reenviada.split(",")[0].strip()
+    """IP del visitante. Con MOVA_DETRAS_DE_PROXY=1 la corrige ProxyFix en app.py;
+    sin proxy NO se lee X-Forwarded-For, que cualquiera puede inventarse."""
     return request.remote_addr or ""

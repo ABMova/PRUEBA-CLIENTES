@@ -20,6 +20,7 @@ from datetime import date, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import config
 from datos import copias, repositorio
@@ -179,6 +180,8 @@ def crear_aplicacion() -> Flask:
     aplicacion.secret_key = secreto_persistente()
     aplicacion.config.update(
         SESSION_COOKIE_HTTPONLY=True,
+        # Publicada con https, la cookie de sesion no viaja nunca sin cifrar.
+        SESSION_COOKIE_SECURE=config.HTTPS,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_NAME="mova_boletines",
         PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
@@ -186,12 +189,18 @@ def crear_aplicacion() -> Flask:
         clave_provisional=provisional,
     )
     aplicacion.register_blueprint(plano_web)
+    if config.DETRAS_DE_PROXY:
+        # Un solo salto (Nginx o el tunel): IP, esquema y host reales del visitante.
+        aplicacion.wsgi_app = ProxyFix(aplicacion.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     @aplicacion.after_request
     def cabeceras_seguridad(respuesta):
         respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
         respuesta.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         respuesta.headers.setdefault("Referrer-Policy", "same-origin")
+        if config.HTTPS:
+            respuesta.headers.setdefault("Strict-Transport-Security",
+                                         "max-age=31536000; includeSubDomains")
         return respuesta
 
     @aplicacion.teardown_appcontext

@@ -73,6 +73,13 @@ PUERTO = int(os.getenv("MOVA_PUERTO", "8770"))
 ABRIR_NAVEGADOR = os.getenv("MOVA_ABRIR_NAVEGADOR", "1") == "1"
 URL_PUBLICA = os.getenv("MOVA_URL_PUBLICA", f"http://{HOST}:{PUERTO}").rstrip("/")
 LOG_NIVEL = os.getenv("MOVA_LOG_NIVEL", "INFO").upper()
+
+# Publicacion en internet. Detras de Nginx (o de un tunel) la IP real del
+# visitante llega en X-Forwarded-For; solo se confia en esa cabecera si se
+# declara aqui, porque sin proxy cualquiera podria falsificarla y saltarse los
+# limites de intentos.
+DETRAS_DE_PROXY = os.getenv("MOVA_DETRAS_DE_PROXY", "0") == "1"
+HTTPS = URL_PUBLICA.lower().startswith("https://")
 API_KEY_ENTORNO = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
 ZONA_HORARIA = "Europe/Madrid"

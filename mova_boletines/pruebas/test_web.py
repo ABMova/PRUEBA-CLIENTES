@@ -173,6 +173,33 @@ def main() -> int:  # noqa: PLR0915 - prueba lineal
         tras_salir = sesion.get(f"{BASE}/", allow_redirects=False, timeout=10)
         comprobar(tras_salir.status_code == 302, "tras salir, el panel vuelve a pedir acceso")
 
+        print("\n11) Proteccion para publicarla en internet")
+        cookie = requests.get(f"{BASE}/login", timeout=10)
+        falsa_ip = requests.post(f"{BASE}/login", data={"usuario": "nadie", "clave": "x"},
+                                 headers={"X-Forwarded-For": "203.0.113.77"}, timeout=10)
+        comprobar(falsa_ip.status_code == 200, "un intento con cabecera X-Forwarded-For inventada")
+        import sqlite3
+        con = sqlite3.connect(carpeta / "mova.db")
+        ultima_ip = con.execute("SELECT ip FROM auditoria WHERE usuario='nadie' "
+                                "ORDER BY id DESC LIMIT 1").fetchone()[0]
+        con.close()
+        comprobar(ultima_ip == "127.0.0.1",
+                  f"sin proxy declarado se ignora la IP falsificada (registra {ultima_ip})")
+
+        bloqueo = requests.Session()
+        for _ in range(5):
+            bloqueo.post(f"{BASE}/login", data={"usuario": "admin", "clave": "mala"}, timeout=10)
+        buena = bloqueo.post(f"{BASE}/login", data={"usuario": "admin", "clave": "ClaveLarga2026!"},
+                             timeout=10)
+        comprobar("Demasiados intentos fallidos" in buena.text,
+                  "tras 5 fallos, el usuario queda bloqueado 15 minutos aunque acierte")
+        comprobar("mova_boletines" not in bloqueo.cookies.get_dict()
+                  or bloqueo.get(f"{BASE}/", allow_redirects=False, timeout=10).status_code == 302,
+                  "y no obtiene sesion")
+        comprobar("HttpOnly" in cookie.headers.get("Set-Cookie", "HttpOnly")
+                  and "Secure" not in cookie.headers.get("Set-Cookie", ""),
+                  "en http local la cookie no se marca Secure (con https si)")
+
     finally:
         proceso.terminate()
         try:

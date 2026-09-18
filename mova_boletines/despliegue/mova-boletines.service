@@ -27,6 +27,8 @@ Environment=MOVA_HOST=127.0.0.1
 Environment=MOVA_PUERTO=8770
 Environment=MOVA_ABRIR_NAVEGADOR=0
 Environment=MOVA_URL_PUBLICA=https://boletines.miempresa.local
+; Detras de Nginx: confiar en X-Forwarded-For para la IP real (limites de intentos)
+Environment=MOVA_DETRAS_DE_PROXY=1
 Environment=MOVA_DATOS=/var/lib/mova-boletines
 Environment=MOVA_LOG_NIVEL=INFO
 Environment=PYTHONUNBUFFERED=1

@@ -835,3 +835,10 @@ def token_documento(token: str) -> sqlite3.Row | None:
 def usar_token_documento(token: str, ip: str) -> None:
     _escribir("UPDATE tokens_documento SET usos=usos+1, ultimo_uso=datetime('now'), ultima_ip=?, "
               "actualizado_en=datetime('now') WHERE token=?", (ip, token))
+
+
+def intentos_de_recurso(recurso: str, minutos: int) -> int:
+    """Intentos de un recurso desde cualquier IP (p. ej. fallos de un mismo usuario)."""
+    fila = _uno("SELECT COUNT(*) AS n FROM intentos_ip WHERE recurso=? "
+                "AND creado_en > datetime('now', ?)", (recurso, f"-{int(minutos)} minutes"))
+    return int(fila["n"])
