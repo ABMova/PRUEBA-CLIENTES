@@ -19,8 +19,8 @@
   {% endfor %}
   <span class="hueco"></span>
   <span class="nota">{{ barra.nota }}</span>
-  <button type="button" class="principal" onclick="window.print()">Imprimir / guardar PDF</button>
-  <a href="{{ barra.descargar }}">Descargar</a>
+  <a class="principal" href="{{ barra.descargar }}">Descargar PDF</a>
+  <button type="button" onclick="window.print()">Imprimir</button>
   {% if barra.regenerar %}
   <form method="post" action="{{ barra.regenerar }}" style="display:inline" onsubmit="return confirm('Volver a analizar la publicacion con la IA? Tiene coste.');">
     <button type="submit">Regenerar</button>

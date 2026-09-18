@@ -28,6 +28,7 @@ import config
 from datos import repositorio
 from integraciones import anthropic_cliente
 from negocio.boletines.base import ErrorBoletin, pedir
+from negocio import pdf
 from negocio.extraccion import texto_con_paginas
 
 registro = logging.getLogger(__name__)
@@ -363,18 +364,38 @@ def _entorno() -> Environment:
                        autoescape=select_autoescape(["html"]))
 
 
-def renderizar(tipo: str, datos: dict, publicacion: dict, barra: dict | None = None) -> str:
-    """HTML autocontenido del documento. barra: botones de la aplicacion (no se imprimen)."""
+def renderizar(tipo: str, datos: dict, publicacion: dict, barra: dict | None = None,
+               para_pdf: bool = False) -> str:
+    """HTML autocontenido del documento. barra: botones de la aplicacion (no se imprimen).
+
+    para_pdf: la infografia se convierte en UNA hoja alta, sin cortes de pagina.
+    """
     if tipo not in TIPOS:
         raise ErrorDocumento("Tipo de documento desconocido")
     contexto = _contexto(datos, publicacion)
     contexto["barra"] = barra
     contexto["tipos"] = TIPOS
     contexto["tipo"] = tipo
+    contexto["para_pdf"] = para_pdf
     return _entorno().get_template(f"{tipo}.html").render(**contexto)
 
 
-def nombre_fichero(tipo: str, publicacion: dict) -> str:
+def nombre_fichero(tipo: str, publicacion: dict, extension: str = "pdf") -> str:
     base = {"corto": "ResumenCorto", "ampliado": "ResumenAmpliado", "infografia": "Infografia"}[tipo]
     titulo = re.sub(r"[^A-Za-z0-9]+", "-", (publicacion.get("titulo_resumido") or "")[:50]).strip("-")
-    return f"{base}-{publicacion.get('codigo_boletin', '')}-{publicacion.get('id', '')}-{titulo}.html"
+    return f"{base}-{publicacion.get('codigo_boletin', '')}-{publicacion.get('id', '')}-{titulo}.{extension}"
+
+
+def descarga(tipo: str, datos: dict, publicacion: dict) -> tuple[bytes, str, str]:
+    """Fichero para el boton Descargar: (contenido, tipo MIME, nombre).
+
+    Es un PDF. Si el equipo no tiene navegador con el que crearlo, se entrega
+    el HTML (se abre igual en cualquier navegador) y se deja aviso en el registro.
+    """
+    try:
+        contenido = pdf.html_a_pdf(renderizar(tipo, datos, publicacion, para_pdf=True))
+        return contenido, "application/pdf", nombre_fichero(tipo, publicacion, "pdf")
+    except pdf.ErrorPdf as exc:
+        registro.warning("No se pudo crear el PDF (%s); se descarga en HTML", exc)
+        html = renderizar(tipo, datos, publicacion).encode("utf-8")
+        return html, "text/html", nombre_fichero(tipo, publicacion, "html")

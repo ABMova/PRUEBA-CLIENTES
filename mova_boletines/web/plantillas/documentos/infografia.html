@@ -30,7 +30,25 @@ li:last-child{border:none}
 .cierre .pie{margin-top:14px;font-size:11px;color:#7c7a72}
 @media print{body{background:#0b0b0d;-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{box-shadow:none;margin:0;border-radius:0;max-width:100%}}
 @media (max-width:700px){.kpis,.dest-grid{grid-template-columns:1fr}.sec,.hero,.cab{padding-left:18px;padding-right:18px}}
-</style></head><body>
+{% if para_pdf %}
+.page{margin:0 auto;border:none;border-radius:0;box-shadow:none}
+{% endif %}
+</style>
+{% if para_pdf %}
+<script>
+/* Hoja a medida del contenido: la infografia no se parte en paginas. */
+addEventListener("DOMContentLoaded", function () {
+  var hoja = document.querySelector(".page");
+  var ancho = Math.ceil(hoja.getBoundingClientRect().width);
+  var alto = Math.ceil(hoja.getBoundingClientRect().height) + 2;
+  var estilo = document.createElement("style");
+  estilo.textContent = "@page{size:" + ancho + "px " + alto + "px;margin:0}" +
+    "html,body{width:" + ancho + "px;background:#121216}";
+  document.head.appendChild(estilo);
+});
+</script>
+{% endif %}
+</head><body>
 {% include "_barra.html" %}
 <div class="page">
 <div class="cab"><div><img class="logo-img" src="{{ logo_oro }}" alt="MOVA"><div class="sub">Consultoría de Subvenciones</div></div></div>

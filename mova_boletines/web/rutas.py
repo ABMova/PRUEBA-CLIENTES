@@ -343,6 +343,13 @@ def documento(publicacion_id: int, tipo: str):
     return _pagina_estado(fila, tipo, "generando")
 
 
+def _respuesta_descarga(tipo: str, doc, fila) -> Response:
+    contenido, mime, nombre = documentos.descarga(
+        tipo, json.loads(doc["datos_json"] or "{}"), dict(fila))
+    return Response(contenido, mimetype=mime,
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
 @web.route("/publicaciones/<int:publicacion_id>/documento/<tipo>/descargar")
 @auth.requiere("ver")
 def descargar_documento(publicacion_id: int, tipo: str):
@@ -351,10 +358,7 @@ def descargar_documento(publicacion_id: int, tipo: str):
     if tipo not in documentos.TIPOS or fila is None or doc is None or doc["estado"] != "listo":
         flash("El documento todavia no esta generado", "error")
         return redirect(url_for("web.publicaciones"))
-    html = documentos.renderizar(tipo, json.loads(doc["datos_json"] or "{}"), dict(fila))
-    nombre = documentos.nombre_fichero(tipo, dict(fila))
-    return Response(html, mimetype="text/html",
-                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    return _respuesta_descarga(tipo, doc, fila)
 
 
 @web.route("/publicaciones/<int:publicacion_id>/documento/regenerar", methods=["POST"])
@@ -441,10 +445,7 @@ def descargar_por_clave(token: str, tipo: str):
     doc = repositorio.documento(fila["id"])
     if doc is None or doc["estado"] != "listo":
         return redirect(url_for("web.documento_por_clave", token=token, tipo=tipo))
-    html = documentos.renderizar(tipo, json.loads(doc["datos_json"] or "{}"), dict(fila))
-    nombre = documentos.nombre_fichero(tipo, dict(fila))
-    return Response(html, mimetype="text/html",
-                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    return _respuesta_descarga(tipo, doc, fila)
 
 
 @web.route("/publicaciones/<int:publicacion_id>/descartar")

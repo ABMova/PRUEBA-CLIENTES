@@ -16,6 +16,19 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.5: los documentos se descargan en PDF
+
+El botón **Descargar PDF** de cada documento entrega un PDF, ya no un HTML. El
+resumen corto y el ampliado salen en A4 con el membrete en cada página (logo
+arriba, edificio de fondo, pie con la dirección al final de cada hoja). La
+infografía sale en una sola hoja alta, sin cortes. El botón **Imprimir** sigue
+abriendo la impresora del navegador.
+
+El PDF lo crea el Edge del propio equipo, sin ventana y sin conexión a internet
+(unos 2 segundos). En Windows no hay que instalar nada. Si en algún equipo no
+hubiera Edge ni Chrome, se descarga el HTML y queda aviso en el registro. Para
+usar otro navegador: variable `MOVA_NAVEGADOR_PDF` con la ruta del ejecutable.
+
 ### Novedades de la versión 1.2: resumen corto, ampliado e infografía
 
 Las fichas del correo y de la aplicación ya **no muestran Resumen, Plazo,
@@ -32,7 +45,7 @@ Al pulsar cualquiera de los tres, la herramienta descarga el PDF oficial, lo lee
 entero y la IA extrae los datos **una sola vez** con las mismas instrucciones que
 Resumen Ayudas. Los tres documentos salen de esa extracción y quedan guardados:
 abrir los otros dos, o volver a abrirlos, no tiene coste. Se pueden imprimir o
-guardar en PDF desde el navegador, o descargar como HTML.
+descargar en PDF (desde la 1.5).
 
 - Los botones del correo abren la aplicación, que pide iniciar sesión. Solo
   funcionan desde este equipo mientras la URL pública sea `127.0.0.1`.
@@ -167,6 +180,7 @@ sudo -u mova git clone <repositorio> /opt/mova-boletines
 cd /opt/mova-boletines
 sudo -u mova python3.11 -m venv .venv
 sudo -u mova .venv/bin/pip install -r requirements.txt
+sudo apt install -y chromium   # crea los PDF de los documentos
 sudo cp despliegue/mova-boletines.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now mova-boletines
 sudo cp despliegue/nginx-mova-boletines.conf /etc/nginx/sites-available/

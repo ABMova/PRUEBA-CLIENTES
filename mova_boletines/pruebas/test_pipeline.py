@@ -685,6 +685,14 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("attachment" in descarga.headers.get("Content-Disposition", "")
               and "Infografia-" in descarga.headers.get("Content-Disposition", ""),
               "se puede descargar el documento")
+    from negocio import pdf as _pdf
+    if _pdf.navegador():
+        disposicion = descarga.headers.get("Content-Disposition", "")
+        comprobar(descarga.mimetype == "application/pdf" and descarga.data.startswith(b"%PDF")
+                  and disposicion.endswith('.pdf"'),
+                  "y se descarga en PDF, no en HTML")
+    else:
+        print("   (sin Edge ni Chrome en este equipo: no se comprueba el PDF)")
     tabla = cliente.get("/publicaciones").get_data(as_text=True)
     comprobar("Resumen corto" in tabla and ">listos<" in tabla,
               "la tabla de publicaciones muestra los botones y que ya estan generados")
@@ -715,6 +723,9 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     descarga = anonimo.get(f"/d/{clave}/corto/descargar")
     comprobar("attachment" in descarga.headers.get("Content-Disposition", ""),
               "puede descargarlos")
+    if _pdf.navegador():
+        comprobar(descarga.mimetype == "application/pdf" and descarga.data.startswith(b"%PDF"),
+                  "tambien en PDF")
     comprobar(anonimo.get("/publicaciones").status_code == 302,
               "la clave no abre el resto de la herramienta")
     falsa = anonimo.get("/d/claveInventadaQueNoExiste1234567/corto")
