@@ -20,6 +20,7 @@ import requests
 RAIZ = Path(__file__).resolve().parents[1]
 PUERTO = 8779
 BASE = f"http://127.0.0.1:{PUERTO}"
+HOST_PUBLICO = "antonio-mova.prueba.ts.net"
 
 fallos: list[str] = []
 
@@ -35,6 +36,7 @@ def arrancar(carpeta: Path) -> subprocess.Popen:
                    MOVA_DATOS=str(carpeta),
                    MOVA_PUERTO=str(PUERTO),
                    MOVA_ABRIR_NAVEGADOR="0",
+                   MOVA_URL_PUBLICA=f"https://{HOST_PUBLICO}",
                    MOVA_LOG_NIVEL="WARNING")
     proceso = subprocess.Popen(
         [str(RAIZ / ".venv" / "Scripts" / "python.exe"), str(RAIZ / "app.py")],
@@ -199,6 +201,24 @@ def main() -> int:  # noqa: PLR0915 - prueba lineal
         comprobar("HttpOnly" in cookie.headers.get("Set-Cookie", "HttpOnly")
                   and "Secure" not in cookie.headers.get("Set-Cookie", ""),
                   "en http local la cookie no se marca Secure (con https si)")
+
+        print("\n12) Desde internet solo responden los enlaces del correo")
+        publico = {"Host": HOST_PUBLICO}
+        for ruta in ("/login", "/", "/publicaciones", "/ajustes", "/usuarios", "/api/progreso"):
+            r = requests.get(f"{BASE}{ruta}", headers=publico, allow_redirects=False, timeout=10)
+            comprobar(r.status_code == 404 and "Direccion reservada" in r.text,
+                      f"desde la direccion publica, {ruta} no existe ({r.status_code})")
+        r = requests.get(f"{BASE}/d/claveInventadaQueNoExiste1234567/corto", headers=publico,
+                         timeout=10)
+        comprobar(r.status_code == 404 and "no es valido" in r.text,
+                  "los botones del correo si llegan (y validan su clave)")
+        r = requests.get(f"{BASE}/estaticos/mova.css", headers=publico, timeout=10)
+        comprobar(r.status_code == 200, "con sus estilos")
+        r = requests.get(f"{BASE}/login", headers={"Tailscale-Funnel-Request": "?1"},
+                         allow_redirects=False, timeout=10)
+        comprobar(r.status_code == 404, "lo que llega por el tunel de Tailscale tambien se filtra")
+        r = requests.get(f"{BASE}/login", timeout=10)
+        comprobar(r.status_code == 200, "y en local la herramienta sigue entera")
 
     finally:
         proceso.terminate()

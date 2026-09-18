@@ -14,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 NOMBRE_APP = "MOVA Boletines Oficiales"
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 LEMA = "Vigilancia diaria de ayudas y subvenciones en boletines autonomicos"
 
 
@@ -79,6 +79,8 @@ LOG_NIVEL = os.getenv("MOVA_LOG_NIVEL", "INFO").upper()
 # declara aqui, porque sin proxy cualquiera podria falsificarla y saltarse los
 # limites de intentos.
 DETRAS_DE_PROXY = os.getenv("MOVA_DETRAS_DE_PROXY", "0") == "1"
+# Desde la direccion publica solo se sirven los enlaces del correo (por defecto).
+PUBLICO_SOLO_ENLACES = os.getenv("MOVA_PUBLICO_SOLO_ENLACES", "1") == "1"
 HTTPS = URL_PUBLICA.lower().startswith("https://")
 API_KEY_ENTORNO = os.getenv("ANTHROPIC_API_KEY", "").strip()
 

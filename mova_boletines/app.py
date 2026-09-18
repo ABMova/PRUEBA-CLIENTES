@@ -19,7 +19,8 @@ from datetime import date, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from flask import Flask
+from flask import Flask, render_template, request
+from flask.sessions import SecureCookieSessionInterface
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import config
@@ -147,6 +148,43 @@ def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
     return planificador
 
 
+# ------------------------------------------------- publicacion en internet --
+class SesionSegunConexion(SecureCookieSessionInterface):
+    """Cookie Secure solo cuando la peticion llega por https.
+
+    Con la direccion publica https (tunel o servidor), quien entra en local por
+    http://127.0.0.1 necesita una cookie sin Secure o no podria iniciar sesion.
+    """
+
+    def get_cookie_secure(self, app) -> bool:  # noqa: D102
+        return request.is_secure
+
+
+# Lo unico que se sirve a quien llega desde la direccion publica: los botones
+# del correo (documentos con clave y descartes), sus estaticos y /salud.
+RUTAS_PUBLICAS = ("/d/", "/descartar/", "/estaticos/", "/salud")
+HOSTS_LOCALES = ("127.0.0.1", "localhost", "::1", "")
+
+
+def _host_publico() -> str:
+    from urllib.parse import urlparse
+
+    from negocio import correo
+
+    return (urlparse(correo.url_publica()).hostname or "").lower()
+
+
+def es_peticion_publica() -> bool:
+    """La peticion viene de internet (direccion publica o tunel de Tailscale)."""
+    if request.headers.get("Tailscale-Funnel-Request"):
+        return True
+    publico = _host_publico()
+    if publico in HOSTS_LOCALES:
+        return False
+    host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(":")[0].lower()
+    return host == publico
+
+
 # ------------------------------------------------------------- aplicacion --
 def crear_aplicacion() -> Flask:
     preparar_registro()
@@ -178,10 +216,9 @@ def crear_aplicacion() -> Flask:
                        static_folder=str(config.RUTA_ESTATICOS),
                        static_url_path="/estaticos")
     aplicacion.secret_key = secreto_persistente()
+    aplicacion.session_interface = SesionSegunConexion()
     aplicacion.config.update(
         SESSION_COOKIE_HTTPONLY=True,
-        # Publicada con https, la cookie de sesion no viaja nunca sin cifrar.
-        SESSION_COOKIE_SECURE=config.HTTPS,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_NAME="mova_boletines",
         PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
@@ -198,10 +235,29 @@ def crear_aplicacion() -> Flask:
         respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
         respuesta.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         respuesta.headers.setdefault("Referrer-Policy", "same-origin")
-        if config.HTTPS:
+        if request.is_secure:
             respuesta.headers.setdefault("Strict-Transport-Security",
                                          "max-age=31536000; includeSubDomains")
         return respuesta
+
+    @aplicacion.before_request
+    def solo_enlaces_desde_internet():
+        """Desde internet solo responden los enlaces del correo.
+
+        Panel, ajustes, usuarios e inicio de sesion no existen para quien llega
+        por la direccion publica: se administran desde el propio equipo. Se
+        puede desactivar con MOVA_PUBLICO_SOLO_ENLACES=0 (servidor con usuarios
+        que entran desde fuera).
+        """
+        if not config.PUBLICO_SOLO_ENLACES or not es_peticion_publica():
+            return None
+        if request.path.startswith(RUTAS_PUBLICAS):
+            return None
+        return render_template(
+            "descarte_ok.html", titulo_pagina="MOVA Boletines Oficiales",
+            titulo_resultado="Direccion reservada", clase="warn",
+            mensaje="Esta direccion solo sirve para abrir los botones de los correos "
+                    "(resumenes, infografia y descartes).", publicacion=""), 404
 
     @aplicacion.teardown_appcontext
     def cerrar(_error=None):
