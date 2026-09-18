@@ -5,8 +5,10 @@
 {% include "_barra.html" %}
 <div class="page">
 <img class="wm" src="{{ edificio }}" alt="">
-<div class="doc">
-<header class="head"><img class="logo" src="{{ logo_negro }}" alt="MOVA"></header>
+<table class="maqueta">
+<thead><tr><td><header class="head"><img class="logo" src="{{ logo_negro }}" alt="MOVA"></header></td></tr></thead>
+<tfoot><tr><td><div class="hueco-pie"></div></td></tr></tfoot>
+<tbody><tr><td><div class="doc">
 <h2>Nombre/objeto del trámite:</h2>
 <p>{{ v('nombre_ayuda', '—') }}</p>
 {% if d.objeto and d.objeto != 'null' %}<p>{{ v('objeto') }}</p>{% endif %}
@@ -21,5 +23,7 @@
 <p>{{ tipo_cuantia }}</p>
 <h2>Plazo:</h2>
 <p>{{ plazo_txt }}</p>
+</div></td></tr></tbody>
+</table>
 {{ m.pie() }}
-</div></div></body></html>
+</div></body></html>
