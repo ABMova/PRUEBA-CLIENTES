@@ -85,7 +85,7 @@ Opciones:
 instalar_tarea.bat -Hora 06:45          cambia la hora del disparo de respaldo
 instalar_tarea.bat -Dias Diaria         tambien fines de semana
 instalar_tarea.bat -Puerto 8880         si el 8770 esta ocupado
-instalar_tarea.bat -Programa "C:uta\MOVA Boletines Oficiales.exe"
+instalar_tarea.bat -Programa "C:\ruta\MOVA Boletines Oficiales.exe"
 desinstalar_tarea.bat                   quita la tarea (no borra ningun dato)
 ```
 
