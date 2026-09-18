@@ -62,13 +62,16 @@
           <td class="celda-estrecha">{{ p.codigo_boletin }}</td>
           <td class="celda-estrecha">{{ p.fecha_publicacion }}</td>
           <td>
-            {{ p.titulo }}
+            {% if p.titulo_resumido %}<strong>{{ p.titulo_resumido }}</strong><br><span class="apoyo">{{ p.titulo }}</span>
+            {% else %}{{ p.titulo }}{% endif %}
             {% if p.revision_manual %}<br><span class="pildora aviso">{{ marcador_revision }}</span>
             <span class="apoyo">{{ p.motivo_revision[:120] }}</span>{% endif %}
             {% if p.resumen and p.resumen != marcador %}<br><span class="apoyo">{{ p.resumen[:220] }}</span>{% endif %}
           </td>
           <td>{% if p.organismo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.organismo }}{% endif %}</td>
-          <td>{% if p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo }}{% endif %}</td>
+          <td>{% if p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo }}{% endif %}
+            {% if p.plazo_fin %}<br><span class="pildora {{ 'error' if p.plazo_fin <= hoy_mas_alerta else 'pendiente' }}" title="{{ 'Fecha escrita en la publicacion' if p.plazo_fin_origen == 'fecha_literal' else 'Fecha estimada a partir del texto del plazo' }}">vence {{ p.plazo_fin[8:10] }}/{{ p.plazo_fin[5:7] }}/{{ p.plazo_fin[0:4] }}{% if p.plazo_fin_origen != 'fecha_literal' %} (est.){% endif %}</span>{% endif %}
+          </td>
           <td>{% if p.beneficiarios == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.beneficiarios[:160] }}{% endif %}</td>
           <td>{% if p.importe == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.importe }}{% endif %}</td>
           <td class="celda-estrecha">

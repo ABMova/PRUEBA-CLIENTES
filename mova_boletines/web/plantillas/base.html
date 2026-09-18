@@ -38,7 +38,8 @@
       ('web.descartes', 'Descartes'),
       ('web.boletines', 'Boletines'),
       ('web.palabras', 'Palabras clave'),
-      ('web.destinatarios', 'Destinatarios')
+      ('web.destinatarios', 'Destinatarios'),
+      ('web.coste', 'Coste')
     ] %}
     {% for destino, rotulo in pasos %}
     <a class="paso {% if request.endpoint == destino %}activo{% endif %}" href="{{ url_for(destino) }}">
@@ -55,7 +56,7 @@
     ] %}
     {% for destino, rotulo in pasos_admin %}
     <a class="paso {% if request.endpoint == destino %}activo{% endif %}" href="{{ url_for(destino) }}">
-      <span class="numero">{{ loop.index + 7 }}</span>{{ rotulo }} <span class="candado">&#128274;</span>
+      <span class="numero">{{ loop.index + pasos|length }}</span>{{ rotulo }} <span class="candado">&#128274;</span>
     </a>
     {% endfor %}
 

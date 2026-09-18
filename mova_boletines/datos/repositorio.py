@@ -98,10 +98,16 @@ _COLUMNAS_ESPERADAS: dict[str, dict[str, str]] = {
         "revision_manual": "INTEGER NOT NULL DEFAULT 0",
         "motivo_revision": "TEXT NOT NULL DEFAULT ''",
         "json_modelo": "TEXT NOT NULL DEFAULT ''",
+        # v1.1: titulo resumido, fin de plazo y alertas
+        "titulo_resumido": "TEXT NOT NULL DEFAULT ''",
+        "plazo_fin": "TEXT",
+        "plazo_fin_origen": "TEXT NOT NULL DEFAULT ''",
+        "alerta_enviada": "INTEGER NOT NULL DEFAULT 0",
     },
     "ejecuciones": {
         "llamadas_modelo": "INTEGER NOT NULL DEFAULT 0",
         "registro": "TEXT NOT NULL DEFAULT ''",
+        "coste_usd": "REAL NOT NULL DEFAULT 0",
     },
     "boletines": {
         "via_acceso": "TEXT NOT NULL DEFAULT ''",
@@ -388,12 +394,13 @@ def cerrar_ejecucion(ejecucion_id: int, estado: str, detalle: str, registro: str
     _escribir(
         "UPDATE ejecuciones SET estado=?, detalle=?, registro=?, terminado_en=datetime('now'), "
         "boletines_ok=?, boletines_fallidos=?, publicaciones_brutas=?, candidatas=?, nuevas=?, "
-        "alta_relevancia=?, llamadas_modelo=?, actualizado_en=datetime('now') WHERE id=?",
+        "alta_relevancia=?, llamadas_modelo=?, coste_usd=?, actualizado_en=datetime('now') "
+        "WHERE id=?",
         (estado, detalle[:2000], registro[:100000],
          contadores.get("boletines_ok", 0), contadores.get("boletines_fallidos", 0),
          contadores.get("publicaciones_brutas", 0), contadores.get("candidatas", 0),
          contadores.get("nuevas", 0), contadores.get("alta_relevancia", 0),
-         contadores.get("llamadas_modelo", 0), ejecucion_id),
+         contadores.get("llamadas_modelo", 0), coste_de_ejecucion(ejecucion_id), ejecucion_id),
     )
 
 
@@ -448,7 +455,8 @@ def titulos_recientes(dias: int) -> list[sqlite3.Row]:
 def guardar_publicacion(datos: dict[str, Any]) -> int:
     columnas = [
         "ejecucion_id", "codigo_boletin", "comunidad", "boletin_nombre", "fecha_publicacion",
-        "titulo", "resumen", "organismo", "plazo", "beneficiarios", "importe", "url_oficial",
+        "titulo", "titulo_resumido", "resumen", "organismo", "plazo", "plazo_fin",
+        "plazo_fin_origen", "beneficiarios", "importe", "url_oficial",
         "url_pdf", "seccion", "relevancia", "sectores", "justificacion", "confianza",
         "motivo_confianza", "hash_contenido", "titulo_normalizado", "terminos", "contextos",
         "texto_incompleto", "revision_manual", "motivo_revision", "duplicado_de", "estado",
@@ -633,14 +641,16 @@ def kpis(fecha: str) -> dict[str, Any]:
         "historico": total,
         "descartadas": descartadas,
         "ultima_ejecucion": ultima,
+        "gasto_mes_usd": gasto_mes_usd(),
     }
 
 
 def exportar_publicaciones() -> list[dict[str, Any]]:
     """Historico completo sin credenciales ni hashes de usuario."""
     filas = _consulta(
-        "SELECT id, codigo_boletin, comunidad, boletin_nombre, fecha_publicacion, titulo, resumen, "
-        "organismo, plazo, beneficiarios, importe, url_oficial, url_pdf, seccion, relevancia, "
+        "SELECT id, codigo_boletin, comunidad, boletin_nombre, fecha_publicacion, titulo, "
+        "titulo_resumido, resumen, organismo, plazo, plazo_fin, beneficiarios, importe, "
+        "url_oficial, url_pdf, seccion, relevancia, "
         "sectores, justificacion, confianza, estado, revision_manual, creado_en "
         "FROM publicaciones WHERE estado <> 'no_convocatoria' "
         "ORDER BY fecha_publicacion DESC, id DESC")
@@ -649,3 +659,105 @@ def exportar_publicaciones() -> list[dict[str, Any]]:
 
 def json_seguro(valor: Any) -> str:
     return json.dumps(valor, ensure_ascii=False)
+
+
+# ---------------------------------------------------------- consumo del modelo --
+def registrar_consumo(ejecucion_id: int | None, fase: str, modelo: str, tokens_entrada: int,
+                      tokens_salida: int, cache_lectura: int, cache_escritura: int,
+                      coste_usd: float, resultado: str = "ok") -> None:
+    _escribir(
+        "INSERT INTO consumo_modelo (ejecucion_id, fase, modelo, tokens_entrada, tokens_salida, "
+        "tokens_cache_lectura, tokens_cache_escritura, coste_usd, resultado) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (ejecucion_id, fase, modelo, tokens_entrada, tokens_salida, cache_lectura,
+         cache_escritura, round(coste_usd, 6), resultado),
+    )
+
+
+def gasto_mes_usd(mes: str | None = None) -> float:
+    """Gasto del mes natural (AAAA-MM, por defecto el actual) en dolares."""
+    mes = mes or datetime.now().strftime("%Y-%m")
+    fila = _uno("SELECT COALESCE(SUM(coste_usd), 0) AS total FROM consumo_modelo "
+                "WHERE strftime('%Y-%m', creado_en, 'localtime') = ?", (mes,))
+    return float(fila["total"])
+
+
+def gasto_dia_usd(dia: str | None = None) -> float:
+    dia = dia or datetime.now().strftime("%Y-%m-%d")
+    fila = _uno("SELECT COALESCE(SUM(coste_usd), 0) AS total FROM consumo_modelo "
+                "WHERE date(creado_en, 'localtime') = ?", (dia,))
+    return float(fila["total"])
+
+
+def coste_de_ejecucion(ejecucion_id: int) -> float:
+    fila = _uno("SELECT COALESCE(SUM(coste_usd), 0) AS total FROM consumo_modelo "
+                "WHERE ejecucion_id=?", (ejecucion_id,))
+    return float(fila["total"])
+
+
+def consumo_por_modelo(mes: str | None = None) -> list[sqlite3.Row]:
+    mes = mes or datetime.now().strftime("%Y-%m")
+    return _consulta(
+        "SELECT modelo, fase, COUNT(*) AS llamadas, SUM(tokens_entrada) AS entrada, "
+        "SUM(tokens_salida) AS salida, SUM(coste_usd) AS coste FROM consumo_modelo "
+        "WHERE strftime('%Y-%m', creado_en, 'localtime') = ? "
+        "GROUP BY modelo, fase ORDER BY coste DESC", (mes,))
+
+
+def consumo_por_dia(dias: int = 30) -> list[sqlite3.Row]:
+    return _consulta(
+        "SELECT date(creado_en, 'localtime') AS dia, COUNT(*) AS llamadas, "
+        "SUM(tokens_entrada) AS entrada, SUM(tokens_salida) AS salida, SUM(coste_usd) AS coste "
+        "FROM consumo_modelo WHERE date(creado_en, 'localtime') >= date('now', 'localtime', ?) "
+        "GROUP BY dia ORDER BY dia DESC", (f"-{int(dias)} day",))
+
+
+def consumo_por_mes(meses: int = 12) -> list[sqlite3.Row]:
+    return _consulta(
+        "SELECT strftime('%Y-%m', creado_en, 'localtime') AS mes, COUNT(*) AS llamadas, "
+        "SUM(tokens_entrada) AS entrada, SUM(tokens_salida) AS salida, SUM(coste_usd) AS coste "
+        "FROM consumo_modelo GROUP BY mes ORDER BY mes DESC LIMIT ?", (meses,))
+
+
+def ejecuciones_con_coste(limite: int = 30) -> list[sqlite3.Row]:
+    return _consulta(
+        "SELECT e.id, e.fecha_objetivo, e.tipo, e.estado, e.nuevas, e.iniciado_en, "
+        "COUNT(c.id) AS llamadas, COALESCE(SUM(c.tokens_entrada), 0) AS entrada, "
+        "COALESCE(SUM(c.tokens_salida), 0) AS salida, COALESCE(SUM(c.coste_usd), 0) AS coste "
+        "FROM ejecuciones e LEFT JOIN consumo_modelo c ON c.ejecucion_id = e.id "
+        "GROUP BY e.id ORDER BY e.id DESC LIMIT ?", (limite,))
+
+
+# ------------------------------------------------------- alertas y resumenes --
+def pendientes_de_alerta(ids: list[int], hoy: str, limite: str) -> list[sqlite3.Row]:
+    """Publicaciones de alta relevancia con fin de plazo entre hoy y limite, sin alertar."""
+    if not ids:
+        return []
+    marcadores = ",".join("?" for _ in ids)
+    return _consulta(
+        f"SELECT * FROM publicaciones WHERE id IN ({marcadores}) AND relevancia='alta' "
+        "AND alerta_enviada=0 AND plazo_fin IS NOT NULL AND plazo_fin >= ? AND plazo_fin <= ? "
+        "AND estado IN ('nueva','enviada') ORDER BY plazo_fin", [*ids, hoy, limite])
+
+
+def marcar_alertadas(ids: list[int]) -> None:
+    if not ids:
+        return
+    marcadores = ",".join("?" for _ in ids)
+    _escribir(f"UPDATE publicaciones SET alerta_enviada=1, actualizado_en=datetime('now') "
+              f"WHERE id IN ({marcadores})", ids)
+
+
+def publicaciones_entre(desde: str, hasta: str) -> list[sqlite3.Row]:
+    """Publicaciones vivas (no descartadas) publicadas entre dos fechas ISO, ambas incluidas."""
+    return _consulta(
+        "SELECT * FROM publicaciones WHERE fecha_publicacion >= ? AND fecha_publicacion <= ? "
+        "AND estado IN ('nueva','enviada') ORDER BY relevancia='alta' DESC, comunidad, id",
+        (desde, hasta))
+
+
+def plazos_que_vencen(desde: str, hasta: str) -> list[sqlite3.Row]:
+    return _consulta(
+        "SELECT * FROM publicaciones WHERE plazo_fin IS NOT NULL AND plazo_fin >= ? "
+        "AND plazo_fin <= ? AND estado IN ('nueva','enviada') "
+        "ORDER BY plazo_fin, relevancia='alta' DESC", (desde, hasta))

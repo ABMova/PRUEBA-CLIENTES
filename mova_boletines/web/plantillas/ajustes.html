@@ -120,6 +120,80 @@
   </div>
 </div>
 
+<div class="fila">
+  <div class="card">
+    <h2>Avisos y comprobaciones</h2>
+
+    <h3>Comprobacion de la tarde</h3>
+    <div class="campo-linea">
+      <div class="campo"><label for="tarde_activa">Estado</label>
+        <select id="tarde_activa" name="tarde_activa">
+          <option value="1" {% if ajustes.tarde_activa == '1' %}selected{% endif %}>Activada</option>
+          <option value="0" {% if ajustes.tarde_activa != '1' %}selected{% endif %}>Desactivada</option>
+        </select></div>
+      <div class="campo"><label for="hora_tarde">Hora (HH:MM)</label>
+        <input type="time" id="hora_tarde" name="hora_tarde" value="{{ ajustes.hora_tarde }}"></div>
+    </div>
+    <p class="apoyo">Vuelve a revisar los boletines del dia por si hay un numero extraordinario o
+       una publicacion tardia. Solo envia correo si encuentra algo nuevo. Mismos dias que la
+       vigilancia de la manana. Proxima: <strong>{{ proxima_tarde or 'sin programar' }}</strong>.</p>
+
+    <h3>Alerta inmediata</h3>
+    <div class="campo-linea">
+      <div class="campo"><label for="alerta_activa">Estado</label>
+        <select id="alerta_activa" name="alerta_activa">
+          <option value="1" {% if ajustes.alerta_activa == '1' %}selected{% endif %}>Activada</option>
+          <option value="0" {% if ajustes.alerta_activa != '1' %}selected{% endif %}>Desactivada</option>
+        </select></div>
+      <div class="campo"><label for="dias_alerta">Alertar si el plazo vence en (dias)</label>
+        <input type="number" id="dias_alerta" name="dias_alerta" value="{{ ajustes.dias_alerta }}" min="1" max="120"></div>
+    </div>
+    <p class="apoyo">Correo aparte, marcado como importante, para convocatorias de alta relevancia
+       cuyo plazo termina pronto. Se envia justo antes del correo del dia.</p>
+
+    <h3>Resumen semanal</h3>
+    <div class="campo-linea">
+      <div class="campo"><label for="semanal_activo">Estado</label>
+        <select id="semanal_activo" name="semanal_activo">
+          <option value="1" {% if ajustes.semanal_activo == '1' %}selected{% endif %}>Activado</option>
+          <option value="0" {% if ajustes.semanal_activo != '1' %}selected{% endif %}>Desactivado</option>
+        </select></div>
+      <div class="campo"><label for="dia_semanal">Dia</label>
+        <select id="dia_semanal" name="dia_semanal">
+          {% for valor, rotulo in [('mon','Lunes'),('tue','Martes'),('wed','Miercoles'),('thu','Jueves'),('fri','Viernes')] %}
+          <option value="{{ valor }}" {% if ajustes.dia_semanal == valor %}selected{% endif %}>{{ rotulo }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="campo"><label for="hora_semanal">Hora (HH:MM)</label>
+        <input type="time" id="hora_semanal" name="hora_semanal" value="{{ ajustes.hora_semanal }}"></div>
+      <div class="campo"><label for="dias_vencimiento_semanal">Plazos que vencen en (dias)</label>
+        <input type="number" id="dias_vencimiento_semanal" name="dias_vencimiento_semanal" value="{{ ajustes.dias_vencimiento_semanal }}" min="1" max="120"></div>
+    </div>
+    <p class="apoyo">Lo publicado la semana anterior y los plazos que vencen pronto. Proximo:
+       <strong>{{ proxima_semanal or 'sin programar' }}</strong>.</p>
+  </div>
+
+  <div class="card" style="flex:0 1 380px;">
+    <h2>Coste</h2>
+    <div class="campo"><label for="tope_mensual_usd">Tope de gasto mensual (dolares, 0 = sin tope)</label>
+      <input type="number" id="tope_mensual_usd" name="tope_mensual_usd" value="{{ ajustes.tope_mensual_usd }}" min="0" step="1"></div>
+    <p class="apoyo">Llevas <strong>{{ "%.2f"|format(gasto_mes) }} $</strong> este mes. Si se
+       alcanza el tope, la vigilancia sigue recogiendo publicaciones pero las guarda para
+       revision manual, sin gastar mas.</p>
+    <div class="campo"><label for="esfuerzo_modelo">Esfuerzo de razonamiento</label>
+      <select id="esfuerzo_modelo" name="esfuerzo_modelo">
+        {% for valor, rotulo in [('low','Bajo (recomendado)'),('medium','Medio'),('high','Alto')] %}
+        <option value="{{ valor }}" {% if ajustes.esfuerzo_modelo == valor %}selected{% endif %}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+      <span class="apoyo">Solo afecta a Sonnet 5, Opus 5 y Opus 4.8, que razonan antes de
+      responder y facturan ese razonamiento. Para extraer datos de un boletin basta con bajo.</span></div>
+    <div class="campo"><label for="cambio_usd_eur">Tipo de cambio dolar a euro</label>
+      <input type="number" id="cambio_usd_eur" name="cambio_usd_eur" value="{{ ajustes.cambio_usd_eur }}" min="0" step="0.01">
+      <span class="apoyo">Solo para mostrar el gasto en euros. Anthropic factura en dolares.</span></div>
+  </div>
+</div>
+
 <div class="card">
   <button type="submit" class="principal">Guardar ajustes</button>
 </div>

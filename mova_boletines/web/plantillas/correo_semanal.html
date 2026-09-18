@@ -1,0 +1,150 @@
+{#
+  Resumen semanal. Mismas reglas que el diario: tablas, estilos en linea, sin
+  flexbox ni imagenes externas, fondo claro y acentos dorados.
+#}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ nombre_app }} - resumen semanal</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f5;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f5;">
+  <tr>
+    <td align="center" style="padding:18px 8px;">
+      <table role="presentation" width="820" cellpadding="0" cellspacing="0" border="0" style="width:820px; max-width:100%; background-color:#ffffff; border:1px solid #e4e4e7;">
+
+        <tr>
+          <td style="background-color:#0b0c0e; padding:20px 24px; border-bottom:3px solid #b8892f;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="left" style="vertical-align:middle;">
+                  <div style="font-family:Segoe UI,Arial,sans-serif; font-size:20px; font-weight:600; color:#f3f4f6;">Resumen semanal</div>
+                  <div style="font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#d9b45b; padding-top:4px;">Del {{ desde }} al {{ hasta }}</div>
+                </td>
+                <td align="right" style="vertical-align:middle; white-space:nowrap;">
+                  <span style="font-family:Segoe UI,Arial,sans-serif; font-size:22px; font-weight:300; color:#ffffff; letter-spacing:3px;">MOVA</span><span style="font-family:Segoe UI,Arial,sans-serif; font-size:9px; font-weight:300; color:#d9b45b; letter-spacing:2px;">IA</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:14px 24px; background-color:#faf7f0; border-bottom:1px solid #e4e4e7;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#3f3f46;">
+              <tr>
+                <td><strong style="color:#b8892f;">{{ total }}</strong> convocatoria(s) publicadas</td>
+                <td><strong style="color:#b8892f;">{{ altas|length }}</strong> de alta relevancia</td>
+                <td><strong style="color:{% if vencimientos %}#dc2626{% else %}#16a34a{% endif %};">{{ vencimientos|length }}</strong> plazo(s) vencen en {{ dias_vencimiento }} dias</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        {% set titulo_bloque = "padding:18px 24px 8px 24px; font-family:Segoe UI,Arial,sans-serif; font-size:16px; font-weight:600; color:#18181b;" %}
+        {% set celda = "padding:8px 10px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; color:#18181b; border-bottom:1px solid #f1f1f3; vertical-align:top;" %}
+        {% set cabecera = "padding:6px 10px; font-family:Segoe UI,Arial,sans-serif; font-size:10px; color:#71717a; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid #e4e4e7; text-align:left;" %}
+
+        <!-- Plazos que vencen -->
+        <tr><td style="{{ titulo_bloque }}"><span style="border-left:4px solid #dc2626; padding-left:10px;">Plazos que vencen en los proximos {{ dias_vencimiento }} dias</span></td></tr>
+        <tr>
+          <td style="padding:0 24px 8px 24px;">
+            {% if vencimientos %}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <th style="{{ cabecera }}">Vence</th>
+                <th style="{{ cabecera }}">Convocatoria</th>
+                <th style="{{ cabecera }}">Comunidad</th>
+                <th style="{{ cabecera }}">Enlace</th>
+              </tr>
+              {% for v in vencimientos %}
+              <tr>
+                <td style="{{ celda }} white-space:nowrap; font-weight:700; color:{% if v.dias_restantes is not none and v.dias_restantes <= 7 %}#dc2626{% else %}#b8892f{% endif %};">
+                  {{ v.plazo_fin_texto }}<br><span style="font-weight:400; color:#71717a;">{% if v.dias_restantes == 0 %}hoy{% elif v.dias_restantes == 1 %}manana{% else %}en {{ v.dias_restantes }} dias{% endif %}{% if v.plazo_estimado %}, estimado{% endif %}</span>
+                </td>
+                <td style="{{ celda }}">
+                  <strong>{{ v.titulo_resumido or v.titulo[:140] }}</strong>
+                  {% if v.relevancia == 'alta' %}&nbsp;<span style="background-color:#b8892f; color:#ffffff; font-size:9px; font-weight:700; padding:1px 6px; border-radius:8px;">ALTA</span>{% endif %}
+                  <br><span style="color:#71717a;">{{ v.organismo }}</span>
+                </td>
+                <td style="{{ celda }} white-space:nowrap;">{{ v.comunidad }}</td>
+                <td style="{{ celda }} white-space:nowrap;">{% if v.url_oficial %}<a href="{{ v.url_oficial }}" style="color:#b8892f;">Oficial</a>{% endif %}{% if v.url_pdf %} | <a href="{{ v.url_pdf }}" style="color:#b8892f;">PDF</a>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </table>
+            {% else %}
+            <p style="font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#3f3f46;">Ningun plazo conocido vence en los proximos {{ dias_vencimiento }} dias.</p>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- Alta relevancia -->
+        <tr><td style="{{ titulo_bloque }}"><span style="border-left:4px solid #b8892f; padding-left:10px;">Alta relevancia publicadas la semana pasada</span></td></tr>
+        <tr>
+          <td style="padding:0 24px 8px 24px;">
+            {% if altas %}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <th style="{{ cabecera }}">Convocatoria</th>
+                <th style="{{ cabecera }}">Comunidad</th>
+                <th style="{{ cabecera }}">Plazo</th>
+                <th style="{{ cabecera }}">Importe</th>
+              </tr>
+              {% for p in altas %}
+              <tr>
+                <td style="{{ celda }}">
+                  <strong>{{ p.titulo_resumido or p.titulo[:140] }}</strong>
+                  <br><span style="color:#71717a;">{{ p.fecha_publicacion }} &middot; {{ p.codigo_boletin }}</span>
+                  {% if p.url_oficial %}<br><a href="{{ p.url_oficial }}" style="color:#b8892f;">Publicacion oficial</a>{% endif %}
+                </td>
+                <td style="{{ celda }} white-space:nowrap;">{{ p.comunidad }}</td>
+                <td style="{{ celda }}">{% if p.plazo == marcador %}<span style="color:#92400e;">{{ marcador }}</span>{% else %}{{ p.plazo }}{% endif %}</td>
+                <td style="{{ celda }}">{% if p.importe == marcador %}<span style="color:#92400e;">{{ marcador }}</span>{% else %}{{ p.importe }}{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </table>
+            {% else %}
+            <p style="font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#3f3f46;">No hubo convocatorias de alta relevancia la semana pasada.</p>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- Resto -->
+        {% if resto %}
+        <tr><td style="{{ titulo_bloque }}"><span style="border-left:4px solid #d4d4d8; padding-left:10px;">Resto de convocatorias ({{ resto|length }})</span></td></tr>
+        <tr>
+          <td style="padding:0 24px 8px 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              {% for p in resto %}
+              <tr>
+                <td style="{{ celda }}">{{ p.titulo_resumido or p.titulo[:140] }}</td>
+                <td style="{{ celda }} white-space:nowrap; color:#71717a;">{{ p.comunidad }}</td>
+                <td style="{{ celda }} white-space:nowrap;">{% if p.url_oficial %}<a href="{{ p.url_oficial }}" style="color:#b8892f;">Oficial</a>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+
+        {% if por_comunidad %}
+        <tr>
+          <td style="padding:12px 24px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; color:#3f3f46;">
+            <strong>Por comunidad:</strong>
+            {% for comunidad, n in por_comunidad.items() %}{{ comunidad }} ({{ n }}){% if not loop.last %} &middot; {% endif %}{% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+
+        <tr>
+          <td style="padding:16px 24px; background-color:#fafafa; border-top:1px solid #e4e4e7; font-family:Segoe UI,Arial,sans-serif; font-size:11px; color:#71717a;">
+            Generado por {{ nombre_app }} el {{ generado }}. Las fechas marcadas como estimadas se calculan a partir del texto del plazo (dias habiles sin festivos locales): confirmalas en la publicacion oficial.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

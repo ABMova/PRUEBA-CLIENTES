@@ -1,7 +1,8 @@
 """Unica puerta a la API de Anthropic.
 
 Todo lo que sale hacia el modelo pasa por aqui: reintentos, traduccion de
-errores a mensajes accionables y control de que datos se envian.
+errores a mensajes accionables, control de que datos se envian, y el registro
+de tokens y coste de cada llamada (panel de coste y tope mensual).
 
 QUE SALE DEL SISTEMA: solo el texto publico de las publicaciones oficiales
 (titulo, organismo, seccion y texto del boletin). Nunca credenciales, nunca
@@ -22,9 +23,46 @@ from datos import repositorio
 
 registro = logging.getLogger(__name__)
 
+# Precios de la API de Anthropic en dolares por millon de tokens (entrada,
+# salida), tarifa estandar de primera parte. Comprobados el 18/09/2026.
+# Si Anthropic los cambia, basta con tocar esta tabla.
+PRECIOS_USD_POR_MILLON: dict[str, tuple[float, float]] = {
+    "claude-opus-5": (5.00, 25.00),
+    "claude-sonnet-5": (2.00, 10.00),
+    "claude-opus-4-8": (5.00, 25.00),
+    "claude-haiku-4-5-20251001": (1.00, 5.00),
+    "claude-haiku-4-5": (1.00, 5.00),
+}
+# Un modelo que no este en la tabla se cuenta a precio alto: es preferible
+# sobreestimar el gasto que dejar pasar el tope mensual.
+PRECIO_DESCONOCIDO = (5.00, 25.00)
+FACTOR_CACHE_LECTURA = 0.10
+FACTOR_CACHE_ESCRITURA = 1.25
+
+# Sonnet 5 y Opus 5 razonan por defecto aunque no se pida, y ese razonamiento
+# se factura como salida y consume max_tokens. Para extraer datos de un
+# boletin basta un esfuerzo bajo: se fija explicitamente en estos modelos.
+# Haiku 4.5 no admite el parametro (daria error), asi que ahi no se envia.
+MODELOS_CON_ESFUERZO = {"claude-opus-5", "claude-sonnet-5", "claude-opus-4-8"}
+ESFUERZOS_VALIDOS = ("low", "medium", "high")
+
+# Ejecucion en curso, para atribuir el consumo. Solo hay una a la vez (el
+# orquestador lo garantiza), asi que una variable de modulo basta y sirve
+# tambien para los hilos del ThreadPoolExecutor.
+_ejecucion_actual: int | None = None
+
 
 class ErrorModelo(Exception):
     """Error de la API traducido a algo que el usuario pueda accionar."""
+
+
+class TopeAlcanzado(ErrorModelo):
+    """Se ha llegado al tope de gasto mensual configurado en Ajustes."""
+
+
+def fijar_ejecucion(ejecucion_id: int | None) -> None:
+    global _ejecucion_actual
+    _ejecucion_actual = ejecucion_id
 
 
 def clave_api() -> str:
@@ -36,6 +74,43 @@ def hay_clave() -> bool:
     return bool(clave_api())
 
 
+# -------------------------------------------------------------------- coste --
+def calcular_coste(modelo: str, entrada: int, salida: int, cache_lectura: int = 0,
+                   cache_escritura: int = 0) -> float:
+    precio_entrada, precio_salida = PRECIOS_USD_POR_MILLON.get(modelo, PRECIO_DESCONOCIDO)
+    return (entrada * precio_entrada
+            + salida * precio_salida
+            + cache_lectura * precio_entrada * FACTOR_CACHE_LECTURA
+            + cache_escritura * precio_entrada * FACTOR_CACHE_ESCRITURA) / 1_000_000
+
+
+def presupuesto() -> tuple[bool, float, float]:
+    """(queda_presupuesto, gasto_del_mes, tope). Tope 0 = sin limite."""
+    try:
+        tope = float(repositorio.ajuste("tope_mensual_usd", "30") or 0)
+    except ValueError:
+        tope = 30.0
+    gasto = repositorio.gasto_mes_usd()
+    return (tope <= 0 or gasto < tope), gasto, tope
+
+
+def _registrar_consumo(respuesta, modelo: str, fase: str, resultado: str) -> None:
+    uso = getattr(respuesta, "usage", None)
+    if uso is None:
+        return
+    entrada = int(getattr(uso, "input_tokens", 0) or 0)
+    salida = int(getattr(uso, "output_tokens", 0) or 0)
+    lectura = int(getattr(uso, "cache_read_input_tokens", 0) or 0)
+    escritura = int(getattr(uso, "cache_creation_input_tokens", 0) or 0)
+    try:
+        repositorio.registrar_consumo(
+            _ejecucion_actual, fase, modelo, entrada, salida, lectura, escritura,
+            calcular_coste(modelo, entrada, salida, lectura, escritura), resultado)
+    except Exception as error:  # noqa: BLE001 - la contabilidad no debe tumbar la llamada
+        registro.error("No se pudo registrar el consumo: %s", error)
+
+
+# ------------------------------------------------------------------ llamadas --
 def _cliente():
     clave = clave_api()
     if not clave:
@@ -67,23 +142,37 @@ def _traducir(error: Exception) -> str:
     return f"Error inesperado de la API: {texto[:200]}"
 
 
+def _parametros(sistema: str, mensaje: str, modelo: str, max_tokens: int) -> dict:
+    parametros = {
+        "model": modelo,
+        "max_tokens": max_tokens,
+        "system": sistema,
+        "messages": [{"role": "user", "content": mensaje}],
+    }
+    if modelo in MODELOS_CON_ESFUERZO:
+        esfuerzo = repositorio.ajuste("esfuerzo_modelo", "low")
+        parametros["output_config"] = {
+            "effort": esfuerzo if esfuerzo in ESFUERZOS_VALIDOS else "low"}
+    return parametros
+
+
 def llamar(sistema: str, mensaje: str, modelo: str, max_tokens: int,
-           reintentos: int = 3) -> str:
+           reintentos: int = 3, fase: str = "") -> str:
     """Llamada de texto con retroceso exponencial ante 429 y 5xx."""
+    queda, gasto, tope = presupuesto()
+    if not queda:
+        raise TopeAlcanzado(
+            f"Tope de gasto mensual alcanzado ({gasto:.2f} de {tope:.2f} $). "
+            f"Las publicaciones se guardan para revision manual. Sube el tope en Ajustes.")
+
     cliente = _cliente()
+    parametros = _parametros(sistema, mensaje, modelo, max_tokens)
     espera = 2.0
     ultimo: Exception | None = None
 
     for intento in range(1, reintentos + 1):
         try:
-            respuesta = cliente.messages.create(
-                model=modelo,
-                max_tokens=max_tokens,
-                system=sistema,
-                messages=[{"role": "user", "content": mensaje}],
-            )
-            return "".join(bloque.text for bloque in respuesta.content
-                           if getattr(bloque, "type", "") == "text")
+            respuesta = cliente.messages.create(**parametros)
         except Exception as error:  # noqa: BLE001 - se clasifica justo debajo
             ultimo = error
             codigo = getattr(error, "status_code", None)
@@ -93,15 +182,31 @@ def llamar(sistema: str, mensaje: str, modelo: str, max_tokens: int,
             registro.warning("Reintento %s tras error %s", intento, codigo)
             time.sleep(espera)
             espera *= 2
+            continue
+
+        motivo = getattr(respuesta, "stop_reason", "end_turn")
+        # Los tokens se facturan aunque la respuesta no sirva: se registran siempre.
+        _registrar_consumo(respuesta, modelo, fase,
+                           "ok" if motivo not in ("refusal", "max_tokens") else motivo)
+        if motivo == "refusal":
+            raise ErrorModelo("El modelo ha declinado analizar esta publicacion.")
+        if motivo == "max_tokens":
+            raise ErrorModelo(
+                "La respuesta del modelo se corto por el limite de tokens. "
+                "Sube los tokens de esta fase en Ajustes.")
+        return "".join(bloque.text for bloque in respuesta.content
+                       if getattr(bloque, "type", "") == "text")
+
     raise ErrorModelo(_traducir(ultimo) if ultimo else "Error desconocido")
 
 
 _BLOQUE_JSON = re.compile(r"\{.*\}", re.S)
 
 
-def llamar_json(sistema: str, mensaje: str, modelo: str, max_tokens: int) -> dict:
+def llamar_json(sistema: str, mensaje: str, modelo: str, max_tokens: int,
+                fase: str = "") -> dict:
     """Llama al modelo y exige JSON. Si viene envuelto en texto, lo rescata."""
-    bruto = llamar(sistema, mensaje, modelo, max_tokens)
+    bruto = llamar(sistema, mensaje, modelo, max_tokens, fase=fase)
     return interpretar_json(bruto)
 
 
@@ -124,7 +229,10 @@ def interpretar_json(bruto: str) -> dict:
 def probar_clave(modelo: str = "claude-haiku-4-5-20251001") -> tuple[bool, str]:
     """Comprobacion desde la pantalla de Ajustes."""
     try:
-        llamar("Responde unicamente con la palabra OK.", "Di OK.", modelo, 16, reintentos=1)
+        # 256 y no menos: si el modelo de relevancia es uno que razona, parte de
+        # los tokens se van en ese razonamiento aunque la respuesta sea "OK".
+        llamar("Responde unicamente con la palabra OK.", "Di OK.", modelo, 256, reintentos=1,
+               fase="prueba")
         return True, "Clave valida: la API responde"
     except ErrorModelo as error:
         return False, str(error)

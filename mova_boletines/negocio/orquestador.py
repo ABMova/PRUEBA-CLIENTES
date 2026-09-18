@@ -9,13 +9,13 @@ import logging
 import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Callable
 
 import config
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio import correo, deduplicador, palabras, relevancia
+from negocio import correo, deduplicador, palabras, relevancia, titulos
 from negocio.boletines import ADAPTADORES, ORDEN
 from negocio.boletines.base import ErrorBoletin
 from negocio.extraccion import normalizar_titulo, recortar
@@ -156,6 +156,7 @@ def cancelar() -> None:
 def _ejecutar(fecha: date, tipo: str, usuario: str, enviar_correo: bool) -> None:
     ejecucion_id = repositorio.crear_ejecucion(fecha.strftime("%Y-%m-%d"), tipo, usuario)
     progreso.iniciar(ejecucion_id)
+    anthropic_cliente.fijar_ejecucion(ejecucion_id)
     contadores = {"boletines_ok": 0, "boletines_fallidos": 0, "publicaciones_brutas": 0,
                   "candidatas": 0, "nuevas": 0, "alta_relevancia": 0, "llamadas_modelo": 0}
     estado = "correcta"
@@ -166,7 +167,11 @@ def _ejecutar(fecha: date, tipo: str, usuario: str, enviar_correo: bool) -> None
         crudas, consultados, fallidos = _fase1(fecha, ejecucion_id, contadores)
         candidatas = _fase2(crudas, contadores)
         guardadas = _fases345(candidatas, ejecucion_id, contadores)
-        _fase6(guardadas, fecha, consultados, fallidos, ejecucion_id, enviar_correo)
+        _fase6(guardadas, fecha, consultados, fallidos, ejecucion_id, enviar_correo, tipo)
+
+        coste = repositorio.coste_de_ejecucion(ejecucion_id)
+        if coste:
+            progreso.anotar(f"Coste de la ejecucion en la API: {coste:.4f} $")
 
         if fallidos:
             estado = "con_avisos"
@@ -186,6 +191,7 @@ def _ejecutar(fecha: date, tipo: str, usuario: str, enviar_correo: bool) -> None
         registro.error("Fallo de la ejecucion %s: %s", ejecucion_id, traceback.format_exc())
         progreso.terminar(detalle)
     finally:
+        anthropic_cliente.fijar_ejecucion(None)
         instantanea = progreso.instantanea()
         repositorio.cerrar_ejecucion(ejecucion_id, estado, detalle,
                                      "\n".join(instantanea["registro"]), contadores)
@@ -314,8 +320,18 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
     hilos = max(1, repositorio.ajuste_int("hilos_modelo", 3))
     refuerzos = [t.strip() for t in repositorio.ajuste("terminos_refuerzo", "").split(",") if t.strip()]
     hay_modelo = anthropic_cliente.hay_clave()
+    motivo_sin_modelo = "No hay clave de API configurada: sin analisis del modelo"
     if not hay_modelo:
         progreso.anotar("AVISO: no hay clave de API; las publicaciones se guardan para revision manual")
+    else:
+        queda, gasto, tope = anthropic_cliente.presupuesto()
+        if not queda:
+            hay_modelo = False
+            motivo_sin_modelo = (f"Tope de gasto mensual alcanzado ({gasto:.2f} de {tope:.2f} $): "
+                                 f"sin analisis del modelo")
+            progreso.anotar(f"AVISO: {motivo_sin_modelo}. Se guardan para revision manual.")
+        elif tope > 0:
+            progreso.anotar(f"Gasto del mes antes de esta ejecucion: {gasto:.2f} de {tope:.2f} $")
 
     # ---- Fase 5 primero sobre el hash, para no pagar modelo por duplicados ----
     umbral = repositorio.ajuste_int("umbral_difuso", 92)
@@ -354,8 +370,7 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
         if not hay_modelo:
             datos = relevancia._esqueleto(publicacion)  # noqa: SLF001 - mismo paquete
             extraccion = relevancia.ResultadoExtraccion(
-                datos=datos, revision_manual=True,
-                motivo="No hay clave de API configurada: sin analisis del modelo")
+                datos=datos, revision_manual=True, motivo=motivo_sin_modelo)
             clasificacion = {"relevancia": "media", "sectores": [],
                              "justificacion": config.MARCADOR_PENDIENTE, "llamadas": 0}
         else:
@@ -400,6 +415,7 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
         publicacion = salida["publicacion"]
         datos = salida["extraccion"].datos
         clasificacion = salida["clasificacion"]
+        plazo_fin, plazo_origen = relevancia.fin_de_plazo(datos, publicacion["fecha_publicacion"])
         fila = {
             "ejecucion_id": ejecucion_id,
             "codigo_boletin": publicacion["codigo_boletin"],
@@ -407,10 +423,14 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
             "boletin_nombre": publicacion["boletin_nombre"],
             "fecha_publicacion": publicacion["fecha_publicacion"],
             "titulo": datos.get("titulo") or publicacion["titulo"],
+            "titulo_resumido": (datos.get("titulo_resumido")
+                                or titulos.resumir(datos.get("titulo") or publicacion["titulo"])),
             "resumen": datos.get("resumen", config.MARCADOR_PENDIENTE),
             "organismo": datos.get("organismo_convocante") or publicacion.get("organismo")
                          or config.MARCADOR_PENDIENTE,
             "plazo": datos.get("plazo_solicitud", config.MARCADOR_PENDIENTE),
+            "plazo_fin": plazo_fin,
+            "plazo_fin_origen": plazo_origen,
             "beneficiarios": datos.get("beneficiarios", config.MARCADOR_PENDIENTE),
             "importe": datos.get("importe", config.MARCADOR_PENDIENTE),
             "url_oficial": publicacion.get("url_oficial", ""),
@@ -450,10 +470,22 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
 
 
 def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos: list[dict],
-           ejecucion_id: int, enviar_correo: bool) -> None:
+           ejecucion_id: int, enviar_correo: bool, tipo: str = "manual") -> None:
     progreso.fijar_fase(6, porcentaje=86)
     destinatarios = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
     dias_token = repositorio.ajuste_int("dias_token_descarte", 90)
+    modo = "tarde" if tipo == "tarde" else "diario"
+
+    # La comprobacion de la tarde solo escribe si ha aparecido algo nuevo desde
+    # la manana: un segundo "sin novedades" al dia seria ruido.
+    if modo == "tarde" and not guardadas:
+        repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios),
+                                    "Comprobacion de la tarde", "omitido", 0,
+                                    "Sin publicaciones nuevas desde la manana: no se envia correo",
+                                    0, "")
+        progreso.anotar("Comprobacion de la tarde sin novedades: no se envia correo")
+        progreso.fijar_fase(6, porcentaje=100)
+        return
 
     tokens: dict[int, str] = {}
     for fila in guardadas:
@@ -461,11 +493,14 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
             destino = destinatarios[0] if destinatarios else ""
             tokens[fila["id"]] = repositorio.crear_token_descarte(fila["id"], destino, dias_token)
 
+    _alertas(guardadas, tokens, destinatarios, ejecucion_id, enviar_correo)
+
     html = correo.componer(guardadas, fecha,
-                           {"consultados": consultados, "fallidos": fallidos}, tokens)
-    ruta = correo.guardar_copia(html, f"correo-{fecha:%Y%m%d}-{ejecucion_id}.html")
+                           {"consultados": consultados, "fallidos": fallidos}, tokens, modo=modo)
+    sufijo = "-tarde" if modo == "tarde" else ""
+    ruta = correo.guardar_copia(html, f"correo-{fecha:%Y%m%d}-{ejecucion_id}{sufijo}.html")
     asunto = correo.asunto(fecha, len(guardadas),
-                           sum(1 for f in guardadas if f["relevancia"] == "alta"))
+                           sum(1 for f in guardadas if f["relevancia"] == "alta"), modo=modo)
 
     if not enviar_correo:
         repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto, "omitido", 0,
@@ -483,6 +518,81 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
     else:
         progreso.anotar(f"Correo NO enviado: {detalle}")
     progreso.fijar_fase(6, porcentaje=100)
+
+
+def _alertas(guardadas: list[dict], tokens: dict[int, str], destinatarios: list[str],
+             ejecucion_id: int, enviar_correo: bool) -> None:
+    """Correo urgente aparte para lo de alta relevancia con el plazo a punto de vencer.
+
+    Se evalua al descubrir la convocatoria. Las que entran mas tarde en la
+    ventana de vencimiento las recoge el resumen semanal.
+    """
+    if repositorio.ajuste("alerta_activa", "1") != "1":
+        return
+    dias = repositorio.ajuste_int("dias_alerta", 15)
+    hoy = date.today()
+    ids = [f["id"] for f in guardadas if f.get("id")]
+    urgentes = [dict(f) for f in repositorio.pendientes_de_alerta(
+        ids, hoy.isoformat(), (hoy + timedelta(days=dias)).isoformat())]
+    if not urgentes:
+        return
+
+    html = correo.componer(urgentes, hoy, {"consultados": [], "fallidos": []}, tokens,
+                           modo="alerta")
+    asunto = correo.asunto(hoy, len(urgentes), len(urgentes), modo="alerta")
+    ruta = correo.guardar_copia(html, f"alerta-{hoy:%Y%m%d}-{ejecucion_id}.html")
+    progreso.anotar(f"ALERTA: {len(urgentes)} convocatoria(s) de alta relevancia vencen en "
+                    f"{dias} dias o menos")
+
+    if not enviar_correo:
+        repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto, "omitido", 0,
+                                    "Envio omitido por peticion", len(urgentes), str(ruta))
+        return
+
+    exito, detalle, intentos = correo.enviar(destinatarios, asunto, html, urgente=True)
+    repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto,
+                                "enviado" if exito else "error", intentos, detalle,
+                                len(urgentes), str(ruta))
+    if exito:
+        repositorio.marcar_alertadas([u["id"] for u in urgentes])
+        progreso.anotar(f"Alerta enviada: {detalle}")
+    else:
+        progreso.anotar(f"Alerta NO enviada: {detalle}")
+
+
+# --------------------------------------------------------------- resumen semanal --
+def enviar_resumen_semanal(hoy: date | None = None, usuario: str = "planificador",
+                           enviar: bool = True) -> tuple[bool, str]:
+    """Lo publicado la semana anterior (lunes a domingo) y los plazos que vencen."""
+    hoy = hoy or date.today()
+    lunes = hoy - timedelta(days=hoy.weekday())
+    desde = lunes - timedelta(days=7)
+    hasta = lunes - timedelta(days=1)
+    dias_vencimiento = repositorio.ajuste_int("dias_vencimiento_semanal", 30)
+
+    publicaciones = [dict(f) for f in repositorio.publicaciones_entre(
+        desde.isoformat(), hasta.isoformat())]
+    vencimientos = [dict(f) for f in repositorio.plazos_que_vencen(
+        hoy.isoformat(), (hoy + timedelta(days=dias_vencimiento)).isoformat())]
+
+    html = correo.componer_semanal(desde, hasta, publicaciones, vencimientos, dias_vencimiento,
+                                   hoy)
+    ruta = correo.guardar_copia(html, f"resumen-semanal-{hasta:%Y%m%d}.html")
+    asunto = correo.asunto_semanal(desde, hasta, len(publicaciones), len(vencimientos))
+    destinatarios = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
+
+    if not enviar:
+        repositorio.registrar_envio(None, ", ".join(destinatarios), asunto, "omitido", 0,
+                                    "Resumen generado sin enviar", len(publicaciones), str(ruta))
+        return True, f"Resumen generado sin enviar: {ruta.name}"
+
+    exito, detalle, intentos = correo.enviar(destinatarios, asunto, html)
+    repositorio.registrar_envio(None, ", ".join(destinatarios), asunto,
+                                "enviado" if exito else "error", intentos, detalle,
+                                len(publicaciones), str(ruta))
+    repositorio.registrar_auditoria(usuario, "resumen_semanal", f"{desde}..{hasta}", detalle,
+                                    resultado="ok" if exito else "error")
+    return exito, detalle
 
 
 # --------------------------------------------------------------- reenvio manual --

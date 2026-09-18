@@ -17,6 +17,7 @@
     <div class="kpi"><div class="cifra">{{ kpis.altas_hoy }}</div><div class="rotulo">De alta relevancia</div></div>
     <div class="kpi"><div class="cifra">{{ kpis.historico }}</div><div class="rotulo">Historico acumulado</div></div>
     <div class="kpi"><div class="cifra">{{ kpis.descartadas }}</div><div class="rotulo">Descartadas</div></div>
+    <div class="kpi"><div class="cifra">{{ "%.2f"|format(kpis.gasto_mes_usd) }} $</div><div class="rotulo">Gasto API del mes{% if tope_mensual > 0 %} (tope {{ "%.0f"|format(tope_mensual) }} $){% endif %} &middot; <a href="{{ url_for('web.coste') }}">detalle</a></div></div>
   </div>
 </div>
 
@@ -56,7 +57,11 @@
       <li>Hora: <strong>{{ ajustes.hora_ejecucion }}</strong> ({{ ajustes.zona_horaria }})</li>
       <li>Dias: <strong>{{ ajustes.dias_ejecucion }}</strong></li>
       <li>Estado: {% if ajustes.planificador_activo == '1' %}<span class="pildora ok">activo</span>{% else %}<span class="pildora pendiente">desactivado</span>{% endif %}</li>
-      <li>Proxima ejecucion: <strong>{{ proxima or 'sin programar' }}</strong></li>
+      {% for nombre, cuando in proximas %}
+      <li>{{ nombre }}: <strong>{{ cuando }}</strong></li>
+      {% else %}
+      <li>Proxima ejecucion: <strong>sin programar</strong></li>
+      {% endfor %}
       <li>Destinatarios activos: <strong>{{ destinatarios }}</strong></li>
     </ul>
 
@@ -88,14 +93,15 @@
         <tr class="{% if p.relevancia == 'alta' %}destacada{% endif %}">
           <td class="celda-estrecha">{{ p.fecha_publicacion }}</td>
           <td class="celda-estrecha">{{ p.comunidad }}</td>
-          <td>{{ p.titulo[:150] }}</td>
+          <td><strong>{{ p.titulo_resumido or p.titulo[:150] }}</strong>{% if p.titulo_resumido %}<br><span class="apoyo">{{ p.titulo[:160] }}</span>{% endif %}</td>
           <td class="celda-estrecha">
             {% if p.relevancia == 'alta' %}<span class="pildora alta">ALTA</span>
             {% elif p.relevancia == 'media' %}<span class="pildora pendiente">media</span>
             {% else %}<span class="pildora pendiente">baja</span>{% endif %}
           </td>
           <td class="celda-estrecha">
-            {% if p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo[:40] }}{% endif %}
+            {% if p.plazo_fin %}<span class="pildora {{ 'error' if p.plazo_fin <= hoy_mas_alerta else 'pendiente' }}">vence {{ p.plazo_fin[8:10] }}/{{ p.plazo_fin[5:7] }}</span>
+            {% elif p.plazo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.plazo[:40] }}{% endif %}
           </td>
         </tr>
         {% endfor %}

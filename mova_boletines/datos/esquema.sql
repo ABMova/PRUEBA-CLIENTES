@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS ejecuciones (
     nuevas               INTEGER NOT NULL DEFAULT 0,
     alta_relevancia      INTEGER NOT NULL DEFAULT 0,
     llamadas_modelo      INTEGER NOT NULL DEFAULT 0,
+    coste_usd            REAL NOT NULL DEFAULT 0,
     detalle              TEXT NOT NULL DEFAULT '',
     registro             TEXT NOT NULL DEFAULT '',
     creado_en            TEXT NOT NULL DEFAULT (datetime('now')),
@@ -104,9 +105,13 @@ CREATE TABLE IF NOT EXISTS publicaciones (
     boletin_nombre     TEXT NOT NULL DEFAULT '',
     fecha_publicacion  TEXT NOT NULL,
     titulo             TEXT NOT NULL,
+    titulo_resumido    TEXT NOT NULL DEFAULT '',
     resumen            TEXT NOT NULL DEFAULT '',
     organismo          TEXT NOT NULL DEFAULT '',
     plazo              TEXT NOT NULL DEFAULT '',
+    plazo_fin          TEXT,
+    plazo_fin_origen   TEXT NOT NULL DEFAULT '',
+    alerta_enviada     INTEGER NOT NULL DEFAULT 0,
     beneficiarios      TEXT NOT NULL DEFAULT '',
     importe            TEXT NOT NULL DEFAULT '',
     url_oficial        TEXT NOT NULL DEFAULT '',
@@ -134,6 +139,25 @@ CREATE INDEX IF NOT EXISTS ix_pub_hash ON publicaciones(hash_contenido);
 CREATE INDEX IF NOT EXISTS ix_pub_fecha ON publicaciones(fecha_publicacion);
 CREATE INDEX IF NOT EXISTS ix_pub_boletin ON publicaciones(codigo_boletin, fecha_publicacion);
 CREATE INDEX IF NOT EXISTS ix_pub_estado ON publicaciones(estado, relevancia);
+
+-- Cada llamada al modelo, con sus tokens y su coste. Alimenta el panel de
+-- coste y el tope de gasto mensual.
+CREATE TABLE IF NOT EXISTS consumo_modelo (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    ejecucion_id        INTEGER REFERENCES ejecuciones(id) ON DELETE SET NULL,
+    fase                TEXT NOT NULL DEFAULT '',
+    modelo              TEXT NOT NULL,
+    tokens_entrada      INTEGER NOT NULL DEFAULT 0,
+    tokens_salida       INTEGER NOT NULL DEFAULT 0,
+    tokens_cache_lectura  INTEGER NOT NULL DEFAULT 0,
+    tokens_cache_escritura INTEGER NOT NULL DEFAULT 0,
+    coste_usd           REAL NOT NULL DEFAULT 0,
+    resultado           TEXT NOT NULL DEFAULT 'ok',
+    creado_en           TEXT NOT NULL DEFAULT (datetime('now')),
+    actualizado_en      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_consumo_fecha ON consumo_modelo(creado_en);
+CREATE INDEX IF NOT EXISTS ix_consumo_ejecucion ON consumo_modelo(ejecucion_id);
 
 CREATE TABLE IF NOT EXISTS descartes (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,7 +294,18 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('smtp_nombre_remitente', 'MOVA Boletines Oficiales', 'Nombre visible del remitente'),
  ('url_publica',           '',        'URL base de los enlaces de descarte (vacio = la del entorno)'),
  ('terminos_refuerzo',     'pyme,pymes,empresa,empresas,empresa industrial,industria,autonomo,autonomos,inversion productiva,modernizacion industrial', 'Terminos que refuerzan la marca de alta relevancia'),
- ('primer_arranque',       '1',       'Marca de instalacion recien creada');
+ ('primer_arranque',       '1',       'Marca de instalacion recien creada'),
+ ('tarde_activa',          '1',       'Comprobacion de la tarde para boletines extraordinarios'),
+ ('hora_tarde',            '20:00',   'Hora de la comprobacion de la tarde (HH:MM)'),
+ ('alerta_activa',         '1',       'Correo urgente aparte para convocatorias de alta relevancia con plazo corto'),
+ ('dias_alerta',           '15',      'Dias que faltan para el fin de plazo por debajo de los cuales se alerta'),
+ ('semanal_activo',        '1',       'Resumen semanal por correo'),
+ ('dia_semanal',           'mon',     'Dia del resumen semanal (mon..sun)'),
+ ('hora_semanal',          '08:30',   'Hora del resumen semanal (HH:MM)'),
+ ('dias_vencimiento_semanal', '30',   'El resumen semanal lista los plazos que vencen en estos dias'),
+ ('esfuerzo_modelo',       'low',     'Esfuerzo de razonamiento en Sonnet 5 / Opus 5 / Opus 4.8 (low, medium, high)'),
+ ('tope_mensual_usd',      '30',      'Tope de gasto mensual en la API en dolares (0 = sin tope)'),
+ ('cambio_usd_eur',        '0.86',    'Tipo de cambio para mostrar el gasto en euros (editable)');
 
 INSERT OR IGNORE INTO ajustes (clave, valor, cifrado, descripcion) VALUES
  ('anthropic_api_key', '', 1, 'Clave de API de Anthropic (cifrada con Fernet)'),

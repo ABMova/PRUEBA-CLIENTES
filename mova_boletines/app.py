@@ -72,6 +72,39 @@ def _tarea_programada() -> None:
     registro.info("Disparo programado: %s", mensaje)
 
 
+def _tarea_tarde() -> None:
+    """Segunda pasada del dia: boletines extraordinarios o publicados tarde.
+
+    Revisa los mismos boletines del dia en curso. La deduplicacion deja fuera
+    todo lo que ya salio por la manana, asi que solo llega lo nuevo, y si no hay
+    nada no se envia correo.
+    """
+    if repositorio.ajuste("planificador_activo", "1") != "1":
+        return
+    if repositorio.ajuste("tarde_activa", "1") != "1":
+        return
+    aceptada, mensaje = orquestador.lanzar(date.today(), "tarde", "planificador")
+    registro.info("Comprobacion de la tarde: %s", mensaje)
+
+
+def _tarea_semanal() -> None:
+    if repositorio.ajuste("semanal_activo", "1") != "1":
+        return
+    exito, detalle = orquestador.enviar_resumen_semanal()
+    registro.info("Resumen semanal: %s", detalle)
+    repositorio.cerrar_conexion()
+
+
+def _disparo(hora: str, dias: str, zona: str, por_defecto: tuple[int, int]) -> CronTrigger:
+    try:
+        horas, minutos = hora.split(":")
+        return CronTrigger(day_of_week=dias, hour=int(horas), minute=int(minutos), timezone=zona)
+    except ValueError:
+        registro.error("Horario no valido (%s %s); se usa %02d:%02d", hora, dias, *por_defecto)
+        return CronTrigger(day_of_week=dias if dias else "mon-fri", hour=por_defecto[0],
+                           minute=por_defecto[1], timezone=zona)
+
+
 def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
     planificador = BackgroundScheduler(timezone=repositorio.ajuste("zona_horaria",
                                                                    config.ZONA_HORARIA))
@@ -79,23 +112,33 @@ def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
 
     def reprogramar() -> None:
         planificador.remove_all_jobs()
-        hora = repositorio.ajuste("hora_ejecucion", "07:45")
+        zona = repositorio.ajuste("zona_horaria", config.ZONA_HORARIA)
         dias = repositorio.ajuste("dias_ejecucion", "mon-fri")
-        try:
-            horas, minutos = hora.split(":")
-            disparo = CronTrigger(day_of_week=dias, hour=int(horas), minute=int(minutos),
-                                  timezone=repositorio.ajuste("zona_horaria", config.ZONA_HORARIA))
-        except ValueError:
-            registro.error("Horario no valido (%s %s); se usa 07:45 mon-fri", hora, dias)
-            disparo = CronTrigger(day_of_week="mon-fri", hour=7, minute=45,
-                                  timezone=config.ZONA_HORARIA)
-        planificador.add_job(_tarea_programada, disparo, id="vigilancia_diaria",
-                             replace_existing=True, misfire_grace_time=3600,
-                             coalesce=True, max_instances=1)
-        trabajos = planificador.get_jobs()
-        if trabajos and trabajos[0].next_run_time:
-            registro.info("Proxima vigilancia: %s",
-                          trabajos[0].next_run_time.strftime("%d/%m/%Y %H:%M %Z"))
+        comunes = {"replace_existing": True, "misfire_grace_time": 3600, "coalesce": True,
+                   "max_instances": 1}
+
+        planificador.add_job(
+            _tarea_programada,
+            _disparo(repositorio.ajuste("hora_ejecucion", "07:45"), dias, zona, (7, 45)),
+            id="vigilancia_diaria", name="Vigilancia de la manana", **comunes)
+
+        if repositorio.ajuste("tarde_activa", "1") == "1":
+            planificador.add_job(
+                _tarea_tarde,
+                _disparo(repositorio.ajuste("hora_tarde", "20:00"), dias, zona, (20, 0)),
+                id="vigilancia_tarde", name="Comprobacion de la tarde", **comunes)
+
+        if repositorio.ajuste("semanal_activo", "1") == "1":
+            planificador.add_job(
+                _tarea_semanal,
+                _disparo(repositorio.ajuste("hora_semanal", "08:30"),
+                         repositorio.ajuste("dia_semanal", "mon"), zona, (8, 30)),
+                id="resumen_semanal", name="Resumen semanal", **comunes)
+
+        for trabajo in planificador.get_jobs():
+            if trabajo.next_run_time:
+                registro.info("Proxima %s: %s", trabajo.name.lower(),
+                              trabajo.next_run_time.strftime("%d/%m/%Y %H:%M %Z"))
 
     reprogramar()
     aplicacion.config["planificador"] = planificador

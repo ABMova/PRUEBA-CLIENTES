@@ -118,7 +118,8 @@ def main() -> int:
               "sin flexbox ni grid (compatible con Outlook)")
     comprobar("<table" in texto, "maquetado con tablas")
     comprobar("#b8892f" in texto, "acento dorado de la paleta MOVA")
-    for campo in ("Comunidad", "Boletin", "Fecha publicacion", "Titulo", "Resumen", "Organismo",
+    for campo in ("Comunidad", "Boletin", "Fecha publicacion", "Titulo completo", "Resumen",
+                  "Organismo",
                   "Plazo", "Beneficiarios", "Importe", "Enlaces"):
         comprobar(f">{campo}<" in texto, f"campo '{campo}' presente")
 

@@ -13,6 +13,13 @@
         <input type="date" id="fecha" name="fecha" value="{{ hoy }}">
       </div>
       <div class="campo" style="flex:0 0 auto;">
+        <label for="tipo">Tipo</label>
+        <select id="tipo" name="tipo">
+          <option value="manual">Vigilancia completa</option>
+          <option value="tarde">Comprobacion de la tarde (solo correo si hay novedades)</option>
+        </select>
+      </div>
+      <div class="campo" style="flex:0 0 auto;">
         <label for="enviar">Correo</label>
         <select id="enviar" name="enviar">
           <option value="1">Generar y enviar</option>
@@ -26,6 +33,15 @@
     </form>
   </div>
 
+  <form method="post" action="{{ url_for('web.resumen_semanal') }}" class="campo-linea" style="margin-top:10px;">
+    <span class="apoyo">Resumen de la semana anterior y plazos que vencen:</span>
+    <select name="enviar" style="width:auto;">
+      <option value="1">Enviar ahora</option>
+      <option value="0">Solo generar</option>
+    </select>
+    <button type="submit">Resumen semanal</button>
+  </form>
+
   <h3>Registro en vivo</h3>
   <div class="registro-vivo" id="registro-vivo">Sin actividad.</div>
 </div>
@@ -38,7 +54,7 @@
         <tr>
           <th>#</th><th>Fecha objetivo</th><th>Tipo</th><th>Estado</th>
           <th>Boletines</th><th>Brutas</th><th>Candidatas</th><th>Nuevas</th>
-          <th>Alta</th><th>Llamadas IA</th><th>Inicio</th><th>Fin</th><th></th>
+          <th>Alta</th><th>Llamadas IA</th><th>Coste</th><th>Inicio</th><th>Fin</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -56,13 +72,14 @@
           <td>{{ e.nuevas }}</td>
           <td>{{ e.alta_relevancia }}</td>
           <td>{{ e.llamadas_modelo }}</td>
+          <td class="celda-estrecha">{% if e.coste_usd %}{{ "%.4f"|format(e.coste_usd) }} ${% else %}-{% endif %}</td>
           <td class="celda-estrecha apoyo">{{ e.iniciado_en }}</td>
           <td class="celda-estrecha apoyo">{{ e.terminado_en or '-' }}</td>
           <td class="celda-estrecha"><a class="boton boton-pequeno" href="{{ url_for('web.ejecucion', ejecucion_id=e.id) }}">Detalle</a></td>
         </tr>
         {% endfor %}
         {% if not ejecuciones %}
-        <tr><td colspan="13" class="apoyo">Sin ejecuciones registradas.</td></tr>
+        <tr><td colspan="14" class="apoyo">Sin ejecuciones registradas.</td></tr>
         {% endif %}
       </tbody>
     </table>

@@ -5,8 +5,9 @@
     QUE HACE LA TAREA
       - Arranca la herramienta al iniciar sesion el usuario, minimizada y sin
         abrir el navegador.
-      - Vuelve a intentarlo cada dia laborable unos minutos antes de la hora de
-        la vigilancia, por si el equipo se encendio tarde o la herramienta se
+      - Vuelve a intentarlo cada dia laborable unos minutos antes de la
+        vigilancia de la manana (07:30) y de la comprobacion de la tarde
+        (19:45), por si el equipo se encendio tarde o la herramienta se
         cerro. Si ya esta en marcha, el segundo arranque se detecta solo y no
         hace nada: la herramienta comprueba si su puerto ya responde.
       - Si el proceso se cae, Windows lo reintenta tres veces.
@@ -31,6 +32,7 @@
 param(
     [string]$Nombre = "MOVA Boletines Oficiales",
     [string]$Hora = "07:30",
+    [string]$HoraTarde = "19:45",
     [ValidateSet("Diaria", "Laborables")]
     [string]$Dias = "Laborables",
     [int]$Puerto = 0,
@@ -106,11 +108,14 @@ Escribir "Carpeta   : $raiz"
 $accion = New-ScheduledTaskAction -Execute $programa -Argument ($argumentos -join " ") -WorkingDirectory $raiz
 
 $disparos = @(New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME)
-if ($Dias -eq "Laborables") {
-    $disparos += New-ScheduledTaskTrigger -Weekly -At $Hora `
-        -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday
-} else {
-    $disparos += New-ScheduledTaskTrigger -Daily -At $Hora
+foreach ($horaDisparo in @($Hora, $HoraTarde)) {
+    if (-not $horaDisparo) { continue }
+    if ($Dias -eq "Laborables") {
+        $disparos += New-ScheduledTaskTrigger -Weekly -At $horaDisparo `
+            -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday
+    } else {
+        $disparos += New-ScheduledTaskTrigger -Daily -At $horaDisparo
+    }
 }
 
 $ajustes = New-ScheduledTaskSettingsSet `
@@ -143,11 +148,11 @@ $info = Get-ScheduledTaskInfo -TaskName $Nombre
 Write-Host ""
 Escribir "Tarea '$Nombre' registrada." "Green"
 Escribir "Estado          : $($tarea.State)"
-Escribir "Disparos        : al iniciar sesion y $($Dias.ToLower()) a las $Hora"
+Escribir "Disparos        : al iniciar sesion y $($Dias.ToLower()) a las $Hora y a las $HoraTarde"
 Escribir "Proxima vez     : $($info.NextRunTime)"
 Write-Host ""
-Escribir "La vigilancia se dispara a la hora que marques en Ajustes (07:45 de inicio),"
-Escribir "no a las $Hora : esta tarea solo se asegura de que la herramienta este encendida."
+Escribir "La vigilancia (07:45) y la comprobacion de la tarde (20:00) las dispara la"
+Escribir "herramienta a la hora de Ajustes: esta tarea solo se asegura de que este encendida."
 Write-Host ""
 Escribir "Comprobar : Get-ScheduledTaskInfo -TaskName '$Nombre'"
 Escribir "Probar    : Start-ScheduledTask -TaskName '$Nombre'"

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block contenido %}
+
+{% if not queda %}
+<div class="aviso error">
+  <strong>Tope de gasto mensual alcanzado.</strong> Hasta el mes que viene (o hasta que subas el
+  tope en Ajustes) las publicaciones se recogen y se guardan para revision manual, sin
+  analisis del modelo.
+</div>
+{% elif tope > 0 and porcentaje >= 80 %}
+<div class="aviso warn">Llevas el {{ porcentaje }} % del tope de gasto de este mes.</div>
+{% endif %}
+
+<div class="card">
+  <h2>Gasto en la API de Anthropic</h2>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="cifra">{{ "%.2f"|format(gasto_mes) }} $</div>
+      <div class="rotulo">Este mes &middot; {{ "%.2f"|format(gasto_mes * cambio) }} &euro;</div>
+    </div>
+    <div class="kpi">
+      <div class="cifra">{{ "%.2f"|format(gasto_hoy) }} $</div>
+      <div class="rotulo">Hoy &middot; {{ "%.2f"|format(gasto_hoy * cambio) }} &euro;</div>
+    </div>
+    <div class="kpi">
+      <div class="cifra">{% if tope > 0 %}{{ "%.0f"|format(tope) }} ${% else %}&infin;{% endif %}</div>
+      <div class="rotulo">Tope mensual{% if tope > 0 %} &middot; queda {{ "%.2f"|format([tope - gasto_mes, 0]|max) }} ${% endif %}</div>
+    </div>
+    <div class="kpi">
+      <div class="cifra">{% if tope > 0 %}{{ porcentaje }} %{% else %}-{% endif %}</div>
+      <div class="rotulo">Del tope consumido</div>
+    </div>
+  </div>
+  {% if tope > 0 %}
+  <div class="barra-progreso" style="margin-top:12px;"><div class="relleno" style="width:{{ porcentaje }}%;"></div></div>
+  {% endif %}
+  <p class="apoyo" style="margin-top:10px;">
+    Extraccion con <span class="mono">{{ modelo_extraccion }}</span>, relevancia con
+    <span class="mono">{{ modelo_relevancia }}</span>, esfuerzo de razonamiento
+    <span class="mono">{{ esfuerzo }}</span>. Los euros usan el tipo de cambio de Ajustes
+    ({{ cambio }}); Anthropic factura en dolares.
+    {% if puede_administrar %}<a href="{{ url_for('web.ajustes') }}">Cambiar tope o modelos</a>{% endif %}
+  </p>
+</div>
+
+<div class="fila">
+  <div class="card">
+    <h2>Por modelo y fase este mes</h2>
+    <table class="datos">
+      <thead><tr><th>Modelo</th><th>Fase</th><th>Llamadas</th><th>Tokens entrada</th><th>Tokens salida</th><th>Coste</th></tr></thead>
+      <tbody>
+        {% for f in por_modelo %}
+        <tr>
+          <td class="mono">{{ f.modelo }}</td>
+          <td>{{ f.fase or '-' }}</td>
+          <td>{{ f.llamadas }}</td>
+          <td>{{ "{:,}".format(f.entrada or 0).replace(",", ".") }}</td>
+          <td>{{ "{:,}".format(f.salida or 0).replace(",", ".") }}</td>
+          <td><strong>{{ "%.4f"|format(f.coste or 0) }} $</strong></td>
+        </tr>
+        {% endfor %}
+        {% if not por_modelo %}<tr><td colspan="6" class="apoyo">Todavia no hay llamadas al modelo este mes.</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="flex:0 1 340px;">
+    <h2>Por mes</h2>
+    <table class="datos">
+      <thead><tr><th>Mes</th><th>Llamadas</th><th>Coste</th></tr></thead>
+      <tbody>
+        {% for f in por_mes %}
+        <tr><td>{{ f.mes }}</td><td>{{ f.llamadas }}</td><td><strong>{{ "%.2f"|format(f.coste or 0) }} $</strong></td></tr>
+        {% endfor %}
+        {% if not por_mes %}<tr><td colspan="3" class="apoyo">Sin datos.</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="fila">
+  <div class="card">
+    <h2>Por ejecucion</h2>
+    <div class="tabla-desplazable">
+      <table class="datos">
+        <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Nuevas</th><th>Llamadas</th><th>Entrada</th><th>Salida</th><th>Coste</th><th>Por publicacion</th></tr></thead>
+        <tbody>
+          {% for e in ejecuciones %}
+          <tr>
+            <td><a href="{{ url_for('web.ejecucion', ejecucion_id=e.id) }}">{{ e.id }}</a></td>
+            <td class="celda-estrecha">{{ e.fecha_objetivo }}</td>
+            <td class="celda-estrecha">{{ e.tipo }}</td>
+            <td class="celda-estrecha"><span class="pildora {{ 'ok' if e.estado == 'correcta' else ('proceso' if e.estado == 'en_curso' else ('aviso' if e.estado in ('con_avisos','interrumpida','cancelada') else 'error')) }}">{{ e.estado }}</span></td>
+            <td>{{ e.nuevas }}</td>
+            <td>{{ e.llamadas }}</td>
+            <td>{{ "{:,}".format(e.entrada).replace(",", ".") }}</td>
+            <td>{{ "{:,}".format(e.salida).replace(",", ".") }}</td>
+            <td><strong>{{ "%.4f"|format(e.coste) }} $</strong></td>
+            <td class="apoyo">{% if e.nuevas %}{{ "%.4f"|format(e.coste / e.nuevas) }} ${% else %}-{% endif %}</td>
+          </tr>
+          {% endfor %}
+          {% if not ejecuciones %}<tr><td colspan="10" class="apoyo">Sin ejecuciones.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="flex:0 1 340px;">
+    <h2>Ultimos 30 dias</h2>
+    <table class="datos">
+      <thead><tr><th>Dia</th><th>Llamadas</th><th>Coste</th></tr></thead>
+      <tbody>
+        {% for f in por_dia %}
+        <tr><td>{{ f.dia }}</td><td>{{ f.llamadas }}</td><td>{{ "%.4f"|format(f.coste or 0) }} $</td></tr>
+        {% endfor %}
+        {% if not por_dia %}<tr><td colspan="3" class="apoyo">Sin datos.</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Tarifas aplicadas</h2>
+  <p class="apoyo">Dolares por millon de tokens, tarifa estandar de Anthropic. Si cambian, se
+     actualizan en <span class="mono">integraciones/anthropic_cliente.py</span>.</p>
+  <table class="datos" style="max-width:640px;">
+    <thead><tr><th>Modelo</th><th>Entrada</th><th>Salida</th></tr></thead>
+    <tbody>
+      {% for modelo, precio in precios.items() %}
+      <tr><td class="mono">{{ modelo }}</td><td>{{ "%.2f"|format(precio[0]) }} $</td><td>{{ "%.2f"|format(precio[1]) }} $</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

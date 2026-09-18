@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import secrets
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import (Blueprint, Response, current_app, flash, redirect, render_template,
                    request, send_file, url_for)
@@ -35,6 +35,9 @@ def contexto():
         "nombre_app": config.NOMBRE_APP,
         "lema": config.LEMA,
         "version": config.VERSION,
+        # Fecha hasta la que un fin de plazo se pinta como urgente (rojo).
+        "hoy_mas_alerta": (date.today() + timedelta(
+            days=repositorio.ajuste_int("dias_alerta", 15))).isoformat(),
         "marcador": config.MARCADOR_PENDIENTE,
         "marcador_revision": config.MARCADOR_REVISION,
         "carpeta_datos": str(config.DATOS),
@@ -42,14 +45,32 @@ def contexto():
     }
 
 
-def _proxima_ejecucion() -> str:
+def _proxima_ejecucion(trabajo_id: str = "vigilancia_diaria") -> str:
     planificador = current_app.config.get("planificador")
     if not planificador:
         return ""
-    trabajos = planificador.get_jobs()
-    if not trabajos or trabajos[0].next_run_time is None:
+    trabajo = planificador.get_job(trabajo_id)
+    if trabajo is None or trabajo.next_run_time is None:
         return ""
-    return trabajos[0].next_run_time.strftime("%d/%m/%Y %H:%M")
+    return trabajo.next_run_time.strftime("%d/%m/%Y %H:%M")
+
+
+def _proximas() -> list[tuple[str, str]]:
+    """Todos los disparos programados, para el panel."""
+    planificador = current_app.config.get("planificador")
+    if not planificador:
+        return []
+    return [(trabajo.name, trabajo.next_run_time.strftime("%d/%m/%Y %H:%M"))
+            for trabajo in sorted(planificador.get_jobs(),
+                                  key=lambda t: t.next_run_time or datetime.max)
+            if trabajo.next_run_time]
+
+
+def _cambio() -> float:
+    try:
+        return float(repositorio.ajuste("cambio_usd_eur", "0.86") or 0.86)
+    except ValueError:
+        return 0.86
 
 
 # ------------------------------------------------------------------ acceso --
@@ -137,6 +158,9 @@ def panel():
         boletines=repositorio.boletines(),
         ajustes=ajustes,
         proxima=_proxima_ejecucion(),
+        proximas=_proximas(),
+        cambio=_cambio(),
+        tope_mensual=float(repositorio.ajuste("tope_mensual_usd", "30") or 0),
         destinatarios=len(repositorio.destinatarios(solo_activos=True)),
         recientes=repositorio.publicaciones({}, limite=25),
         avisos_configuracion=avisos,
@@ -179,8 +203,9 @@ def lanzar():
         return redirect(url_for("web.ejecuciones"))
 
     usuario = auth.usuario_actual()
+    tipo = "tarde" if request.form.get("tipo") == "tarde" else "manual"
     aceptada, mensaje = orquestador.lanzar(
-        objetivo, "manual", usuario["usuario"],
+        objetivo, tipo, usuario["usuario"],
         enviar_correo=request.form.get("enviar", "1") == "1")
     flash(mensaje, "ok" if aceptada else "error")
     return redirect(url_for("web.ejecuciones"))
@@ -195,6 +220,40 @@ def cancelar():
         orquestador.cancelar()
         flash("Cancelacion solicitada", "warn")
     return redirect(url_for("web.ejecuciones"))
+
+
+@web.route("/ejecuciones/resumen-semanal", methods=["POST"])
+@auth.requiere("ejecutar")
+def resumen_semanal():
+    usuario = auth.usuario_actual()
+    enviar = request.form.get("enviar", "1") == "1"
+    exito, detalle = orquestador.enviar_resumen_semanal(usuario=usuario["usuario"], enviar=enviar)
+    flash(f"Resumen semanal: {detalle}", "ok" if exito else "error")
+    return redirect(url_for("web.ejecuciones"))
+
+
+# -------------------------------------------------------------------- coste --
+@web.route("/coste")
+@auth.requiere("ver")
+def coste():
+    queda, gasto_mes, tope = anthropic_cliente.presupuesto()
+    return render_template(
+        "coste.html", titulo_pagina="Coste",
+        gasto_mes=gasto_mes,
+        gasto_hoy=repositorio.gasto_dia_usd(),
+        tope=tope,
+        queda=queda,
+        porcentaje=min(100, int(100 * gasto_mes / tope)) if tope > 0 else 0,
+        cambio=_cambio(),
+        por_modelo=repositorio.consumo_por_modelo(),
+        por_dia=repositorio.consumo_por_dia(30),
+        por_mes=repositorio.consumo_por_mes(12),
+        ejecuciones=repositorio.ejecuciones_con_coste(30),
+        precios=anthropic_cliente.PRECIOS_USD_POR_MILLON,
+        modelo_extraccion=repositorio.ajuste("modelo_extraccion", "claude-sonnet-5"),
+        modelo_relevancia=repositorio.ajuste("modelo_relevancia", "claude-haiku-4-5-20251001"),
+        esfuerzo=repositorio.ajuste("esfuerzo_modelo", "low"),
+        puede_administrar=auth.tiene_permiso("administrar"))
 
 
 @web.route("/api/progreso")
@@ -525,7 +584,10 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "smtp_seguridad", "smtp_usuario", "smtp_remitente", "smtp_nombre_remitente",
                   "url_publica", "hora_ejecucion", "dias_ejecucion", "planificador_activo",
                   "umbral_difuso", "dias_dedup", "dias_token_descarte", "reintentos_boletin",
-                  "copias_max", "max_candidatas_ejecucion", "terminos_refuerzo")
+                  "copias_max", "max_candidatas_ejecucion", "terminos_refuerzo",
+                  "tarde_activa", "hora_tarde", "alerta_activa", "dias_alerta",
+                  "semanal_activo", "dia_semanal", "hora_semanal", "dias_vencimiento_semanal",
+                  "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur")
 
 
 @web.route("/ajustes", methods=["GET", "POST"])
@@ -566,7 +628,10 @@ def ajustes():
         hay_ocr=tesseract_disponible(),
         url_publica_efectiva=correo.url_publica(),
         ruta_clave=str(config.RUTA_CLAVE),
-        proxima=_proxima_ejecucion())
+        proxima=_proxima_ejecucion(),
+        proxima_tarde=_proxima_ejecucion("vigilancia_tarde"),
+        proxima_semanal=_proxima_ejecucion("resumen_semanal"),
+        gasto_mes=repositorio.gasto_mes_usd())
 
 
 @web.route("/ajustes/probar-api", methods=["POST"])

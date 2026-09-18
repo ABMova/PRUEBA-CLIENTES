@@ -11,8 +11,9 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
@@ -23,6 +24,7 @@ os.environ["MOVA_URL_PUBLICA"] = "http://boletines.interno:8770"
 
 import config  # noqa: E402
 from datos import repositorio  # noqa: E402
+from integraciones import anthropic_cliente  # noqa: E402
 from negocio import correo, deduplicador, orquestador, relevancia  # noqa: E402
 from negocio.boletines import ADAPTADORES  # noqa: E402
 from negocio.boletines.base import ErrorBoletin, PublicacionCruda  # noqa: E402
@@ -106,11 +108,53 @@ def _boletin_caido(fecha):  # noqa: ARG001
     raise ErrorBoletin("Simulacion: el boletin no responde")
 
 
+# Convocatorias extra para las pruebas de alerta y de la tarde.
+_MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+             "septiembre", "octubre", "noviembre", "diciembre"]
+FIN_URGENTE = date.today() + timedelta(days=7)
+TEXTO_FIN_URGENTE = f"hasta el {FIN_URGENTE.day} de {_MESES_ES[FIN_URGENTE.month - 1]} de {FIN_URGENTE.year}"
+
+AYUDA_URGENTE = PublicacionCruda(
+    codigo_boletin="DOGV",
+    titulo=("RESOLUCION de 16 de septiembre de 2026, por la que se convocan ayudas urgentes a la "
+            "digitalizacion de pymes industriales del sector del calzado"),
+    organismo="Conselleria de Innovacion, Industria, Comercio y Turismo",
+    seccion="III. ACTOS ADMINISTRATIVOS",
+    url_oficial="https://dogv.gva.es/es/disposicio-canonica?sig=999010",
+    url_pdf="", fecha="2026-09-17",
+    texto=f"Ayudas a pymes industriales del calzado. Plazo de solicitud: {TEXTO_FIN_URGENTE}.",
+    identificador="999010",
+)
+
+AYUDA_EXTRAORDINARIA = PublicacionCruda(
+    codigo_boletin="DOGV",
+    titulo=("DECRETO extraordinario 140/2026 por el que se aprueba un programa de ayudas a la "
+            "eficiencia energetica de la industria afectada por la DANA"),
+    organismo="Presidencia de la Generalitat",
+    seccion="I. DISPOSICIONES GENERALES",
+    url_oficial="https://dogv.gva.es/es/disposicio-canonica?sig=999020",
+    url_pdf="", fecha="2026-09-17",
+    texto="Programa de ayudas a la industria para eficiencia energetica. Numero extraordinario.",
+    identificador="999020",
+)
+
+AYUDA_SIN_PRESUPUESTO = PublicacionCruda(
+    codigo_boletin="DOGV",
+    titulo="ORDEN 20/2026 por la que se convocan subvenciones a la internacionalizacion de pymes",
+    organismo="Conselleria de Economia",
+    seccion="I. DISPOSICIONES GENERALES",
+    url_oficial="https://dogv.gva.es/es/disposicio-canonica?sig=999030",
+    url_pdf="", fecha="2026-09-17",
+    texto="Subvenciones a la internacionalizacion de pymes.",
+    identificador="999030",
+)
+
 # -------------------------------------------------------- modelo simulado --
 LLAMADAS = {"n": 0}
 
 
-def _modelo_simulado(sistema: str, mensaje: str, modelo: str, max_tokens: int) -> dict:
+def _modelo_simulado(sistema: str, mensaje: str, modelo: str, max_tokens: int,
+                     **_opciones) -> dict:
     """Responde como Claude, sin red. Distingue extraccion de relevancia."""
     LLAMADAS["n"] += 1
     texto = mensaje.lower()
@@ -128,8 +172,28 @@ def _modelo_simulado(sistema: str, mensaje: str, modelo: str, max_tokens: int) -
                     "beneficiarios": config.MARCADOR_PENDIENTE,
                     "importe": config.MARCADOR_PENDIENTE,
                     "confianza": "alta", "motivo_confianza": "Es un nombramiento de personal."}
+        if "calzado" in texto:
+            return {"es_convocatoria_ayuda": True, "titulo": titulo,
+                    "titulo_resumido": "Ayudas a la digitalizacion de pymes del calzado",
+                    "resumen": "Ayudas a la digitalizacion de pymes industriales del calzado.",
+                    "organismo_convocante": "Conselleria de Innovacion, Industria, Comercio y Turismo",
+                    "plazo_solicitud": TEXTO_FIN_URGENTE, "fecha_fin_plazo": FIN_URGENTE.isoformat(),
+                    "beneficiarios": "Pymes industriales del calzado",
+                    "importe": config.MARCADOR_PENDIENTE,
+                    "confianza": "alta", "motivo_confianza": "El plazo figura en el texto."}
+        if "extraordinario" in texto:
+            return {"es_convocatoria_ayuda": True, "titulo": titulo,
+                    "titulo_resumido": "Ayudas a la eficiencia energetica de la industria tras la DANA",
+                    "resumen": "Programa de ayudas a la industria para eficiencia energetica.",
+                    "organismo_convocante": "Presidencia de la Generalitat",
+                    "plazo_solicitud": config.MARCADOR_PENDIENTE, "fecha_fin_plazo": None,
+                    "beneficiarios": "Empresas industriales afectadas por la DANA",
+                    "importe": config.MARCADOR_PENDIENTE,
+                    "confianza": "media", "motivo_confianza": "No figura el plazo."}
         if es_pyme:
             return {"es_convocatoria_ayuda": True, "titulo": titulo,
+                    "titulo_resumido": "Subvenciones a la modernizacion de pymes industriales",
+                    "fecha_fin_plazo": "2026-10-30",
                     "resumen": "Subvenciones para modernizacion e inversion productiva de pymes "
                                "industriales de la Comunitat Valenciana.",
                     "organismo_convocante": "Conselleria de Innovacion, Industria, Comercio y Turismo",
@@ -138,6 +202,8 @@ def _modelo_simulado(sistema: str, mensaje: str, modelo: str, max_tokens: int) -
                     "importe": "12.000.000 euros",
                     "confianza": "alta", "motivo_confianza": "Todos los datos figuran en el texto."}
         return {"es_convocatoria_ayuda": True, "titulo": titulo,
+                "titulo_resumido": "Ayudas a asociaciones vecinales para actividades culturales",
+                "fecha_fin_plazo": None,
                 "resumen": "Ayudas a asociaciones vecinales para actividades culturales.",
                 "organismo_convocante": "Conselleria de Participacion",
                 "plazo_solicitud": config.MARCADOR_PENDIENTE,
@@ -146,7 +212,7 @@ def _modelo_simulado(sistema: str, mensaje: str, modelo: str, max_tokens: int) -
                 "confianza": "media", "motivo_confianza": "El plazo no aparece en el texto."}
 
     # Fase 4 - relevancia
-    if es_pyme:
+    if es_pyme or "industria" in texto:
         return {"relevancia": "alta", "sectores": ["industria", "pyme"],
                 "justificacion": "Dirigida expresamente a pymes industriales."}
     return {"relevancia": "baja", "sectores": ["cultura"],
@@ -291,7 +357,7 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "el fallo del boletin queda trazado en logs_scraping")
 
     print("\n8) Bucle de calidad: respuesta mala del modelo")
-    def _modelo_malo(sistema, mensaje, modelo, max_tokens):
+    def _modelo_malo(sistema, mensaje, modelo, max_tokens, **_opciones):
         return {"titulo": "", "resumen": "linea1\nlinea2\nlinea3\nlinea4\nlinea5\nlinea6",
                 "organismo_convocante": "no disponible", "plazo_solicitud": "no consta",
                 "beneficiarios": "", "importe": "", "confianza": "altisima",
@@ -308,6 +374,164 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "el titulo se rescata del sumario en vez de quedar vacio")
     comprobar(resultado.datos["plazo_solicitud"] == config.MARCADOR_PENDIENTE,
               "los textos genericos se sustituyen por el marcador, nunca por datos inventados")
+
+
+    # ---------------------------------------------------------- v1.1 --
+    ENVIADOS: list[dict] = []
+
+    def _enviar_simulado(destinatarios, asunto, html, reintentos=3, urgente=False):
+        ENVIADOS.append({"asunto": asunto, "html": html, "urgente": urgente,
+                         "destinatarios": list(destinatarios)})
+        return True, f"Enviado a {len(destinatarios)} destinatario(s)", 1
+
+    correo.enviar = _enviar_simulado
+    repositorio.activar_boletin("BOJA", False)
+
+    print("\n9) Titulo resumido y fin de plazo")
+    pyme = repositorio.publicacion(pyme["id"])
+    comprobar(pyme["titulo_resumido"] == "Subvenciones a la modernizacion de pymes industriales",
+              "se guarda el titulo resumido que da el modelo")
+    comprobar(pyme["titulo"].startswith("ORDEN 12/2026"),
+              "y se conserva el titulo oficial literal")
+    comprobar(pyme["plazo_fin"] == "2026-10-30" and pyme["plazo_fin_origen"] == "fecha_literal",
+              f"el fin de plazo sale del texto: {pyme['plazo_fin']} ({pyme['plazo_fin_origen']})")
+    asociaciones = repositorio.publicacion(asociaciones["id"])
+    comprobar(asociaciones["plazo_fin"] is None,
+              "sin plazo en el texto no se inventa fecha de fin")
+
+    print("\n10) Alerta inmediata por plazo corto")
+    _guion["publicaciones"] = [AYUDA_URGENTE]
+    ENVIADOS.clear()
+    orquestador.lanzar(FECHA, "manual", "prueba", enviar_correo=True)
+    _esperar_fin()
+    urgentes = [e for e in ENVIADOS if e["urgente"]]
+    comprobar(len(urgentes) == 1 and urgentes[0]["asunto"].startswith("[URGENTE]"),
+              "se envia un correo urgente aparte")
+    comprobar(bool(urgentes) and "Ayudas a la digitalizacion de pymes del calzado" in urgentes[0]["html"],
+              "la alerta lleva el titulo resumido")
+    comprobar(bool(urgentes) and "Vence el" in urgentes[0]["html"],
+              "la alerta dice cuando vence el plazo")
+    comprobar(len(ENVIADOS) == 2 and not ENVIADOS[1]["urgente"],
+              "y despues sale el correo diario normal")
+    urgente = [p for p in repositorio.publicaciones({}, limite=50) if "calzado" in p["titulo"]][0]
+    comprobar(urgente["alerta_enviada"] == 1, "la publicacion queda marcada como alertada")
+
+    print("\n11) Comprobacion de la tarde sin novedades: no escribe")
+    ENVIADOS.clear()
+    orquestador.lanzar(FECHA, "tarde", "planificador", enviar_correo=True)
+    _esperar_fin()
+    comprobar(not ENVIADOS, "sin publicaciones nuevas no se envia ningun correo")
+    ultimo_envio = repositorio.envios(1)[0]
+    comprobar(ultimo_envio["estado"] == "omitido" and "tarde" in ultimo_envio["asunto"].lower(),
+              "queda trazado que la comprobacion de la tarde no envio nada")
+
+    print("\n12) Comprobacion de la tarde con un boletin extraordinario")
+    _guion["publicaciones"] = [AYUDA_URGENTE, AYUDA_EXTRAORDINARIA]
+    ENVIADOS.clear()
+    orquestador.lanzar(FECHA, "tarde", "planificador", enviar_correo=True)
+    _esperar_fin()
+    comprobar(len(ENVIADOS) == 1, f"se envia un unico correo ({len(ENVIADOS)})")
+    if ENVIADOS:
+        comprobar("comprobacion de la tarde" in ENVIADOS[0]["asunto"],
+                  "con asunto de comprobacion de la tarde")
+        comprobar("eficiencia energetica de la industria" in ENVIADOS[0]["html"],
+                  "con la publicacion extraordinaria")
+        comprobar("calzado" not in ENVIADOS[0]["html"],
+                  "y sin repetir lo que ya se envio por la manana")
+
+    print("\n13) Resumen semanal")
+    repositorio.guardar_ajuste("dias_vencimiento_semanal", "60")
+    ENVIADOS.clear()
+    exito, _ = orquestador.enviar_resumen_semanal(hoy=date(2026, 9, 21), usuario="prueba")
+    comprobar(exito and len(ENVIADOS) == 1, "el resumen semanal se envia")
+    if ENVIADOS:
+        html = ENVIADOS[0]["html"]
+        comprobar("Resumen semanal" in ENVIADOS[0]["asunto"], "con su asunto")
+        comprobar("14 de septiembre de 2026" in html and "20 de septiembre de 2026" in html,
+                  "cubre la semana anterior de lunes a domingo")
+        comprobar("Ayudas a la digitalizacion de pymes del calzado" in html,
+                  "recoge lo publicado esa semana")
+        comprobar("Subvenciones a la modernizacion de pymes industriales" not in html,
+                  "sin lo que se descarto (la de pymes del paso 4)")
+        comprobar("Ayudas a asociaciones vecinales" not in html.split("Alta relevancia")[1].split("Resto")[0],
+                  "las de relevancia baja no se mezclan con las de alta")
+
+    # Los vencimientos se cuentan desde el dia real, igual que en produccion.
+    ENVIADOS.clear()
+    orquestador.enviar_resumen_semanal(hoy=date.today(), usuario="prueba")
+    if ENVIADOS:
+        comprobar("Plazos que vencen" in ENVIADOS[0]["html"]
+                  and FIN_URGENTE.strftime("%d/%m/%Y") in ENVIADOS[0]["html"],
+                  "y lista los plazos que vencen en los proximos dias")
+
+    print("\n14) Coste: tokens, precio, esfuerzo y tope mensual")
+    PETICIONES: list[dict] = []
+    RESPUESTA = {"motivo": "end_turn"}
+
+    class _Mensajes:
+        def create(self, **parametros):
+            PETICIONES.append(parametros)
+            return SimpleNamespace(
+                content=[SimpleNamespace(type="text", text='{"relevancia": "alta"}')],
+                usage=SimpleNamespace(input_tokens=1000, output_tokens=200,
+                                      cache_read_input_tokens=0, cache_creation_input_tokens=0),
+                stop_reason=RESPUESTA["motivo"])
+
+    anthropic_cliente._cliente = lambda: SimpleNamespace(messages=_Mensajes())
+    repositorio.guardar_ajuste("tope_mensual_usd", "30")
+    gasto_antes = repositorio.gasto_mes_usd()
+
+    anthropic_cliente.llamar("s", "m", "claude-sonnet-5", 2000, fase="extraccion")
+    comprobar(PETICIONES[-1].get("output_config") == {"effort": "low"},
+              "a Sonnet 5 se le pide esfuerzo bajo (razona por defecto)")
+    anthropic_cliente.llamar("s", "m", "claude-haiku-4-5-20251001", 600, fase="relevancia")
+    comprobar("output_config" not in PETICIONES[-1],
+              "a Haiku 4.5 no se le manda (no lo admite)")
+
+    gasto = repositorio.gasto_mes_usd() - gasto_antes
+    esperado = (1000 * 2 + 200 * 10) / 1e6 + (1000 * 1 + 200 * 5) / 1e6
+    comprobar(abs(gasto - esperado) < 1e-9,
+              f"el coste se calcula con la tarifa de cada modelo ({gasto:.6f} $)")
+    por_modelo = {f["modelo"]: f for f in repositorio.consumo_por_modelo()}
+    comprobar(por_modelo.get("claude-sonnet-5") is not None
+              and por_modelo["claude-sonnet-5"]["entrada"] == 1000,
+              "cada llamada queda registrada con sus tokens")
+
+    RESPUESTA["motivo"] = "max_tokens"
+    try:
+        anthropic_cliente.llamar("s", "m", "claude-sonnet-5", 2000, fase="extraccion")
+        cortada = False
+    except anthropic_cliente.ErrorModelo as error:
+        cortada = "limite de tokens" in str(error)
+    comprobar(cortada, "una respuesta cortada por max_tokens da un error claro")
+    comprobar(repositorio.gasto_mes_usd() - gasto_antes > esperado,
+              "y sus tokens se contabilizan igualmente (se facturan)")
+    RESPUESTA["motivo"] = "end_turn"
+
+    repositorio.guardar_ajuste("tope_mensual_usd", "0.001")
+    try:
+        anthropic_cliente.llamar("s", "m", "claude-sonnet-5", 2000)
+        bloqueada = False
+    except anthropic_cliente.TopeAlcanzado:
+        bloqueada = True
+    comprobar(bloqueada, "con el tope superado no se hace ninguna llamada mas")
+
+    print("\n15) Con el tope alcanzado, la vigilancia sigue pero sin gastar")
+    llamadas_antes = LLAMADAS["n"]
+    relevancia.anthropic_cliente.hay_clave = lambda: True
+    _guion["publicaciones"] = [AYUDA_SIN_PRESUPUESTO]
+    orquestador.lanzar(FECHA, "manual", "prueba", enviar_correo=False)
+    _esperar_fin()
+    guardada = [p for p in repositorio.publicaciones({}, limite=80)
+                if "internacionalizacion" in p["titulo"]]
+    comprobar(len(guardada) == 1, "la publicacion se recoge igualmente")
+    comprobar(bool(guardada) and guardada[0]["revision_manual"] == 1
+              and "Tope de gasto" in guardada[0]["motivo_revision"],
+              "marcada para revision manual por el tope de gasto")
+    comprobar(LLAMADAS["n"] == llamadas_antes, "sin ninguna llamada al modelo")
+    comprobar(bool(guardada) and guardada[0]["titulo_resumido"] != "",
+              "y aun asi con titulo resumido (respaldo sin IA)")
+    repositorio.guardar_ajuste("tope_mensual_usd", "30")
 
     print(f"\n{'TODAS LAS COMPROBACIONES PASAN' if not fallos else 'FALLOS: ' + str(fallos)}")
     print(f"Llamadas simuladas al modelo: {LLAMADAS['n']}")

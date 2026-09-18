@@ -16,6 +16,25 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.1
+
+| Qué | Cómo funciona | Dónde se ajusta |
+|---|---|---|
+| **Título resumido** | El modelo redacta en una línea qué se subvenciona y a quién. Encabeza cada ficha del correo y de la pantalla; el título oficial literal se mantiene debajo. Sin modelo, se obtiene recortando la referencia normativa del título oficial. | — |
+| **Comprobación de las 20:00** | Segunda pasada del día por los siete boletines, para números extraordinarios y publicaciones tardías. Solo manda correo si aparece algo nuevo. | Ajustes → Avisos |
+| **Alerta inmediata** | Correo urgente aparte, marcado como importante, cuando aparece una convocatoria de alta relevancia cuyo plazo vence en 15 días o menos. | Ajustes → Avisos |
+| **Resumen semanal** | Lunes a las 08:30: lo publicado la semana anterior (lunes a domingo) y los plazos que vencen en los próximos 30 días. | Ajustes → Avisos |
+| **Panel de coste** | Tokens y dólares por llamada, por ejecución, por día y por mes, con tope de gasto mensual (30 $ de inicio). | Pantalla Coste y Ajustes → Coste |
+
+Para las alertas y el resumen, la herramienta calcula el **fin de plazo** a partir
+del texto: si trae la fecha escrita la usa tal cual; si da una duración contada
+desde la publicación («10 días hábiles…», «un mes…») la calcula y la marca como
+**estimada** (los días hábiles no descuentan festivos locales). Si el plazo se
+cuenta desde otra cosa, como una notificación, no se inventa ninguna fecha.
+
+Si se alcanza el tope de gasto, la vigilancia **no se detiene**: sigue
+recogiendo publicaciones y las guarda para revisión manual, sin llamar al modelo.
+
 ---
 
 ## 1. Puesta en marcha en tres pasos
@@ -66,13 +85,13 @@ instalar_tarea.bat
 ```
 
 No necesita permisos de administrador: la tarea es del usuario actual. Registra
-dos disparos:
+tres disparos:
 
 - **Al iniciar sesión**: arranca la herramienta minimizada y sin abrir el
   navegador.
-- **Cada día laborable a las 07:30**: la vuelve a levantar por si el equipo se
-  encendió tarde o la herramienta se cerró. Son quince minutos de margen antes
-  de la vigilancia.
+- **Cada día laborable a las 07:30 y a las 19:45**: la vuelve a levantar por si
+  el equipo se encendió tarde o la herramienta se cerró, quince minutos antes de
+  la vigilancia de la mañana y de la comprobación de la tarde.
 
 Si la herramienta ya está en marcha, el segundo arranque se detecta solo y no
 hace nada: antes de tocar nada comprueba si su puerto ya responde. Esto importa,
@@ -82,7 +101,8 @@ marcaría como «interrumpida» la ejecución que el primero está haciendo).
 Opciones:
 
 ```
-instalar_tarea.bat -Hora 06:45          cambia la hora del disparo de respaldo
+instalar_tarea.bat -Hora 06:45          cambia el disparo de respaldo de la manana
+instalar_tarea.bat -HoraTarde 19:30     cambia el de la tarde
 instalar_tarea.bat -Dias Diaria         tambien fines de semana
 instalar_tarea.bat -Puerto 8880         si el 8770 esta ocupado
 instalar_tarea.bat -Programa "C:\ruta\MOVA Boletines Oficiales.exe"
@@ -185,7 +205,7 @@ DATOS/                  (en ejecución, junto al .exe) mova.db, clave.key,
 |---|---|---|
 | 1 | Descarga el sumario de cada boletín | Python |
 | 2 | Filtra por las 25 palabras clave configurables | Python |
-| 3 | Extrae los datos estructurados de cada candidata | Claude Sonnet |
+| 3 | Extrae los datos estructurados de cada candidata, título resumido incluido | Claude Sonnet |
 | 4 | Clasifica la relevancia para empresa industrial o pyme | Claude Haiku |
 | 4 bis | Valida la respuesta; un reintento; si falla, `[REVISIÓN MANUAL]` | Python + Claude |
 | 5 | Deduplica por hash y por similitud de título | Python |
@@ -329,9 +349,20 @@ diez veces más) y el registro dice cuántas quedaron fuera.
   se active la descarga del PDF; el BOCM sí incluye el texto en su XML.
 - **OCR opcional.** Si Tesseract no está instalado, un PDF escaneado se marca
   con `texto_incompleto` en vez de fallar.
-- **Coste.** Con 107 candidatas al día y Sonnet en la fase 3, el gasto ronda
-  1–2 $ diarios. Cambiar el modelo de extracción a Haiku en *Ajustes* lo
-  reduce mucho a cambio de resúmenes más pobres.
+- **Coste.** Con unas 107 candidatas al día y Sonnet 5 en la fase 3 (2 $ por
+  millón de tokens de entrada y 10 $ de salida), el gasto ronda 1 $ diario. La
+  pantalla *Coste* da la cifra real. Dos palancas en *Ajustes*: el tope mensual
+  y el **esfuerzo de razonamiento**. Sonnet 5 y Opus 5 razonan antes de
+  responder aunque no se les pida, y ese razonamiento se factura como salida; la
+  herramienta lo fija en «bajo», que basta para extraer datos de un boletín.
+- **Fechas de fin de plazo estimadas.** Los días hábiles se cuentan sin
+  festivos, que dependen de la comunidad y del municipio. Una fecha marcada como
+  estimada puede adelantarse uno o dos días a la real: confírmala en la
+  publicación antes de presentar nada.
+- **Comprobación de la tarde con el equipo apagado.** Como la de la mañana,
+  depende de que el equipo esté encendido. Si a las 20:00 está apagado, la
+  herramienta la recupera si se enciende antes de las 21:00; si no, las
+  publicaciones de la tarde saldrán en el correo del día siguiente.
 - **Equipo apagado.** En Windows la vigilancia depende de que alguien encienda
   el equipo e inicie sesión. La tarea programada y el margen de 60 minutos del
   planificador cubren los retrasos normales, pero un día de vacaciones con el
@@ -343,12 +374,10 @@ diez veces más) y el registro dice cuántas quedaron fuera.
 
 - Descarga del PDF y extracción del texto íntegro para los boletines que solo
   dan título, con caché en `DATOS/adjuntos/`.
-- Resumen semanal y alertas inmediatas para convocatorias de alta relevancia
-  con plazo corto.
 - Cruce automático con la Base de Datos Nacional de Subvenciones (BDNS) a
   partir del identificador BDNS que ya aparece en algunas publicaciones.
-- Panel de coste por ejecución (tokens y euros) a partir de las llamadas ya
-  registradas.
+- Alertas cuando una convocatoria ya conocida entra en la ventana de
+  vencimiento (hoy se avisa al descubrirla, y el resumen semanal recoge el resto).
 - Más comunidades: añadir un módulo en `negocio/boletines/` y registrarlo.
 - Migración a PostgreSQL sustituyendo solo `datos/repositorio.py`.
 

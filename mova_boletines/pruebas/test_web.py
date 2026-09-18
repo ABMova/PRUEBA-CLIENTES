@@ -121,7 +121,8 @@ def main() -> int:  # noqa: PLR0915 - prueba lineal
                             ("/destinatarios", "Destinatarios"),
                             ("/usuarios", "Usuarios y roles"),
                             ("/ajustes", "Claves y modelos"),
-                            ("/copias", "Copias de seguridad")):
+                            ("/copias", "Copias de seguridad"),
+                            ("/coste", "Gasto en la API de Anthropic")):
             respuesta = sesion.get(f"{BASE}{ruta}", timeout=15)
             comprobar(respuesta.status_code == 200 and texto in respuesta.text,
                       f"GET {ruta} -> {respuesta.status_code} con su contenido")
