@@ -1,13 +1,14 @@
 # MOVA Boletines Oficiales
 
-Vigilancia diaria de ayudas y subvenciones en los boletines oficiales de siete
-comunidades autónomas. Cada día laborable a las 07:45 revisa los siete
-boletines, localiza las convocatorias relevantes para empresas industriales y
+Vigilancia diaria de ayudas y subvenciones en el Boletín Oficial del Estado y en
+los boletines oficiales de siete comunidades autónomas. Cada día laborable a las
+07:45 revisa los ocho boletines, localiza las convocatorias relevantes para empresas industriales y
 pymes, y envía un correo HTML consolidado por comunidad, sin repetir lo ya
 enviado y sin mostrar lo descartado.
 
 | Comunidad | Boletín | Código |
 |---|---|---|
+| Estatal | Boletín Oficial del Estado (secciones I, III y V-B) | BOE |
 | Comunidad Valenciana | Diari Oficial de la Generalitat Valenciana | DOGV |
 | Madrid | Boletín Oficial de la Comunidad de Madrid | BOCM |
 | Cataluña | Diari Oficial de la Generalitat de Catalunya | DOGC |
@@ -15,6 +16,18 @@ enviado y sin mostrar lo descartado.
 | Murcia | Boletín Oficial de la Región de Murcia | BORM |
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
+
+### Novedades de la versión 1.7: el BOE
+
+Se vigila también el **Boletín Oficial del Estado**, por su API de datos abiertos.
+En el correo sale el primero, como «Estatal (BOE)», y sus publicaciones tienen
+los mismos botones de resumen corto, ampliado e infografía.
+
+Solo se leen las secciones donde se publican ayudas: **I** (reales decretos y
+órdenes de concesión directa), **III** (convocatorias y bases reguladoras) y
+**V-B** (extractos de la BDNS). Nombramientos, oposiciones, justicia y
+contratación se dejan fuera: son la otra mitad del BOE y nunca son ayudas. Se
+puede desactivar como cualquier boletín en la pantalla *Boletines*.
 
 ### Novedades de la versión 1.6: si el equipo estaba apagado, se hace al encenderlo
 
@@ -84,7 +97,7 @@ descargar en PDF (desde la 1.5).
 | Qué | Cómo funciona | Dónde se ajusta |
 |---|---|---|
 | **Título resumido** | El modelo redacta en una línea qué se subvenciona y a quién. Encabeza cada ficha del correo y de la pantalla; el título oficial literal se mantiene debajo. Sin modelo, se obtiene recortando la referencia normativa del título oficial. | — |
-| **Comprobación de las 20:00** | Segunda pasada del día por los siete boletines, para números extraordinarios y publicaciones tardías. Solo manda correo si aparece algo nuevo. | Ajustes → Avisos |
+| **Comprobación de las 20:00** | Segunda pasada del día por los ocho boletines, para números extraordinarios y publicaciones tardías. Solo manda correo si aparece algo nuevo. | Ajustes → Avisos |
 | **Alerta inmediata** | Correo urgente aparte, marcado como importante, cuando aparece una convocatoria de alta relevancia cuyo plazo vence en 15 días o menos. | Ajustes → Avisos |
 | **Resumen semanal** | Lunes a las 08:30: lo publicado la semana anterior (lunes a domingo) y los plazos que vencen en los próximos 30 días. | Ajustes → Avisos |
 | **Panel de coste** | Tokens y dólares por llamada, por ejecución, por día y por mes, con tope de gasto mensual (30 $ de inicio). | Pantalla Coste y Ajustes → Coste |
@@ -371,7 +384,7 @@ Para servir el modelo en la red local basta con sustituir
 `integraciones/anthropic_cliente.py`, manteniendo la firma de `llamar_json()`.
 Ningún otro módulo habla con la API.
 
-Salidas a internet: los siete boletines, `api.anthropic.com` y el servidor
+Salidas a internet: los ocho boletines, `api.anthropic.com` y el servidor
 SMTP. Nada más: no hay CDN, ni Google Fonts, ni analítica.
 
 ---

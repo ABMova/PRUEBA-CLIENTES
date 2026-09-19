@@ -285,7 +285,8 @@ INSERT OR IGNORE INTO boletines (codigo, nombre, comunidad, url_base, via_acceso
  ('BOJA',  'Boletin Oficial de la Junta de Andalucia',     'Andalucia',            'https://www.juntadeandalucia.es/boja', 'Feed Atom de boletin completo',   4),
  ('BORM',  'Boletin Oficial de la Region de Murcia',       'Murcia',               'https://www.borm.es',                  'API REST XML (services/boletin)', 5),
  ('DOCM',  'Diario Oficial de Castilla-La Mancha',         'Castilla-La Mancha',   'https://docm.castillalamancha.es',     'HTML de sumario diario',          6),
- ('BOCYL', 'Boletin Oficial de Castilla y Leon',           'Castilla y Leon',      'https://bocyl.jcyl.es',                'HTML de sumario diario',          7);
+ ('BOCYL', 'Boletin Oficial de Castilla y Leon',           'Castilla y Leon',      'https://bocyl.jcyl.es',                'HTML de sumario diario',          7),
+ ('BOE',   'Boletin Oficial del Estado',                   'Estatal (BOE)',        'https://www.boe.es',                   'API de datos abiertos JSON (secciones I, III y V-B)', 0);
 
 INSERT OR IGNORE INTO palabras_clave (termino, refuerzo) VALUES
  ('ayudas', 0), ('subvenciones', 0), ('convocatoria', 0), ('orden', 0),

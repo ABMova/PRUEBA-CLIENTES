@@ -81,7 +81,7 @@ def main() -> int:
             fallidos.append(codigo)
             print(f"{codigo:6} FALLO  {type(error).__name__}: {str(error)[:120]} ({ms} ms)")
 
-    print(f"\nResumen: {correctos}/7 boletines respondieron, {total} publicaciones, "
+    print(f"\nResumen: {correctos}/{len(ORDEN)} boletines respondieron, {total} publicaciones, "
           f"{candidatas_total} candidatas tras el filtro de palabras clave")
     if fallidos:
         print(f"Boletines que fallaron: {', '.join(fallidos)}")

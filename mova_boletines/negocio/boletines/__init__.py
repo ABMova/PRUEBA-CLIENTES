@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from types import ModuleType
 
-from negocio.boletines import boja, bocm, bocyl, docm, dogc, dogv, borm
+from negocio.boletines import boe, boja, bocm, bocyl, docm, dogc, dogv, borm
 
 ADAPTADORES: dict[str, ModuleType] = {
+    boe.CODIGO: boe,
     dogv.CODIGO: dogv,
     bocm.CODIGO: bocm,
     dogc.CODIGO: dogc,
@@ -19,7 +20,7 @@ ADAPTADORES: dict[str, ModuleType] = {
     bocyl.CODIGO: bocyl,
 }
 
-ORDEN = ["DOGV", "BOCM", "DOGC", "BOJA", "BORM", "DOCM", "BOCYL"]
+ORDEN = ["BOE", "DOGV", "BOCM", "DOGC", "BOJA", "BORM", "DOCM", "BOCYL"]
 
 
 def adaptador(codigo: str) -> ModuleType:

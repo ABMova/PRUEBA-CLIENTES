@@ -49,7 +49,7 @@ def main() -> int:
     boletines_1 = repositorio.boletines()
     palabras_1 = repositorio.palabras_clave(solo_activas=False)
     destinatarios_1 = repositorio.destinatarios(solo_activos=False)
-    comprobar(len(boletines_1) == 7, f"7 boletines precargados (hay {len(boletines_1)})")
+    comprobar(len(boletines_1) == 8, f"8 boletines precargados: BOE y 7 autonomicos (hay {len(boletines_1)})")
     comprobar(len([p for p in palabras_1 if not p["refuerzo"]]) == 25,
               "25 palabras clave de filtro precargadas")
     comprobar({d["correo"] for d in destinatarios_1} == {"antonio@mova.es", "j.javier@mova.es"},
@@ -59,7 +59,7 @@ def main() -> int:
     repositorio.aplicar_esquema()
     tablas_2 = set(repositorio.tablas())
     comprobar(tablas_1 == tablas_2, "las tablas no cambian al reaplicar el esquema")
-    comprobar(len(repositorio.boletines()) == 7, "los boletines no se duplican")
+    comprobar(len(repositorio.boletines()) == 8, "los boletines no se duplican (BOE y 7 autonomicos)")
     comprobar(len(repositorio.palabras_clave(solo_activas=False)) == len(palabras_1),
               "las palabras clave no se duplican")
     comprobar(len(repositorio.destinatarios(solo_activos=False)) == len(destinatarios_1),

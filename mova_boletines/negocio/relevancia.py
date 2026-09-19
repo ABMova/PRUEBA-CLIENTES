@@ -20,7 +20,7 @@ registro = logging.getLogger(__name__)
 
 PENDIENTE = config.MARCADOR_PENDIENTE
 
-SISTEMA_EXTRACCION = """Eres un analista de convocatorias publicas espanolas. Recibes el texto integro de una publicacion de un boletin oficial autonomico.
+SISTEMA_EXTRACCION = """Eres un analista de convocatorias publicas espanolas. Recibes el texto integro de una publicacion de un boletin oficial (el BOE o uno autonomico).
 
 Devuelve EXCLUSIVAMENTE un objeto JSON valido, sin texto antes ni despues, con este esquema:
 

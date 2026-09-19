@@ -840,6 +840,18 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                       "y se manda su correo avisando del retraso")
             comprobar(recuperacion.pendientes() == [], "despues ya no queda nada pendiente")
 
+    print("\n23) El BOE sale el primero del correo")
+    from negocio.boletines import ORDEN as _orden
+
+    comprobar("BOE" in ADAPTADORES and _orden[0] == "BOE", "el BOE esta registrado y se consulta el primero")
+    base = {"titulo": "Convocatoria de prueba", "relevancia": "media", "fecha_publicacion": "2026-09-17",
+            "codigo_boletin": "DOGV", "url_oficial": "https://ejemplo", "id": None}
+    html = correo.componer([dict(base, comunidad="Andalucia"), dict(base, comunidad="Estatal (BOE)",
+                                                                    codigo_boletin="BOE")],
+                           FECHA, {"consultados": ["BOE", "DOGV"], "fallidos": []})
+    comprobar(0 < html.find("Estatal (BOE)") < html.find("Andalucia"),
+              "en el correo va delante de las comunidades")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)
