@@ -389,9 +389,18 @@ def main(argumentos: list[str] | None = None) -> int:
     if config.ABRIR_NAVEGADOR:
         abrir_navegador(url)
 
+    opciones_proxy = {}
+    if config.DETRAS_DE_PROXY:
+        # waitress BORRA por defecto las cabeceras X-Forwarded-*: sin esto la
+        # aplicacion no ve la IP real (limites de intentos) ni que la conexion
+        # es HTTPS (cookie Secure, HSTS). Solo se fia de quien conecta desde el
+        # propio equipo: Nginx o el tunel.
+        opciones_proxy = {"trusted_proxy": "127.0.0.1", "trusted_proxy_count": 1,
+                          "trusted_proxy_headers": "x-forwarded-for x-forwarded-host "
+                                                   "x-forwarded-proto"}
     # threads=8: suficiente para la interfaz mientras el pipeline usa su hilo.
     serve(aplicacion, host=config.HOST, port=config.PUERTO, threads=8,
-          channel_timeout=600, ident="MOVA Boletines")
+          channel_timeout=600, ident="MOVA Boletines", **opciones_proxy)
     return 0
 
 
