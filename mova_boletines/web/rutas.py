@@ -10,7 +10,7 @@ import logging
 import secrets
 from datetime import date, datetime, timedelta
 
-from flask import (Blueprint, Response, current_app, flash, redirect, render_template,
+from flask import (Blueprint, Response, current_app, flash, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
 import config
@@ -420,21 +420,39 @@ def documento_por_clave(token: str, tipo: str):
         }
         return documentos.renderizar(tipo, json.loads(doc["datos_json"] or "{}"), dict(fila), barra)
 
-    def estado(nombre: str, mensaje: str = ""):
+    def estado(nombre: str):
+        # Quien viene del correo solo ve "Generando" y luego el documento: ni
+        # fases ni mensajes tecnicos (el motivo de un fallo queda en el registro).
         return render_template(
-            "documento_estado.html", titulo_pagina=documentos.TIPOS[tipo][0],
-            rotulo=documentos.TIPOS[tipo][0], publicacion=fila, estado=nombre, mensaje=mensaje,
-            refrescar=(nombre == "generando"), puede_generar=True,
+            "documento_espera.html", rotulo=documentos.TIPOS[tipo][0], estado=nombre,
+            titulo=fila["titulo_resumido"] or fila["titulo"][:160],
+            url_oficial=fila["url_oficial"] or fila["url_pdf"],
+            url_listo=url_for("web.documento_por_clave_listo", token=token, tipo=tipo),
             url_reintentar=url_for("web.documento_por_clave", token=token, tipo=tipo,
                                    reintentar=1))
 
     if documentos.generando(fila["id"]):
         return estado("generando")
     if doc is not None and doc["estado"] == "error" and not request.args.get("reintentar"):
-        return estado("error", doc["error"])
+        return estado("error")
 
     aceptada, mensaje = documentos.lanzar(fila["id"], f"correo ({auth.ip_peticion()})")
-    return estado("generando") if aceptada else estado("error", mensaje)
+    if not aceptada:
+        registro.warning("Documento de la publicacion %s no lanzado: %s",
+                         fila["id"], mensaje)
+    return estado("generando") if aceptada else estado("error")
+
+
+@web.route("/d/<token>/<tipo>/listo")
+def documento_por_clave_listo(token: str, tipo: str):
+    """Lo consulta la pagina de espera cada pocos segundos: ya esta, o ha fallado."""
+    fila, error = _publicacion_por_clave(token, tipo)
+    if error:
+        return jsonify({"listo": False, "error": True}), 404
+    doc = repositorio.documento(fila["id"])
+    en_curso = documentos.generando(fila["id"])
+    return jsonify({"listo": bool(doc is not None and doc["estado"] == "listo" and not en_curso),
+                    "error": bool(doc is not None and doc["estado"] == "error" and not en_curso)})
 
 
 @web.route("/d/<token>/<tipo>/descargar")

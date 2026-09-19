@@ -707,12 +707,20 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "la misma publicacion reutiliza su enlace (diario, alerta y semanal coinciden)")
     PETICIONES_DOC.clear()
     primera = anonimo.get(f"/d/{clave}/ampliado").get_data(as_text=True)
-    comprobar("Analizando la publicacion" in primera,
-              "sin sesion, el boton del correo lanza el analisis")
+    comprobar("Generando el resumen ampliado" in primera,
+              "sin sesion, el boton del correo lanza el analisis y dice 'Generando'")
+    comprobar("Analizando la publicacion" not in primera and "IA" not in primera
+              and "barra-progreso" not in primera and "Publicaciones" not in primera,
+              "sin mostrar el proceso ni la herramienta")
     for _ in range(50):
         if not documentos.generando(otra["id"]):
             break
         _time.sleep(0.1)
+    estado_listo = anonimo.get(f"/d/{clave}/ampliado/listo").get_json()
+    comprobar(estado_listo == {"listo": True, "error": False},
+              "la pagina de espera sabe cuando ya esta el documento")
+    comprobar(anonimo.get("/d/claveInventadaQueNoExiste1234567/ampliado/listo").status_code == 404,
+              "y esa consulta no responde a un enlace inventado")
     listo = anonimo.get(f"/d/{clave}/ampliado").get_data(as_text=True)
     comprobar("Criterios de valoración:" in listo and "barra-mova" in listo,
               "y luego muestra el documento")
