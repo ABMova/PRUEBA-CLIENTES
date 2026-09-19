@@ -35,6 +35,11 @@ registro = logging.getLogger("mova")
 # ------------------------------------------------------------------ registro --
 def preparar_registro() -> None:
     config.preparar_carpetas()
+    # El .exe no tiene ventana: sin esto, cualquier escritura en consola fallaria.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
     formato = logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
 
     fichero = logging.handlers.RotatingFileHandler(

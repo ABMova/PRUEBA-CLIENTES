@@ -67,7 +67,8 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,          # consola visible: el registro se ve al arrancar
+    console=False,         # sin ventana: si alguien la cerraba, se apagaba la herramienta
+                           # (el registro esta en DATOS\registros\mova.log)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

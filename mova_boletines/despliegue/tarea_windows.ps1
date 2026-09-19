@@ -3,14 +3,13 @@
     MOVA Boletines Oficiales para que la vigilancia de las 07:45 se dispare.
 
     QUE HACE LA TAREA
-      - Arranca la herramienta al iniciar sesion el usuario, minimizada y sin
+      - Arranca la herramienta al iniciar sesion el usuario, sin ventana y sin
         abrir el navegador.
-      - Vuelve a intentarlo cada dia laborable unos minutos antes de la
-        vigilancia de la manana (07:30) y de la comprobacion de la tarde
-        (19:45), por si el equipo se encendio tarde o la herramienta se
-        cerro. Si ya esta en marcha, el segundo arranque se detecta solo y no
-        hace nada: la herramienta comprueba si su puerto ya responde.
-      - Si el proceso se cae, Windows lo reintenta tres veces.
+      - Cada 10 minutos, todos los dias, comprueba que siga en marcha y, si se
+        ha cerrado o caido, la vuelve a arrancar. Mientras esta en marcha
+        Windows no lanza nada (una sola instancia), asi que no cuesta nada.
+      - Lo que no se hizo a su hora por estar el equipo apagado lo recupera la
+        propia herramienta al arrancar (Ajustes > Horario de la vigilancia).
 
     POR QUE ASI
       La vigilancia la dispara el planificador interno de la herramienta, no
@@ -21,20 +20,18 @@
     USO
         powershell -ExecutionPolicy Bypass -File despliegue\tarea_windows.ps1
         powershell -ExecutionPolicy Bypass -File despliegue\tarea_windows.ps1 -Quitar
-        powershell -ExecutionPolicy Bypass -File despliegue\tarea_windows.ps1 -Hora 07:30
+        powershell -ExecutionPolicy Bypass -File despliegue\tarea_windows.ps1 -CadaMinutos 5
 
     No necesita permisos de administrador: la tarea se crea para el usuario
     actual. Si el equipo esta apagado a la hora fijada, la vigilancia se hara
-    en cuanto se encienda e inicie sesion (ese dia, en el momento del arranque).
+    en cuanto se encienda e inicie sesion.
 #>
 
 [CmdletBinding()]
 param(
     [string]$Nombre = "MOVA Boletines Oficiales",
-    [string]$Hora = "07:30",
-    [string]$HoraTarde = "19:45",
-    [ValidateSet("Diaria", "Laborables")]
-    [string]$Dias = "Laborables",
+    [ValidateRange(1, 60)]
+    [int]$CadaMinutos = 10,
     [int]$Puerto = 0,
     [string]$Programa = "",
     [switch]$Quitar
@@ -108,15 +105,12 @@ Escribir "Carpeta   : $raiz"
 $accion = New-ScheduledTaskAction -Execute $programa -Argument ($argumentos -join " ") -WorkingDirectory $raiz
 
 $disparos = @(New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME)
-foreach ($horaDisparo in @($Hora, $HoraTarde)) {
-    if (-not $horaDisparo) { continue }
-    if ($Dias -eq "Laborables") {
-        $disparos += New-ScheduledTaskTrigger -Weekly -At $horaDisparo `
-            -DaysOfWeek Monday, Tuesday, Wednesday, Thursday, Friday
-    } else {
-        $disparos += New-ScheduledTaskTrigger -Daily -At $horaDisparo
-    }
-}
+# Vigilante: todos los dias desde las 00:00, cada $CadaMinutos minutos durante 24 h.
+$vigilante = New-ScheduledTaskTrigger -Daily -At "00:00"
+$vigilante.Repetition = (New-ScheduledTaskTrigger -Once -At "00:00" `
+    -RepetitionInterval (New-TimeSpan -Minutes $CadaMinutos) `
+    -RepetitionDuration (New-TimeSpan -Hours 24)).Repetition
+$disparos += $vigilante
 
 $ajustes = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
@@ -148,7 +142,7 @@ $info = Get-ScheduledTaskInfo -TaskName $Nombre
 Write-Host ""
 Escribir "Tarea '$Nombre' registrada." "Green"
 Escribir "Estado          : $($tarea.State)"
-Escribir "Disparos        : al iniciar sesion y $($Dias.ToLower()) a las $Hora y a las $HoraTarde"
+Escribir "Disparos        : al iniciar sesion y cada $CadaMinutos minutos, todos los dias"
 Escribir "Proxima vez     : $($info.NextRunTime)"
 Write-Host ""
 Escribir "La vigilancia (07:45) y la comprobacion de la tarde (20:00) las dispara la"

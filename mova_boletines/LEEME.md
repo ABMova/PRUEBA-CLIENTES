@@ -148,13 +148,19 @@ instalar_tarea.bat
 ```
 
 No necesita permisos de administrador: la tarea es del usuario actual. Registra
-tres disparos:
+dos disparos:
 
-- **Al iniciar sesión**: arranca la herramienta minimizada y sin abrir el
+- **Al iniciar sesión**: arranca la herramienta sin ventana y sin abrir el
   navegador.
-- **Cada día laborable a las 07:30 y a las 19:45**: la vuelve a levantar por si
-  el equipo se encendió tarde o la herramienta se cerró, quince minutos antes de
-  la vigilancia de la mañana y de la comprobación de la tarde.
+- **Cada 10 minutos, todos los días**: si la herramienta se ha cerrado o caído,
+  la vuelve a arrancar. Mientras está en marcha, Windows no lanza nada.
+
+Desde la 1.6.1 el ejecutable **no tiene ventana**: antes abría una consola negra
+y, si alguien la cerraba, la herramienta se apagaba y los botones del correo
+daban «HTTP ERROR 502». El registro sigue en `DATOS\registros\mova.log`. Para
+pararla a propósito: Administrador de tareas → «MOVA Boletines Oficiales» →
+Finalizar tarea (el vigilante la volverá a arrancar en 10 minutos salvo que
+quites la tarea con `desinstalar_tarea.bat`).
 
 Si la herramienta ya está en marcha, el segundo arranque se detecta solo y no
 hace nada: antes de tocar nada comprueba si su puerto ya responde. Esto importa,
@@ -164,9 +170,7 @@ marcaría como «interrumpida» la ejecución que el primero está haciendo).
 Opciones:
 
 ```
-instalar_tarea.bat -Hora 06:45          cambia el disparo de respaldo de la manana
-instalar_tarea.bat -HoraTarde 19:30     cambia el de la tarde
-instalar_tarea.bat -Dias Diaria         tambien fines de semana
+instalar_tarea.bat -CadaMinutos 5      comprueba cada 5 minutos en vez de 10
 instalar_tarea.bat -Puerto 8880         si el 8770 esta ocupado
 instalar_tarea.bat -Programa "C:\ruta\MOVA Boletines Oficiales.exe"
 desinstalar_tarea.bat                   quita la tarea (no borra ningun dato)
