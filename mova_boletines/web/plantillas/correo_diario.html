@@ -46,6 +46,14 @@
           </td>
         </tr>
 
+        {% if retraso %}
+        <tr>
+          <td style="padding:12px 24px; background-color:#fef3c7; border-bottom:1px solid #e4e4e7; border-left:4px solid #d97706; font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#18181b;">
+            <strong>ENVIADO CON RETRASO.</strong> El equipo no estaba encendido a la hora programada. Este correo recoge lo publicado el {{ fecha }}, igual que si hubiera salido a su hora.
+          </td>
+        </tr>
+        {% endif %}
+
         {% if aviso_modo %}
         <tr>
           <td style="padding:12px 24px; background-color:{% if modo == 'alerta' %}#fee2e2{% else %}#eff6ff{% endif %}; border-bottom:1px solid #e4e4e7; border-left:4px solid {% if modo == 'alerta' %}#dc2626{% else %}#3b82f6{% endif %}; font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#18181b;">

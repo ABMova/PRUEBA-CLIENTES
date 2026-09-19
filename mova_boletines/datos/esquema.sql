@@ -341,7 +341,9 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('cambio_usd_eur',        '0.86',    'Tipo de cambio para mostrar el gasto en euros (editable)'),
  ('modelo_documentos',     'claude-sonnet-5', 'Modelo para resumen corto, ampliado e infografia'),
  ('max_tokens_documentos', '16000',   'Limite de tokens de la extraccion para los documentos'),
- ('dias_token_documento',  '90',      'Caducidad de los botones de documentos del correo (dias)');
+ ('dias_token_documento',  '90',      'Caducidad de los botones de documentos del correo (dias)'),
+ ('recuperacion_activa',   '1',       'Si el equipo estaba apagado a la hora, hacer lo pendiente al encenderlo'),
+ ('dias_recuperacion',     '7',       'Dias hacia atras que se recuperan como mucho');
 
 INSERT OR IGNORE INTO ajustes (clave, valor, cifrado, descripcion) VALUES
  ('anthropic_api_key', '', 1, 'Clave de API de Anthropic (cifrada con Fernet)'),

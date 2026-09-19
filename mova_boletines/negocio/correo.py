@@ -89,7 +89,8 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
 
 
 def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
-             tokens: dict[int, str] | None = None, modo: str = "diario") -> str:
+             tokens: dict[int, str] | None = None, modo: str = "diario",
+             retraso: bool = False) -> str:
     """Genera el HTML del correo. tokens: {publicacion_id: token}.
 
     modo: "diario" (el de las 07:45), "tarde" (comprobacion de las 20:00) o
@@ -111,6 +112,7 @@ def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
         nombre_app=config.NOMBRE_APP,
         modo=modo,
         aviso_modo=MODOS.get(modo, ""),
+        retraso=retraso,
         fecha=fecha_larga(fecha),
         por_comunidad=dict(sorted(por_comunidad.items())),
         total=len(publicaciones),
@@ -124,7 +126,13 @@ def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
     )
 
 
-def asunto(fecha: date, total: int, altas: int, modo: str = "diario") -> str:
+def asunto(fecha: date, total: int, altas: int, modo: str = "diario",
+           retraso: bool = False) -> str:
+    texto = _asunto(fecha, total, altas, modo)
+    return f"{texto} (enviado con retraso)" if retraso else texto
+
+
+def _asunto(fecha: date, total: int, altas: int, modo: str) -> str:
     if modo == "alerta":
         return (f"[URGENTE] [MOVA Boletines] {total} convocatoria(s) de alta relevancia "
                 f"con plazo corto")

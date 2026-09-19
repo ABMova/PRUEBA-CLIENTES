@@ -16,6 +16,26 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.6: si el equipo estaba apagado, se hace al encenderlo
+
+Si a las 07:45 (o a las 20:00, o el lunes a las 08:30) el equipo está apagado o
+dormido, la herramienta lo hace en cuanto vuelve a estar encendida: unos 2 minutos
+después de arrancar, y lo comprueba cada 10 minutos, así que también sirve al
+volver de la suspensión.
+
+- Cada día que faltó se vigila con **su** fecha y manda **su** correo, con lo
+  publicado ese día, del más antiguo al más reciente. El asunto termina en
+  «(enviado con retraso)» y el correo lleva un aviso arriba.
+- La comprobación de la tarde solo se recupera si hace falta: si la vigilancia
+  de ese día se recuperó ya pasadas las 20:00, esa misma la cubre.
+- El resumen semanal se manda una sola vez por semana, aunque sea con retraso.
+- Nunca repite lo ya hecho, ni lo lanzado a mano desde *Ejecutar*.
+- Sin conexión no lanza nada (al encender, la red tarda en llegar): espera al
+  siguiente intento. Tras 3 intentos fallidos de un mismo día, deja de insistir.
+- Como mucho recupera 7 días hacia atrás, y nada anterior al día en que se
+  instaló la 1.6. Las dos cosas se cambian en *Ajustes → Horario de la vigilancia*, donde
+  también se puede desactivar.
+
 ### Novedades de la versión 1.5: los documentos se descargan en PDF
 
 El botón **Descargar PDF** de cada documento entrega un PDF, ya no un HTML. El

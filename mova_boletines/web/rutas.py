@@ -749,6 +749,7 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "max_tokens_relevancia", "hilos_modelo", "smtp_servidor", "smtp_puerto",
                   "smtp_seguridad", "smtp_usuario", "smtp_remitente", "smtp_nombre_remitente",
                   "url_publica", "hora_ejecucion", "dias_ejecucion", "planificador_activo",
+                  "recuperacion_activa", "dias_recuperacion",
                   "umbral_difuso", "dias_dedup", "dias_token_descarte", "reintentos_boletin",
                   "copias_max", "max_candidatas_ejecucion", "terminos_refuerzo",
                   "tarde_activa", "hora_tarde", "alerta_activa", "dias_alerta",

@@ -420,6 +420,11 @@ def marcar_ejecuciones_interrumpidas() -> int:
     )
 
 
+def ejecuciones_de_fecha(fecha_objetivo: str) -> list[sqlite3.Row]:
+    return _consulta("SELECT id, tipo, estado, iniciado_en, boletines_ok FROM ejecuciones "
+                     "WHERE fecha_objetivo=? ORDER BY id", (fecha_objetivo,))
+
+
 def hay_ejecucion_en_curso() -> bool:
     return _uno("SELECT id FROM ejecuciones WHERE estado='en_curso' LIMIT 1") is not None
 

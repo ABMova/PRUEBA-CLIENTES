@@ -95,6 +95,20 @@
         </select>
       </div>
     </div>
+    <div class="campo-linea">
+      <div class="campo"><label for="recuperacion_activa">Si el equipo estaba apagado</label>
+        <select id="recuperacion_activa" name="recuperacion_activa">
+          <option value="1" {% if ajustes.recuperacion_activa != '0' %}selected{% endif %}>Hacerlo al encenderlo</option>
+          <option value="0" {% if ajustes.recuperacion_activa == '0' %}selected{% endif %}>No recuperar</option>
+        </select>
+      </div>
+      <div class="campo"><label for="dias_recuperacion">Dias que se recuperan como mucho</label>
+        <input type="number" id="dias_recuperacion" name="dias_recuperacion" value="{{ ajustes.dias_recuperacion or 7 }}" min="1" max="30"></div>
+    </div>
+    <p class="apoyo">Si a la hora programada el equipo esta apagado o dormido, la vigilancia de
+       ese dia, la comprobacion de la tarde y el resumen semanal se hacen en cuanto se enciende
+       (unos 2 minutos despues, con conexion). Cada dia recuperado manda su correo con lo
+       publicado ESE dia y el asunto avisa del retraso.</p>
     <p class="apoyo">Zona horaria: {{ ajustes.zona_horaria }}. Proxima ejecucion: <strong>{{ proxima or 'sin programar' }}</strong>.</p>
   </div>
 

@@ -485,7 +485,9 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
     progreso.fijar_fase(6, porcentaje=86)
     destinatarios = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
     dias_token = repositorio.ajuste_int("dias_token_descarte", 90)
-    modo = "tarde" if tipo == "tarde" else "diario"
+    modo = "tarde" if tipo in ("tarde", "tarde_recuperada") else "diario"
+    # Recuperada al encender el equipo: el correo avisa de que llega tarde.
+    retraso = tipo in ("recuperada", "tarde_recuperada")
 
     # La comprobacion de la tarde solo escribe si ha aparecido algo nuevo desde
     # la manana: un segundo "sin novedades" al dia seria ruido.
@@ -507,11 +509,13 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
     _alertas(guardadas, tokens, destinatarios, ejecucion_id, enviar_correo)
 
     html = correo.componer(guardadas, fecha,
-                           {"consultados": consultados, "fallidos": fallidos}, tokens, modo=modo)
+                           {"consultados": consultados, "fallidos": fallidos}, tokens, modo=modo,
+                           retraso=retraso)
     sufijo = "-tarde" if modo == "tarde" else ""
     ruta = correo.guardar_copia(html, f"correo-{fecha:%Y%m%d}-{ejecucion_id}{sufijo}.html")
     asunto = correo.asunto(fecha, len(guardadas),
-                           sum(1 for f in guardadas if f["relevancia"] == "alta"), modo=modo)
+                           sum(1 for f in guardadas if f["relevancia"] == "alta"), modo=modo,
+                           retraso=retraso)
 
     if not enviar_correo:
         repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto, "omitido", 0,
@@ -601,6 +605,8 @@ def enviar_resumen_semanal(hoy: date | None = None, usuario: str = "planificador
     repositorio.registrar_envio(None, ", ".join(destinatarios), asunto,
                                 "enviado" if exito else "error", intentos, detalle,
                                 len(publicaciones), str(ruta))
+    if exito:  # la recuperacion al encender no lo vuelve a mandar esta semana
+        repositorio.guardar_ajuste("semanal_ultima_semana", lunes.isoformat())
     repositorio.registrar_auditoria(usuario, "resumen_semanal", f"{desde}..{hasta}", detalle,
                                     resultado="ok" if exito else "error")
     return exito, detalle

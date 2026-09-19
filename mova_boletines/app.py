@@ -15,17 +15,18 @@ import socket
 import sys
 import threading
 import webbrowser
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from flask import Flask, render_template, request
 from flask.sessions import SecureCookieSessionInterface
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import config
 from datos import copias, repositorio
-from negocio import orquestador
+from negocio import orquestador, recuperacion
 from web.rutas import web as plano_web
 
 registro = logging.getLogger("mova")
@@ -97,6 +98,16 @@ def _tarea_semanal() -> None:
     repositorio.cerrar_conexion()
 
 
+def _tarea_recuperacion() -> None:
+    """Lo que no se hizo porque el equipo estaba apagado o dormido a su hora."""
+    try:
+        hecho = recuperacion.recuperar()
+        if hecho:
+            registro.info("Recuperado: %s", ", ".join(hecho))
+    except Exception:  # noqa: BLE001 - un fallo aqui no debe parar el planificador
+        registro.exception("Fallo al recuperar lo pendiente")
+
+
 def _disparo(hora: str, dias: str, zona: str, por_defecto: tuple[int, int]) -> CronTrigger:
     try:
         horas, minutos = hora.split(":")
@@ -137,8 +148,17 @@ def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
                          repositorio.ajuste("dia_semanal", "mon"), zona, (8, 30)),
                 id="resumen_semanal", name="Resumen semanal", **comunes)
 
+        if config.RECUPERACION:
+            # Al encender (con 2 minutos para que llegue la red) y cada 10 minutos,
+            # lo que cubre tambien la vuelta de la suspension.
+            planificador.add_job(
+                _tarea_recuperacion, IntervalTrigger(minutes=10, timezone=zona),
+                next_run_time=datetime.now(planificador.timezone) + timedelta(minutes=2),
+                id="recuperacion", name="Recuperacion de lo pendiente",
+                replace_existing=True, max_instances=1, coalesce=True, misfire_grace_time=600)
+
         for trabajo in planificador.get_jobs():
-            if trabajo.next_run_time:
+            if trabajo.next_run_time and trabajo.id != "recuperacion":
                 registro.info("Proxima %s: %s", trabajo.name.lower(),
                               trabajo.next_run_time.strftime("%d/%m/%Y %H:%M %Z"))
 

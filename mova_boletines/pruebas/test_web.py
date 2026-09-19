@@ -36,6 +36,7 @@ def arrancar(carpeta: Path) -> subprocess.Popen:
                    MOVA_DATOS=str(carpeta),
                    MOVA_PUERTO=str(PUERTO),
                    MOVA_ABRIR_NAVEGADOR="0",
+                   MOVA_RECUPERACION="0",
                    MOVA_URL_PUBLICA=f"https://{HOST_PUBLICO}",
                    MOVA_LOG_NIVEL="WARNING")
     proceso = subprocess.Popen(
