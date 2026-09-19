@@ -64,6 +64,18 @@ Desde una ruta **corta y fuera de OneDrive** (`C:\build\mova_boletines`):
 PyInstaller falla con rutas largas y OneDrive bloquea ficheros a medio
 escribir. El resultado es `dist\MOVA Boletines Oficiales.exe`.
 
+## Servidor de producción (VPS IONOS, boletines.movaia.es)
+
+```bash
+ssh -i ~/.ssh/mova_vps root@31.70.150.4                       # solo con clave
+git archive --format=tar HEAD -o /tmp/mova.tar                 # desde mova_boletines/
+```
+
+Subir el tar a `/tmp/mova.tar`, descomprimirlo en `/opt/mova-boletines`
+conservando `.venv`, `pip install -r requirements.txt` y
+`systemctl restart mova-boletines`. Datos en `/var/lib/mova-boletines`.
+No copiar la carpeta de trabajo con tar: Windows deja finales CRLF.
+
 ## Instalar dependencias
 
 ```bash

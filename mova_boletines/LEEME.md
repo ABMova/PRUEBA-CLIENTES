@@ -209,20 +209,44 @@ hora, ese día se salta y hay que lanzarla a mano desde *Ejecuciones* con la
 fecha correspondiente. Si necesitas que corra siempre, sin depender de que
 alguien encienda el equipo, el sitio es el servidor Linux.
 
-### Linux (servicio interno)
+### Linux: el servidor de producción (VPS de IONOS)
+
+Desde el 19/09/2026 la herramienta vive en un VPS de IONOS (Ubuntu 24.04, IP
+`31.70.150.4`) y se usa en **https://boletines.movaia.es**. El panel se abre desde
+cualquier navegador con usuario y contraseña; los botones del correo, sin sesión.
+El equipo de Windows ya no la ejecuta (tarea programada desactivada).
+
+| Qué | Dónde |
+|---|---|
+| Código | `/opt/mova-boletines` (propiedad de root, solo lectura para el servicio) |
+| Datos, claves y copias | `/var/lib/mova-boletines` (usuario `mova`) |
+| Servicio | `systemctl status mova-boletines` · `journalctl -u mova-boletines -f` |
+| Web y HTTPS | Nginx + certificado Let's Encrypt que se renueva solo (avisos a boletines@mova.es) |
+| Copias | una diaria a las 03:30 y otra en cada arranque; se conservan 10 |
+
+Se entra por SSH solo con clave (`ssh -i %USERPROFILE%\.ssh\mova_vps root@31.70.150.4`);
+la contraseña de root no sirve por SSH. En una emergencia, la consola del panel de
+IONOS sigue funcionando.
+
+Instalación desde cero (lo que se hizo el 19/09/2026):
 
 ```bash
-sudo mkdir -p /opt/mova-boletines && sudo chown mova:mova /opt/mova-boletines
-sudo -u mova git clone <repositorio> /opt/mova-boletines
-cd /opt/mova-boletines
-sudo -u mova python3.11 -m venv .venv
-sudo -u mova .venv/bin/pip install -r requirements.txt
-sudo apt install -y chromium   # crea los PDF de los documentos
-sudo cp despliegue/mova-boletines.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now mova-boletines
-sudo cp despliegue/nginx-mova-boletines.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/nginx-mova-boletines.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+apt install -y python3-venv nginx certbot ufw fail2ban unattended-upgrades sqlite3 \
+  fonts-liberation2 fonts-dejavu-core fonts-noto-core tesseract-ocr tesseract-ocr-spa
+# Google Chrome para los PDF: el Chromium de Ubuntu 24.04 es un snap y falla sin ventana.
+curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+apt update && apt install -y google-chrome-stable
+adduser --system --group --home /var/lib/mova-boletines --shell /usr/sbin/nologin mova
+# El código se sube con `git archive HEAD` (finales de línea de Linux), no copiando la carpeta.
+python3 -m venv /opt/mova-boletines/.venv
+/opt/mova-boletines/.venv/bin/pip install -r /opt/mova-boletines/requirements.txt
+certbot certonly --webroot -w /var/www/letsencrypt -d boletines.movaia.es \
+  --deploy-hook "systemctl reload nginx"
+cp despliegue/nginx-mova-boletines.conf /etc/nginx/sites-available/mova-boletines
+ln -s /etc/nginx/sites-available/mova-boletines /etc/nginx/sites-enabled/
+cp despliegue/mova-boletines.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now mova-boletines
 ```
 
 > **UN SOLO PROCESO.** La aplicación guarda el progreso de la ejecución en
