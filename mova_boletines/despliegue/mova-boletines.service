@@ -26,7 +26,7 @@ WorkingDirectory=/opt/mova-boletines
 Environment=MOVA_HOST=127.0.0.1
 Environment=MOVA_PUERTO=8770
 Environment=MOVA_ABRIR_NAVEGADOR=0
-Environment=MOVA_URL_PUBLICA=https://boletines.mova.es
+Environment=MOVA_URL_PUBLICA=https://boletines.movaia.es
 ; Los usuarios entran al panel desde internet (con usuario y contrasena).
 Environment=MOVA_PUBLICO_SOLO_ENLACES=0
 ; Detras de Nginx: confiar en X-Forwarded-For para la IP real (limites de intentos)
