@@ -26,12 +26,16 @@ WorkingDirectory=/opt/mova-boletines
 Environment=MOVA_HOST=127.0.0.1
 Environment=MOVA_PUERTO=8770
 Environment=MOVA_ABRIR_NAVEGADOR=0
-Environment=MOVA_URL_PUBLICA=https://boletines.miempresa.local
+Environment=MOVA_URL_PUBLICA=https://boletines.mova.es
+; Los usuarios entran al panel desde internet (con usuario y contrasena).
+Environment=MOVA_PUBLICO_SOLO_ENLACES=0
 ; Detras de Nginx: confiar en X-Forwarded-For para la IP real (limites de intentos)
 Environment=MOVA_DETRAS_DE_PROXY=1
 Environment=MOVA_DATOS=/var/lib/mova-boletines
 Environment=MOVA_LOG_NIVEL=INFO
 Environment=PYTHONUNBUFFERED=1
+; Chrome (PDF de los documentos) necesita una carpeta personal escribible.
+Environment=HOME=/var/lib/mova-boletines
 
 ExecStart=/opt/mova-boletines/.venv/bin/python /opt/mova-boletines/app.py
 

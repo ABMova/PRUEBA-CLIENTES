@@ -103,6 +103,18 @@ def _tarea_semanal() -> None:
     repositorio.cerrar_conexion()
 
 
+def _tarea_copia_diaria() -> None:
+    """En un servidor la herramienta pasa meses sin reiniciarse: la copia de
+    arranque no basta. Se conservan las ultimas `copias_max` (10)."""
+    try:
+        destino = copias.crear_copia("diaria")
+        registro.info("Copia de seguridad diaria: %s", destino.name)
+    except Exception:  # noqa: BLE001 - un fallo aqui no debe parar el planificador
+        registro.exception("No se pudo hacer la copia diaria")
+    finally:
+        repositorio.cerrar_conexion()
+
+
 def _tarea_recuperacion() -> None:
     """Lo que no se hizo porque el equipo estaba apagado o dormido a su hora."""
     try:
@@ -153,6 +165,11 @@ def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
                          repositorio.ajuste("dia_semanal", "mon"), zona, (8, 30)),
                 id="resumen_semanal", name="Resumen semanal", **comunes)
 
+        planificador.add_job(
+            _tarea_copia_diaria, CronTrigger(hour=3, minute=30, timezone=zona),
+            id="copia_diaria", name="Copia de seguridad diaria", replace_existing=True,
+            max_instances=1, coalesce=True, misfire_grace_time=6 * 3600)
+
         if config.RECUPERACION:
             # Al encender (con 2 minutos para que llegue la red) y cada 10 minutos,
             # lo que cubre tambien la vuelta de la suspension.
@@ -163,7 +180,7 @@ def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
                 replace_existing=True, max_instances=1, coalesce=True, misfire_grace_time=600)
 
         for trabajo in planificador.get_jobs():
-            if trabajo.next_run_time and trabajo.id != "recuperacion":
+            if trabajo.next_run_time and trabajo.id not in ("recuperacion", "copia_diaria"):
                 registro.info("Proxima %s: %s", trabajo.name.lower(),
                               trabajo.next_run_time.strftime("%d/%m/%Y %H:%M %Z"))
 

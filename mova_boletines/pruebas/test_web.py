@@ -40,7 +40,7 @@ def arrancar(carpeta: Path) -> subprocess.Popen:
                    MOVA_URL_PUBLICA=f"https://{HOST_PUBLICO}",
                    MOVA_LOG_NIVEL="WARNING")
     proceso = subprocess.Popen(
-        [str(RAIZ / ".venv" / "Scripts" / "python.exe"), str(RAIZ / "app.py")],
+        [sys.executable, str(RAIZ / "app.py")],  # el mismo Python que ejecuta la prueba
         cwd=str(RAIZ), env=entorno, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace")
 
