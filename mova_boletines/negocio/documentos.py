@@ -384,7 +384,9 @@ def renderizar(tipo: str, datos: dict, publicacion: dict, barra: dict | None = N
 def nombre_fichero(tipo: str, publicacion: dict, extension: str = "pdf") -> str:
     base = {"corto": "ResumenCorto", "ampliado": "ResumenAmpliado", "infografia": "Infografia"}[tipo]
     # "aprobación" -> "aprobacion" (sin la tilde, la letra no se pierde)
-    sin_tildes = unicodedata.normalize("NFKD", publicacion.get("titulo_resumido") or "")
+    # Sin titulo resumido (publicaciones antiguas o sin analizar) se usa el completo.
+    titulo = publicacion.get("titulo_resumido") or publicacion.get("titulo") or ""
+    sin_tildes = unicodedata.normalize("NFKD", titulo)
     sin_tildes = sin_tildes.encode("ascii", "ignore").decode("ascii")
     titulo = re.sub(r"[^A-Za-z0-9]+", "-", sin_tildes[:50]).strip("-")
     return f"{base}-{publicacion.get('codigo_boletin', '')}-{publicacion.get('id', '')}-{titulo}.{extension}"
