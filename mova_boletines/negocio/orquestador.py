@@ -399,6 +399,23 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
                     "es_ayuda": False,
                     "indice": indice,
                 }
+            if extraccion.datos.get("destinatario") in relevancia.DESTINATARIOS_FUERA:
+                # Para administraciones publicas o personas fisicas: no interesa.
+                # Se guarda oculta (su hash evita volver a pagar al modelo) y no
+                # hace falta clasificar su relevancia.
+                return {
+                    "publicacion": publicacion,
+                    "extraccion": extraccion,
+                    "clasificacion": {"relevancia": "baja", "sectores": [],
+                                      "justificacion": "Fuera de destinatario: se dirige a "
+                                                       + ("administraciones publicas"
+                                                          if extraccion.datos["destinatario"] == "publico"
+                                                          else "personas fisicas"),
+                                      "llamadas": 0},
+                    "es_ayuda": False,
+                    "estado": "fuera_destinatario",
+                    "indice": indice,
+                }
             clasificacion = relevancia.clasificar(publicacion, extraccion.datos,
                                                  modelo_relevancia, tokens_relevancia, refuerzos)
 
@@ -460,7 +477,9 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
             "revision_manual": int(salida["extraccion"].revision_manual),
             "motivo_revision": salida["extraccion"].motivo,
             "duplicado_de": publicacion.get("duplicado_de"),
-            "estado": "nueva" if salida.get("es_ayuda", True) else "no_convocatoria",
+            "destinatario": datos.get("destinatario", "no_consta"),
+            "estado": ("nueva" if salida.get("es_ayuda", True)
+                       else salida.get("estado", "no_convocatoria")),
             "json_modelo": relevancia.json_crudo(datos, clasificacion),
         }
         try:
@@ -468,15 +487,20 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
         except Exception as error:  # noqa: BLE001 - un choque de hash no tumba la ejecucion
             progreso.anotar(f"No se pudo guardar '{fila['titulo'][:50]}': {error}")
             continue
-        if fila["estado"] == "no_convocatoria":
+        if fila["estado"] in repositorio.ESTADOS_OCULTOS:
+            if fila["estado"] == "fuera_destinatario":
+                contadores["fuera_destinatario"] = contadores.get("fuera_destinatario", 0) + 1
             continue  # queda trazada, pero no va al correo ni cuenta como novedad
         guardadas.append(fila)
         if fila["relevancia"] == "alta":
             contadores["alta_relevancia"] += 1
 
     contadores["nuevas"] = len(guardadas)
+    fuera = contadores.pop("fuera_destinatario", 0)
     progreso.anotar(f"Fases 3-5 terminadas: {len(guardadas)} publicaciones guardadas "
-                    f"({contadores['alta_relevancia']} de alta relevancia)")
+                    f"({contadores['alta_relevancia']} de alta relevancia)"
+                    + (f"; {fuera} descartada(s) por ir a administraciones o personas"
+                       if fuera else ""))
     return guardadas
 
 

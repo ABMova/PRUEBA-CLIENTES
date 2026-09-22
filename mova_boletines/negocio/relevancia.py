@@ -33,6 +33,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON valido, sin texto antes ni despues, con e
   "plazo_solicitud": "fecha o periodo tal como figura, o [PENDIENTE: dato]",
   "fecha_fin_plazo": "AAAA-MM-DD o null",
   "beneficiarios": "descripcion de los beneficiarios potenciales, o [PENDIENTE: dato]",
+  "destinatario": "privado|publico|personas|no_consta",
   "importe": "importe o presupuesto con su unidad, o [PENDIENTE: dato]",
   "confianza": "alta|media|baja",
   "motivo_confianza": "una frase"
@@ -44,6 +45,12 @@ Reglas:
 - El resumen no supera 5 lineas ni incluye valoraciones propias.
 - El titulo se copia literal de la publicacion.
 - "titulo_resumido" es una sola linea de 15 palabras como maximo que diga que se financia y para quien, sin la referencia normativa (nada de "Orden 12/2026, de 15 de septiembre, de la Conselleria..."). Usa solo informacion del titulo o del texto. Ejemplo: "Subvenciones para la digitalizacion de pymes industriales".
+- "destinatario" dice a quien se dirige la ayuda, segun el titulo y el texto:
+  "privado": empresas, pymes, autonomos, cooperativas, fundaciones, asociaciones, federaciones, clubes u otras entidades privadas, con o sin animo de lucro.
+  "publico": ayuntamientos, diputaciones, mancomunidades y demas entidades locales, otras administraciones, universidades publicas, centros publicos de investigacion, hospitales o centros educativos publicos.
+  "personas": personas fisicas que no solicitan como autonomos: estudiantes, investigadores a titulo individual, deportistas, familias, desempleados, particulares.
+  "no_consta": el titulo y el texto no permiten saberlo.
+  Si entre los beneficiarios hay alguno privado, aunque tambien haya publicos o personas, es "privado".
 - "fecha_fin_plazo" es el ultimo dia para solicitar, en formato AAAA-MM-DD. Rellenalo solo si la fecha figura escrita en el texto o se deduce sin suposiciones de un plazo contado desde la fecha de publicacion que se te indica. En cualquier otro caso (plazo abierto, contado desde una notificacion, o no indicado) escribe null."""
 
 SISTEMA_RELEVANCIA = """Clasificas convocatorias de ayudas publicas segun su interes para una empresa industrial o pyme.
@@ -51,7 +58,8 @@ SISTEMA_RELEVANCIA = """Clasificas convocatorias de ayudas publicas segun su int
 Devuelve solo JSON: {"relevancia": "alta|media|baja", "sectores": ["..."], "justificacion": "una o dos frases"}
 
 Asigna alta cuando los beneficiarios son expresamente empresas, pymes, autonomos o industria, o cuando el objeto es inversion productiva, modernizacion industrial, innovacion, digitalizacion, sostenibilidad o eficiencia energetica en el ambito empresarial.
-Asigna baja cuando se dirige a particulares, entidades locales, asociaciones sin animo de lucro o al ambito academico sin vertiente empresarial.
+Asigna media cuando se dirige a fundaciones, asociaciones u otras entidades privadas sin animo de lucro, salvo que el objeto sea claramente empresarial (entonces alta).
+Asigna baja cuando el interes para una empresa o una entidad privada es escaso.
 No justifiques mas de dos frases."""
 
 _CAMPOS = ("es_convocatoria_ayuda", "titulo", "titulo_resumido", "resumen",
@@ -59,6 +67,16 @@ _CAMPOS = ("es_convocatoria_ayuda", "titulo", "titulo_resumido", "resumen",
            "importe", "confianza", "motivo_confianza")
 
 MAX_PALABRAS_TITULO_RESUMIDO = 20
+
+# A quien se dirige la ayuda. Al correo solo van "privado" y "no_consta" (en la
+# duda se envia: mejor una de mas que perder una ayuda para empresas).
+DESTINATARIOS = ("privado", "publico", "personas", "no_consta")
+DESTINATARIOS_FUERA = ("publico", "personas")
+# Red de seguridad: si el titulo o los beneficiarios nombran a una empresa o
+# entidad privada, cuenta como privado aunque el modelo diga otra cosa.
+_SENALES_PRIVADO = ("empresa", "pyme", "autonomos", "trabajo autonomo", "trabajadores autonomos",
+                    "cooperativa", "fundacion", "asociacion", "sin animo de lucro",
+                    "tercer sector", "entidades privadas", "emprendedor", "startup")
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _GENERICOS = ("no disponible", "no consta", "no especificado", "no procede", "sin datos",
@@ -111,6 +129,10 @@ def validar(datos: dict) -> list[str]:
         if normalizar(valor) in _GENERICOS:
             problemas.append(
                 f"El campo {campo} usa un texto generico en vez de {PENDIENTE}")
+
+    destinatario_modelo = datos.get("destinatario")
+    if destinatario_modelo not in (None, "") and normalizar(str(destinatario_modelo)) not in DESTINATARIOS:
+        problemas.append("destinatario debe ser privado, publico, personas o no_consta")
 
     confianza = normalizar(str(datos.get("confianza", "")))
     if confianza and confianza not in ("alta", "media", "baja"):
@@ -192,6 +214,7 @@ def _esqueleto(publicacion: dict) -> dict:
         "fecha_fin_plazo": None,
         "beneficiarios": PENDIENTE,
         "importe": PENDIENTE,
+        "destinatario": "no_consta",
         "confianza": "baja",
         "motivo_confianza": "No se pudo analizar el texto con el modelo",
     }
@@ -213,7 +236,22 @@ def _completar(datos: dict, publicacion: dict) -> dict:
             completo[campo] = PENDIENTE
     completo.setdefault("confianza", "media")
     completo.setdefault("motivo_confianza", PENDIENTE)
+    completo["destinatario"] = destinatario(completo, publicacion)
     return completo
+
+
+def destinatario(datos: dict, publicacion: dict) -> str:
+    """privado | publico | personas | no_consta, con la red de seguridad del titulo."""
+    valor = normalizar(str(datos.get("destinatario") or "")).replace(" ", "_")
+    if valor not in DESTINATARIOS:
+        valor = "no_consta"
+    if valor in DESTINATARIOS_FUERA:
+        texto = normalizar(" ".join(str(x or "") for x in (
+            publicacion.get("titulo"), datos.get("titulo"), datos.get("titulo_resumido"),
+            datos.get("beneficiarios"))))
+        if any(senal in texto for senal in _SENALES_PRIVADO):
+            return "privado"
+    return valor
 
 
 # ------------------------------------------------------------------ fase 4 --

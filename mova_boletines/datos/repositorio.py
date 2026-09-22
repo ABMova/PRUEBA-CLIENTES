@@ -103,6 +103,8 @@ _COLUMNAS_ESPERADAS: dict[str, dict[str, str]] = {
         "plazo_fin": "TEXT",
         "plazo_fin_origen": "TEXT NOT NULL DEFAULT ''",
         "alerta_enviada": "INTEGER NOT NULL DEFAULT 0",
+        # v1.9: a quien se dirige (privado | publico | personas | no_consta)
+        "destinatario": "TEXT NOT NULL DEFAULT ''",
     },
     "ejecuciones": {
         "llamadas_modelo": "INTEGER NOT NULL DEFAULT 0",
@@ -457,6 +459,12 @@ def titulos_recientes(dias: int) -> list[sqlite3.Row]:
         "WHERE date(creado_en) >= date('now', ?) ", (f"-{int(dias)} day",))
 
 
+# Guardadas solo para que su hash evite volver a pagar al modelo: no se envian
+# ni se ven en el panel. "fuera_destinatario": para administraciones o personas.
+ESTADOS_OCULTOS = ("no_convocatoria", "fuera_destinatario")
+_SQL_VISIBLES = "estado NOT IN ('no_convocatoria', 'fuera_destinatario')"
+
+
 def guardar_publicacion(datos: dict[str, Any]) -> int:
     columnas = [
         "ejecucion_id", "codigo_boletin", "comunidad", "boletin_nombre", "fecha_publicacion",
@@ -465,7 +473,7 @@ def guardar_publicacion(datos: dict[str, Any]) -> int:
         "url_pdf", "seccion", "relevancia", "sectores", "justificacion", "confianza",
         "motivo_confianza", "hash_contenido", "titulo_normalizado", "terminos", "contextos",
         "texto_incompleto", "revision_manual", "motivo_revision", "duplicado_de", "estado",
-        "json_modelo",
+        "json_modelo", "destinatario",
     ]
     valores = [datos.get(col) for col in columnas]
     marcadores = ",".join("?" for _ in columnas)
@@ -493,9 +501,9 @@ def publicaciones(filtros: dict[str, Any] | None = None, limite: int = 300) -> l
         sql += " AND estado=?"
         params.append(filtros["estado"])
     else:
-        # Las publicaciones que el modelo descarto por no ser convocatorias se
-        # guardan solo para no volver a pagarlas: no se muestran por defecto.
-        sql += " AND estado <> 'no_convocatoria'"
+        # Las que el modelo descarto (no son convocatorias, o van a administraciones
+        # o personas) se guardan solo para no volver a pagarlas: no se muestran.
+        sql += " AND " + _SQL_VISIBLES
     if filtros.get("texto"):
         sql += " AND (titulo LIKE ? OR organismo LIKE ?)"
         patron = f"%{filtros['texto']}%"
@@ -633,11 +641,11 @@ def auditoria(limite: int = 200) -> list[sqlite3.Row]:
 # ------------------------------------------------------------- panel / KPIs --
 def kpis(fecha: str) -> dict[str, Any]:
     nuevas = _uno("SELECT COUNT(*) AS n FROM publicaciones WHERE fecha_publicacion=? "
-                  "AND estado <> 'no_convocatoria'", (fecha,))["n"]
+                  "AND " + _SQL_VISIBLES, (fecha,))["n"]
     altas = _uno(
         "SELECT COUNT(*) AS n FROM publicaciones WHERE fecha_publicacion=? AND relevancia='alta' "
-        "AND estado <> 'no_convocatoria'", (fecha,))["n"]
-    total = _uno("SELECT COUNT(*) AS n FROM publicaciones WHERE estado <> 'no_convocatoria'")["n"]
+        "AND " + _SQL_VISIBLES, (fecha,))["n"]
+    total = _uno("SELECT COUNT(*) AS n FROM publicaciones WHERE " + _SQL_VISIBLES)["n"]
     descartadas = _uno("SELECT COUNT(*) AS n FROM descartes WHERE activo=1")["n"]
     ultima = _uno("SELECT * FROM ejecuciones ORDER BY id DESC LIMIT 1")
     return {
@@ -657,7 +665,7 @@ def exportar_publicaciones() -> list[dict[str, Any]]:
         "titulo_resumido, resumen, organismo, plazo, plazo_fin, beneficiarios, importe, "
         "url_oficial, url_pdf, seccion, relevancia, "
         "sectores, justificacion, confianza, estado, revision_manual, creado_en "
-        "FROM publicaciones WHERE estado <> 'no_convocatoria' "
+        "FROM publicaciones WHERE " + _SQL_VISIBLES + " "
         "ORDER BY fecha_publicacion DESC, id DESC")
     return [dict(fila) for fila in filas]
 

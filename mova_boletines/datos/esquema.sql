@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS publicaciones (
     duplicado_de       INTEGER REFERENCES publicaciones(id) ON DELETE SET NULL,
     estado             TEXT NOT NULL DEFAULT 'nueva',
     json_modelo        TEXT NOT NULL DEFAULT '',
+    destinatario       TEXT NOT NULL DEFAULT '',
     creado_en          TEXT NOT NULL DEFAULT (datetime('now')),
     actualizado_en     TEXT NOT NULL DEFAULT (datetime('now'))
 );

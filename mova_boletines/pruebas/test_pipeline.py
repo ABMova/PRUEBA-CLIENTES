@@ -173,6 +173,18 @@ def _modelo_simulado(sistema: str, mensaje: str, modelo: str, max_tokens: int,
                     "beneficiarios": config.MARCADOR_PENDIENTE,
                     "importe": config.MARCADOR_PENDIENTE,
                     "confianza": "alta", "motivo_confianza": "Es un nombramiento de personal."}
+        destinos = {"estudiantes": "personas", "ayuntamientos y empresas": "publico",
+                     "ayuntamientos": "publico", "fundaciones": "privado"}
+        for clave, destino in destinos.items():
+            if clave in texto:
+                return {"es_convocatoria_ayuda": True, "titulo": titulo,
+                        "titulo_resumido": f"Ayudas de prueba para {clave}",
+                        "resumen": f"Ayudas de prueba dirigidas a {clave}.",
+                        "organismo_convocante": "Conselleria de Prueba",
+                        "plazo_solicitud": config.MARCADOR_PENDIENTE, "fecha_fin_plazo": None,
+                        "beneficiarios": clave.capitalize(), "destinatario": destino,
+                        "importe": config.MARCADOR_PENDIENTE,
+                        "confianza": "media", "motivo_confianza": "Prueba."}
         if "calzado" in texto:
             return {"es_convocatoria_ayuda": True, "titulo": titulo,
                     "titulo_resumido": "Ayudas a la digitalizacion de pymes del calzado",
@@ -768,53 +780,53 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     for clave, valor in {"dias_ejecucion": "mon-sun", "hora_ejecucion": "07:45",
                          "hora_tarde": "20:00", "tarde_activa": "1", "planificador_activo": "1",
                          "recuperacion_activa": "1", "dias_recuperacion": "7",
-                         "recuperacion_desde": "2026-09-20", "zona_horaria": "Europe/Madrid",
+                         "recuperacion_desde": "2030-01-13", "zona_horaria": "Europe/Madrid",
                          "semanal_activo": "1", "dia_semanal": "mon",
                          "hora_semanal": "08:30"}.items():
         repositorio.guardar_ajuste(clave, valor)
-    ahora = _dt(2026, 9, 23, 10, 0, tzinfo=madrid)  # miercoles por la manana
+    ahora = _dt(2030, 1, 16, 10, 0, tzinfo=madrid)  # miercoles por la manana
     lista = recuperacion.pendientes(ahora)
-    comprobar(lista[:2] == [(date(2026, 9, 20), "recuperada"), (date(2026, 9, 20), "tarde_recuperada")]
-              and lista[-1] == (date(2026, 9, 23), "recuperada") and len(lista) == 7,
+    comprobar(lista[:2] == [(date(2030, 1, 13), "recuperada"), (date(2030, 1, 13), "tarde_recuperada")]
+              and lista[-1] == (date(2030, 1, 16), "recuperada") and len(lista) == 7,
               f"apagado desde el domingo: 4 mananas y 3 tardes pendientes, la mas antigua primero ({len(lista)})")
-    comprobar((date(2026, 9, 23), "tarde_recuperada") not in lista,
+    comprobar((date(2030, 1, 16), "tarde_recuperada") not in lista,
               "la tarde de hoy aun no toca")
 
-    buena = repositorio.crear_ejecucion("2026-09-21", "manual", "prueba")
+    buena = repositorio.crear_ejecucion("2030-01-14", "manual", "prueba")
     repositorio.cerrar_ejecucion(buena, "correcta", "", "", {"boletines_ok": 7})
     lista = recuperacion.pendientes(ahora)
-    comprobar((date(2026, 9, 21), "recuperada") not in lista,
+    comprobar((date(2030, 1, 14), "recuperada") not in lista,
               "un dia ya vigilado (aunque sea a mano) no se repite")
-    comprobar((date(2026, 9, 21), "tarde_recuperada") in lista,
+    comprobar((date(2030, 1, 14), "tarde_recuperada") in lista,
               "pero su tarde si, porque esa ejecucion empezo antes de las 20:00")
 
-    sin_red = repositorio.crear_ejecucion("2026-09-22", "programada", "planificador")
+    sin_red = repositorio.crear_ejecucion("2030-01-15", "programada", "planificador")
     repositorio.cerrar_ejecucion(sin_red, "con_avisos", "", "", {"boletines_ok": 0,
                                                                  "boletines_fallidos": 7})
-    comprobar((date(2026, 9, 22), "recuperada") in recuperacion.pendientes(ahora),
+    comprobar((date(2030, 1, 15), "recuperada") in recuperacion.pendientes(ahora),
               "una ejecucion sin ningun boletin consultado (sin red) no cuenta como hecha")
     for _ in range(recuperacion.INTENTOS_MAX):
-        fallida = repositorio.crear_ejecucion("2026-09-22", "recuperada", "recuperacion")
+        fallida = repositorio.crear_ejecucion("2030-01-15", "recuperada", "recuperacion")
         repositorio.cerrar_ejecucion(fallida, "error", "", "", {})
-    comprobar((date(2026, 9, 22), "recuperada") not in recuperacion.pendientes(ahora),
+    comprobar((date(2030, 1, 15), "recuperada") not in recuperacion.pendientes(ahora),
               "tras 3 intentos fallidos se deja de insistir")
 
-    en_curso = repositorio.crear_ejecucion("2026-09-20", "manual", "prueba")
-    comprobar(not any(f == date(2026, 9, 20) for f, _ in recuperacion.pendientes(ahora)),
+    en_curso = repositorio.crear_ejecucion("2030-01-13", "manual", "prueba")
+    comprobar(not any(f == date(2030, 1, 13) for f, _ in recuperacion.pendientes(ahora)),
               "no se lanza nada para un dia con una ejecucion en curso")
     repositorio.cerrar_ejecucion(en_curso, "cancelada", "", "", {})
 
-    repositorio.guardar_ajuste("recuperacion_desde", "2026-09-23")
-    comprobar(all(f >= date(2026, 9, 23) for f, _ in recuperacion.pendientes(ahora)),
+    repositorio.guardar_ajuste("recuperacion_desde", "2030-01-16")
+    comprobar(all(f >= date(2030, 1, 16) for f, _ in recuperacion.pendientes(ahora)),
               "nada anterior al dia en que se activo la recuperacion")
     repositorio.guardar_ajuste("recuperacion_activa", "0")
     comprobar(recuperacion.pendientes(ahora) == [], "se puede desactivar en Ajustes")
     repositorio.guardar_ajuste("recuperacion_activa", "1")
 
-    repositorio.guardar_ajuste("semanal_ultima_semana", "2026-09-14")
-    comprobar(recuperacion.semanal_pendiente(ahora) == date(2026, 9, 21),
+    repositorio.guardar_ajuste("semanal_ultima_semana", "2030-01-07")
+    comprobar(recuperacion.semanal_pendiente(ahora) == date(2030, 1, 14),
               "el resumen semanal del lunes apagado se manda el miercoles")
-    repositorio.guardar_ajuste("semanal_ultima_semana", "2026-09-21")
+    repositorio.guardar_ajuste("semanal_ultima_semana", "2030-01-14")
     comprobar(recuperacion.semanal_pendiente(ahora) is None, "y solo una vez por semana")
 
     comprobar(correo.asunto(FECHA, 2, 1, retraso=True).endswith("(enviado con retraso)")
@@ -859,6 +871,55 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                            FECHA, {"consultados": ["BOE", "DOGV"], "fallidos": []})
     comprobar(0 < html.find("Estatal (BOE)") < html.find("Andalucia"),
               "en el correo va delante de las comunidades")
+
+    print("\n24) Solo llegan las ayudas para empresas, pymes, fundaciones o entidades privadas")
+    comprobar(relevancia.destinatario({"destinatario": "publico"},
+                                      {"titulo": "Ayudas a ayuntamientos y empresas para el comercio"})
+              == "privado", "si el titulo nombra a empresas cuenta como privado aunque el modelo dude")
+    comprobar(relevancia.destinatario({"destinatario": "publico"},
+                                      {"titulo": "Subvencion a la Comunidad Autonoma de Canarias"})
+              == "publico", "'Comunidad Autonoma' no se confunde con 'autonomos'")
+    comprobar(relevancia.destinatario({}, {"titulo": "Ayudas"}) == "no_consta"
+              and relevancia.destinatario({"destinatario": "cualquiera"}, {}) == "no_consta",
+              "sin dato o con un valor raro queda como 'no consta'")
+
+    def _cruda(ident, titulo):
+        return PublicacionCruda(codigo_boletin="DOGV", titulo=titulo, organismo="Conselleria de Prueba",
+                                seccion="III", url_oficial=f"https://dogv.gva.es/{ident}",
+                                url_pdf="", fecha="2026-09-25", texto=titulo, identificador=ident)
+
+    _guion["publicaciones"] = [
+        _cruda("999101", "Convocatoria de becas y ayudas para estudiantes de formacion profesional"),
+        _cruda("999102", "Subvenciones a ayuntamientos para la mejora de caminos rurales"),
+        _cruda("999103", "Ayudas a ayuntamientos y empresas para la dinamizacion del comercio local"),
+        _cruda("999104", "Subvenciones a fundaciones para proyectos de accion social"),
+        _cruda("999105", "Convocatoria de subvenciones del programa de igualdad 2026"),
+    ]
+    llamar_antes = anthropic_cliente.llamar_json
+    relevancia.anthropic_cliente.llamar_json = _modelo_simulado  # la seccion 18 lo cambio
+    orquestador.lanzar(date(2026, 9, 25), "manual", "prueba", enviar_correo=False)
+    _esperar_fin()
+    relevancia.anthropic_cliente.llamar_json = llamar_antes
+    ultima = repositorio.ejecuciones(1)[0]
+    enviables = {f["titulo"]: f["destinatario"]
+                 for f in repositorio.publicaciones_de_ejecucion(ultima["id"])}
+    comprobar(len(enviables) == 3, f"de 5 ayudas, van al correo 3 ({len(enviables)})")
+    comprobar(not any("estudiantes" in t or "caminos" in t for t in enviables),
+              "fuera las de estudiantes y las solo para ayuntamientos")
+    comprobar(any("fundaciones" in t for t in enviables) and any("comercio" in t for t in enviables),
+              "dentro las de fundaciones y las compartidas con empresas")
+    comprobar(sorted(enviables.values()) == ["no_consta", "privado", "privado"],
+              "la que no dice a quien va se envia como 'no consta'")
+    visibles = [f["titulo"] for f in repositorio.publicaciones({}, limite=1000)]
+    comprobar(not any("estudiantes de formacion" in t or "caminos rurales" in t for t in visibles),
+              "las descartadas no aparecen en el panel")
+    comprobar(repositorio.existe_hash(deduplicador.calcular_hash(
+        "DOGV", "Convocatoria de becas y ayudas para estudiantes de formacion profesional")),
+        "pero quedan registradas para no volver a pagar al modelo por ellas")
+    html = correo.componer([dict(f) for f in repositorio.publicaciones_de_ejecucion(ultima["id"])],
+                           date(2026, 9, 25), {"consultados": ["DOGV"], "fallidos": []})
+    comprobar(html.count("DESTINATARIO SIN CONFIRMAR") == 1,
+              "en el correo, la de destinatario dudoso lleva su aviso")
 
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
