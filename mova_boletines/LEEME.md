@@ -17,6 +17,28 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.9: solo ayudas para empresas y entidades privadas
+
+Al correo solo llegan las convocatorias dirigidas a **empresas, pymes, autónomos,
+fundaciones, asociaciones y demás entidades privadas** (con o sin ánimo de lucro).
+Agricultores, ganaderos, pescadores y titulares de explotaciones cuentan como
+privados: son actividad económica.
+
+| Qué | Qué pasa |
+|---|---|
+| Para administraciones públicas (ayuntamientos, diputaciones, universidades y centros públicos) | No se envía ni se ve en el panel |
+| Para personas físicas (estudiantes, familias, particulares) | No se envía ni se ve en el panel |
+| Empleo público, contratación y trámites sin convocatoria nueva (oposiciones, libre designación, listas de admitidos, licitaciones, notificaciones, resoluciones de concesión) | No es una ayuda: no se envía ni se ve |
+| El título no dice a quién va | Se envía con la marca **«DESTINATARIO SIN CONFIRMAR»** |
+
+Las descartadas se guardan ocultas solo para no volver a pagar a la IA por ellas
+cada día. Red de seguridad: si el título nombra empresas, pymes, autónomos,
+fundaciones, asociaciones o agricultores, cuenta como privado aunque la IA dude.
+
+Medido con 40 publicaciones reales ya enviadas (22/09/2026): 24 no eran ayudas
+(sobre todo puestos de trabajo público), 7 iban a personas o administraciones y
+9 siguen llegando. El correo trae bastante menos ruido.
+
 ### Novedades de la versión 1.7: el BOE
 
 Se vigila también el **Boletín Oficial del Estado**, por su API de datos abiertos.
