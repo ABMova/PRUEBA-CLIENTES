@@ -45,12 +45,12 @@ Reglas:
   empleo publico: nombramientos, oposiciones, procesos selectivos, bolsas de empleo, provision de puestos de trabajo (libre designacion, concursos de meritos), ofertas de empleo publico, plazas de profesorado o investigacion, listas de admitidos o aprobados;
   contratacion publica: contratos, anuncios de licitacion, mesas de contratacion, perfil del contratante;
   tramites sin convocatoria nueva: notificaciones a interesados, correcciones de errores sin contenido nuevo, resoluciones que solo conceden, deniegan o reintegran ayudas de una convocatoria ya publicada, y ampliaciones del plazo para resolver.
-  Una ampliacion del plazo para PRESENTAR solicitudes si es true.
+  Una ampliacion del plazo para PRESENTAR solicitudes si es true, y unas bases reguladoras de ayudas son siempre true aunque todavia no abran el plazo.
 - El resumen no supera 5 lineas ni incluye valoraciones propias.
 - El titulo se copia literal de la publicacion.
 - "titulo_resumido" es una sola linea de 15 palabras como maximo que diga que se financia y para quien, sin la referencia normativa (nada de "Orden 12/2026, de 15 de septiembre, de la Conselleria..."). Usa solo informacion del titulo o del texto. Ejemplo: "Subvenciones para la digitalizacion de pymes industriales".
 - "destinatario" dice a quien se dirige la ayuda, segun el titulo y el texto:
-  "privado": empresas, pymes, autonomos, cooperativas, fundaciones, asociaciones, federaciones, clubes u otras entidades privadas, con o sin animo de lucro.
+  "privado": empresas, pymes, autonomos, cooperativas, fundaciones, asociaciones, federaciones, clubes u otras entidades privadas, con o sin animo de lucro. Tambien agricultores, ganaderos, pescadores y titulares de explotaciones: son actividad economica aunque sean personas fisicas.
   "publico": ayuntamientos, diputaciones, mancomunidades y demas entidades locales, otras administraciones, universidades publicas, centros publicos de investigacion, hospitales o centros educativos publicos.
   "personas": personas fisicas que no solicitan como autonomos: estudiantes, investigadores a titulo individual, deportistas, familias, desempleados, particulares.
   "no_consta": el titulo y el texto no permiten saberlo.
@@ -80,7 +80,9 @@ DESTINATARIOS_FUERA = ("publico", "personas")
 # entidad privada, cuenta como privado aunque el modelo diga otra cosa.
 _SENALES_PRIVADO = ("empresa", "pyme", "autonomos", "trabajo autonomo", "trabajadores autonomos",
                     "cooperativa", "fundacion", "asociacion", "sin animo de lucro",
-                    "tercer sector", "entidades privadas", "emprendedor", "startup")
+                    "tercer sector", "entidades privadas", "emprendedor", "startup",
+                    "agricultor", "ganader", "explotaciones agrarias", "explotaciones ganaderas",
+                    "pescador", "sector pesquero")
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _GENERICOS = ("no disponible", "no consta", "no especificado", "no procede", "sin datos",
