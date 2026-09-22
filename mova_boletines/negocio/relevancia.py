@@ -41,7 +41,11 @@ Devuelve EXCLUSIVAMENTE un objeto JSON valido, sin texto antes ni despues, con e
 
 Reglas:
 - No inventes ningun dato. Si un dato no aparece en el texto, escribe exactamente [PENDIENTE: dato]. Nunca escribas "no disponible", "no consta", "no especificado" ni ningun equivalente: el unico marcador admitido es [PENDIENTE: dato].
-- "es_convocatoria_ayuda" es false cuando la publicacion solo menciona las palabras clave de pasada: nombramientos, contratacion administrativa, anuncios de licitacion, correcciones de errores sin contenido nuevo.
+- "es_convocatoria_ayuda" es true solo si la publicacion convoca (o establece las bases de) ayudas, subvenciones, premios, prestamos o incentivos a los que se pueda optar. Es false cuando solo menciona las palabras clave de pasada, y siempre en estos casos:
+  empleo publico: nombramientos, oposiciones, procesos selectivos, bolsas de empleo, provision de puestos de trabajo (libre designacion, concursos de meritos), ofertas de empleo publico, plazas de profesorado o investigacion, listas de admitidos o aprobados;
+  contratacion publica: contratos, anuncios de licitacion, mesas de contratacion, perfil del contratante;
+  tramites sin convocatoria nueva: notificaciones a interesados, correcciones de errores sin contenido nuevo, resoluciones que solo conceden, deniegan o reintegran ayudas de una convocatoria ya publicada, y ampliaciones del plazo para resolver.
+  Una ampliacion del plazo para PRESENTAR solicitudes si es true.
 - El resumen no supera 5 lineas ni incluye valoraciones propias.
 - El titulo se copia literal de la publicacion.
 - "titulo_resumido" es una sola linea de 15 palabras como maximo que diga que se financia y para quien, sin la referencia normativa (nada de "Orden 12/2026, de 15 de septiembre, de la Conselleria..."). Usa solo informacion del titulo o del texto. Ejemplo: "Subvenciones para la digitalizacion de pymes industriales".
