@@ -12,9 +12,29 @@
 <h2>Nombre/objeto del trámite:</h2>
 <p>{{ v('nombre_ayuda', '—') }}</p>
 {% if d.objeto and d.objeto != 'null' %}<p>{{ v('objeto') }}</p>{% endif %}
+{% if tipo_ayuda == 'empleo' %}<h2>Personas Destinatarias:</h2>
+<p>{{ empleo.personas_destinatarias }}</p>{% endif %}
 <h2>Beneficiarios:</h2>
 <p>{{ v('beneficiarios') }}</p>
-{% if d.exclusiones and d.exclusiones != 'null' %}<h2>Exclusiones:</h2><p>{{ v('exclusiones') }}</p>{% endif %}
+{% if d.exclusiones and d.exclusiones != 'null' %}<h2>Exclusiones:</h2>
+{% if tipo_ayuda == 'empleo' %}{{ m.vinetas(lista('exclusiones'), 'dot') }}{% else %}<p>{{ v('exclusiones') }}</p>{% endif %}
+{% endif %}
+{% if tipo_ayuda == 'empleo' %}
+<h2>Requisitos de la Contratación:</h2>
+{{ m.vinetas(empleo.requisitos_contratacion, 'dot') }}
+<h2>Requisitos de los trabajadores:</h2>
+{{ m.vinetas(empleo.requisitos_trabajadores, 'dot') }}
+<h2>Obligaciones del Empresario:</h2>
+{{ m.vinetas(empleo.obligaciones_empresario, 'dot') }}
+<h2>Tipo de Contrato y Cuantía:</h2>
+{{ m.vinetas(empleo.condiciones_contrato, 'chk') }}
+{{ m.cuantias(empleo.cuantias) }}
+<ul>
+<li class="dot"><strong>Régimen:</strong> {{ v('regimen') }}</li>
+<li class="dot"><strong>Compatibilidades:</strong> {{ v('compatibilidades') }}</li>
+<li class="dot"><strong>Incompatibilidades:</strong> {{ v('incompatibilidades') }}</li>
+</ul>
+{% else %}
 <h2>Actuaciones Apoyables:</h2>
 {{ m.vinetas(lista('actuaciones'), 'dot') }}
 {% if tipo_ayuda != 'financiacion' %}<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>{% endif %}
@@ -38,6 +58,7 @@
 <li class="dot"><strong>Compatibilidades:</strong> {{ v('compatibilidades') }}</li>
 <li class="dot"><strong>Incompatibilidades:</strong> {{ v('incompatibilidades') }}</li>
 </ul>
+{% endif %}
 {% endif %}
 <h2>Criterios de valoración:</h2>
 {% if criterios %}<ul>{% for c in criterios %}<li class="dot"><strong>{{ c.criterio }}</strong>{% if c.puntos %} ({{ c.puntos }}){% endif %}{% if c.descripcion %}: {{ c.descripcion }}{% endif %}</li>{% endfor %}</ul>

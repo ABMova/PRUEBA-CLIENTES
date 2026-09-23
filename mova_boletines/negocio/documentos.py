@@ -78,7 +78,8 @@ REGLAS DE EXTRACCIÓN OBLIGATORIAS:
 10. EJECUCIÓN Y PAGO: en "ejecucion_pago" indica el PERIODO en el que las actuaciones subvencionadas deben estar REALIZADAS Y PAGADAS según la orden o la convocatoria (por ejemplo "entre el 01/01/2026 y el 31/12/2026" o "desde la resolución hasta el 30/09/2026"). Si el texto no lo especifica, usa null.
 11. TIPO DE AYUDA: en "tipo_ayuda" escribe "financiacion" cuando lo que se concede sea un prestamo, credito, aval, garantia, linea de financiacion bonificada, bonificacion de intereses o participacion en capital (aunque lleve un tramo no reembolsable); "empleo" cuando lo subvencionado sea contratar personas, mantener el empleo, bonificar cuotas de la Seguridad Social, fomentar el autoempleo o formar trabajadores; y "general" en los demas casos. Si encajan las dos, elige la que sea el grueso de la ayuda.
 12. CONDICIONES DE FINANCIACION: rellena el objeto "financiacion" SOLO si "tipo_ayuda" es "financiacion". Cada campo con el dato tal como figura en el texto, o null: "inicio_proyecto" (cuanto antes de la solicitud puede haber empezado el proyecto), "financiacion_max" (porcentaje financiable, distinguiendo inversion y circulante si el texto lo distingue), "intereses" (indice y diferencial, p. ej. "Euribor a un ano + un diferencial entre el 0,50 y el 0,75%"), "amortizacion" (plazo de devolucion), "carencia", "tramo_no_reembolsable" (porcentaje, cuantia maxima y regimen si lo indica), "garantias", "comision_apertura". La inversion minima y maxima van, como siempre, en "inversion_min" e "inversion_max".
-13. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
+13. AYUDAS DE EMPLEO: rellena el objeto "empleo" SOLO si "tipo_ayuda" es "empleo". "personas_destinatarias" describe a QUIEN hay que contratar (edad, titulacion, situacion de desempleo, inscripcion en registros), que no es lo mismo que "beneficiarios" (quien cobra la ayuda: la empresa). "requisitos_contratacion" son las condiciones que debe cumplir el contrato o la empresa (incremento de plantilla, numero maximo de contratos, limites de otras ayudas). "requisitos_trabajadores" son los que debe acreditar la persona contratada. "obligaciones_empresario" son los compromisos posteriores (mantenimiento del empleo y de la plantilla, sustituciones, devolucion si se incumple). "condiciones_contrato" son la modalidad, jornada y duracion exigidas. "cuantias" es una lista con un objeto {"colectivo","importe"} por cada importe distinto segun a quien se contrate (por ejemplo hombres, mujeres, personas con discapacidad, victimas de violencia de genero). Las exclusiones van, como siempre, en "exclusiones".
+14. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
 
 Estructura JSON requerida:
 {"nombre_ayuda":null,"organismo":null,"linea":null,"ambito":null,"regimen":null,"claim":null,"objeto":null,
@@ -87,6 +88,7 @@ Estructura JSON requerida:
 "actuaciones":[],"gastos_elegibles":[],"gastos_excluidos":[],
 "cuantia_max":null,"cuantia_min":null,"intensidad":null,"inversion_min":null,"inversion_max":null,
 "financiacion":{"inicio_proyecto":null,"financiacion_max":null,"intereses":null,"amortizacion":null,"carencia":null,"tramo_no_reembolsable":null,"garantias":null,"comision_apertura":null},
+"empleo":{"personas_destinatarias":null,"requisitos_contratacion":[],"requisitos_trabajadores":[],"obligaciones_empresario":[],"condiciones_contrato":[],"cuantias":[]},
 "credito":null,"criterios":[],"doc_solicitud":[],"doc_justificacion":[],
 "plazo_inicio":null,"plazo_fin":null,"plazo_ejecucion":null,"plazo_justificacion":null,"ejecucion_pago":null,
 "compatibilidades":null,"incompatibilidades":null,
@@ -360,6 +362,7 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         "logo_oro": _imagen("logo-oro.png"), "logo_negro": _imagen("logo-negro.png"),
         "tipo_ayuda": _tipo_ayuda(datos),
         "condiciones_financiacion": _condiciones_financiacion(datos),
+        "empleo": _datos_empleo(datos),
         "edificio": _imagen("edificio-fondo.png"),
         "no_disponible": NO_DISPONIBLE,
         "generado": datetime.now().strftime("%d/%m/%Y"),
@@ -399,6 +402,40 @@ def _condiciones_financiacion(datos: dict) -> list[dict]:
         condiciones.append({"rotulo": rotulo,
                             "valor": NO_DISPONIBLE if _vacio(valor) else item_a_texto(valor)})
     return condiciones
+
+
+def _datos_empleo(datos: dict) -> dict:
+    """Apartados propios de las ayudas de empleo, ya listos para la plantilla."""
+    bloque = datos.get("empleo")
+    bloque = bloque if isinstance(bloque, dict) else {}
+
+    def lista_de(clave: str) -> list[str]:
+        valor = bloque.get(clave)
+        if _vacio(valor):
+            return []
+        if isinstance(valor, list):
+            return [t for t in (item_a_texto(v) for v in valor) if t]
+        return [item_a_texto(valor)]
+
+    cuantias = []
+    for cuantia in (bloque.get("cuantias") or []):
+        if isinstance(cuantia, dict):
+            colectivo = item_a_texto(cuantia.get("colectivo", ""))
+            importe = item_a_texto(cuantia.get("importe", ""))
+            if colectivo or importe:
+                cuantias.append({"colectivo": colectivo, "importe": importe or NO_DISPONIBLE})
+        elif not _vacio(cuantia):
+            cuantias.append({"colectivo": "", "importe": item_a_texto(cuantia)})
+
+    personas = bloque.get("personas_destinatarias")
+    return {
+        "personas_destinatarias": NO_DISPONIBLE if _vacio(personas) else item_a_texto(personas),
+        "requisitos_contratacion": lista_de("requisitos_contratacion"),
+        "requisitos_trabajadores": lista_de("requisitos_trabajadores"),
+        "obligaciones_empresario": lista_de("obligaciones_empresario"),
+        "condiciones_contrato": lista_de("condiciones_contrato"),
+        "cuantias": cuantias,
+    }
 
 
 def _entorno() -> Environment:

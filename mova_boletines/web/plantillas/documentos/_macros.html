@@ -16,3 +16,11 @@
 {% for c in condiciones %}<li class="chk"><strong>{{ c.rotulo }}:</strong> {{ c.valor }}</li>
 {% endfor %}</ul>
 {% endmacro %}
+
+{# Cuantia por colectivo de las ayudas de empleo: "Mujeres: 12.500 €". #}
+{% macro cuantias(cuantias) %}
+{% if cuantias %}<ul>
+{% for c in cuantias %}<li class="dot">{% if c.colectivo %}<strong>{{ c.colectivo }}:</strong> {% endif %}{{ c.importe }}</li>
+{% endfor %}</ul>
+{% else %}<p class="nd">{{ no_disponible }}</p>{% endif %}
+{% endmacro %}

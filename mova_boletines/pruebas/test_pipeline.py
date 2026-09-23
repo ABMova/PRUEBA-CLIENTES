@@ -1019,6 +1019,52 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(faltan.count(documentos.NO_DISPONIBLE) >= 10,
               "las condiciones que no figuran en la convocatoria llevan su aviso")
 
+    print("\n27) Las ayudas de empleo llevan su propia estructura")
+    datos_emp = {
+        "nombre_ayuda": "Ayuda a la contratacion indefinida de jovenes cualificados 2026",
+        "tipo_ayuda": "empleo",
+        "beneficiarios": "Empresas privadas y autonomos",
+        "exclusiones": ["Contratos fijos discontinuos", "Contrato a tiempo parcial"],
+        "empleo": {
+            "personas_destinatarias": "Jovenes menores de 30 anos desempleados con FP o titulacion",
+            "requisitos_contratacion": ["Incremento neto de la plantilla media, a mantener dos anos",
+                                        "Maximo 2 contrataciones por entidad"],
+            "requisitos_trabajadores": ["Inscritos en Garantia Juvenil", "Inscritos en LABORA"],
+            "obligaciones_empresario": ["Mantener el empleo creado durante 2 anos"],
+            "condiciones_contrato": ["Indefinido a jornada completa", "Duracion de 2 anos"],
+            "cuantias": [{"colectivo": "Hombres", "importe": "10.000 €"},
+                         {"colectivo": "Mujeres", "importe": "12.500 €"}]},
+    }
+    publicacion_emp = {"id": 9002, "codigo_boletin": "DOGV", "titulo_resumido": "Empleo"}
+    corto_emp = documentos.renderizar("corto", datos_emp, publicacion_emp)
+    apartados = ("Personas Destinatarias:", "Beneficiarios:", "Requisitos de la Contratación:",
+                 "Requisitos de los trabajadores:", "Exclusiones:", "Obligaciones del Empresario:",
+                 "Tipo de Contrato y Cuantía:", "Plazo:")
+    comprobar(all(a in corto_emp for a in apartados),
+              "el resumen corto trae los ocho apartados del modelo de empleo")
+    comprobar(corto_emp.index("Personas Destinatarias:") < corto_emp.index("Beneficiarios:")
+              < corto_emp.index("Requisitos de la Contratación:")
+              < corto_emp.index("Obligaciones del Empresario:") < corto_emp.index("Plazo:"),
+              "y en el mismo orden")
+    comprobar("Actuaciones Apoyables" not in corto_emp and "Costes Apoyables" not in corto_emp
+              and "Tipo de Ayuda y Cuantía" not in corto_emp,
+              "sin los apartados que en empleo no aplican")
+    comprobar("Hombres:" in corto_emp and "10.000 €" in corto_emp and "Mujeres:" in corto_emp,
+              "con la cuantia de cada colectivo")
+
+    ampliado_emp = documentos.renderizar("ampliado", datos_emp, publicacion_emp)
+    comprobar(all(a in ampliado_emp for a in ("Personas Destinatarias:", "Obligaciones del Empresario:",
+                                              "Tipo de Contrato y Cuantía:", "Criterios de valoración:",
+                                              "Documentación de justificación:", "Crédito presupuestario:")),
+              "el ampliado suma sus apartados de siempre a los de empleo")
+
+    comprobar("Personas Destinatarias" not in documentos.renderizar(
+        "corto", dict(datos_emp, tipo_ayuda="general"), publicacion_emp),
+        "una ayuda general no usa la estructura de empleo")
+    vacia = documentos.renderizar("corto", {"tipo_ayuda": "empleo"}, publicacion_emp)
+    comprobar(documentos.NO_DISPONIBLE in vacia and "Personas Destinatarias:" in vacia,
+              "si la convocatoria no da esos datos, el apartado sale con su aviso")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)
