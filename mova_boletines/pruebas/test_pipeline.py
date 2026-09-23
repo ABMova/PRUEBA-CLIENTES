@@ -1009,8 +1009,12 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("Tipo de Ayuda y Cuantía" in corto_general
               and "Condiciones de financiación" not in corto_general,
               "las demas ayudas siguen con la estructura de siempre")
-    comprobar("Condiciones de financiación" not in documentos.renderizar(
-        "infografia", datos_fin, publicacion_fin), "la infografia no cambia")
+    info_fin = documentos.renderizar("infografia", datos_fin, publicacion_fin)
+    comprobar("Condiciones de financiación" in info_fin and "Inversión máxima" in info_fin
+              and "Financiación máxima" in info_fin,
+              "la infografia de financiacion lleva sus cifras y el bloque de condiciones")
+    comprobar("Ayuda máxima" not in info_fin and "Intensidad" not in info_fin,
+              "y ya no muestra ayuda maxima ni intensidad, que aqui no aplican")
 
     sin_tipo = documentos.renderizar("corto", {"nombre_ayuda": "Sin tipo"}, publicacion_fin)
     comprobar("Tipo de Ayuda y Cuantía" in sin_tipo,
@@ -1057,6 +1061,22 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                                               "Tipo de Contrato y Cuantía:", "Criterios de valoración:",
                                               "Documentación de justificación:", "Crédito presupuestario:")),
               "el ampliado suma sus apartados de siempre a los de empleo")
+
+    info_emp = documentos.renderizar("infografia", datos_emp, publicacion_emp)
+    comprobar(all(t in info_emp for t in ("Ayuda por contrato", "Contrato", "Fin de plazo",
+                                          "Personas destinatarias", "Requisitos de la contratación",
+                                          "Cuantía por colectivo")),
+              "la infografia de empleo cambia sus cifras y sus apartados")
+    comprobar("10.000 € – 12.500 €" in info_emp,
+              "la cifra destacada es el rango de cuantias por colectivo")
+    comprobar("Objeto y acciones subvencionables" not in info_emp,
+              "sin el apartado de acciones subvencionables")
+
+    info_general = documentos.renderizar("infografia", dict(datos_emp, tipo_ayuda="general"),
+                                         publicacion_emp)
+    comprobar("Ayuda máxima" in info_general and "Objeto y acciones subvencionables" in info_general
+              and "Cuantía por colectivo" not in info_general,
+              "la infografia de las ayudas generales no cambia")
 
     comprobar("Personas Destinatarias" not in documentos.renderizar(
         "corto", dict(datos_emp, tipo_ayuda="general"), publicacion_emp),

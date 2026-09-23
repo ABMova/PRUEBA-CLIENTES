@@ -54,22 +54,53 @@ addEventListener("DOMContentLoaded", function () {
 <div class="cab"><div><img class="logo-img" src="{{ logo_oro }}" alt="MOVA"><div class="sub">Consultoría de Subvenciones</div></div></div>
 <div class="hero"><div class="titulo">{{ v('nombre_ayuda', 'Subvención pública') }}</div><div class="claim">{{ v('claim', 'Análisis de subvención pública') }}</div></div>
 <div class="sec"><div class="sec-t">Datos clave</div><div class="kpis">
+{% if tipo_ayuda == 'financiacion' %}
+<div class="kpi"><div class="val">{{ v('inversion_max') }}</div><div class="etq">Inversión máxima</div></div>
+<div class="kpi"><div class="val">{{ fin.financiacion_max }}</div><div class="etq">Financiación máxima</div></div>
+{% elif tipo_ayuda == 'empleo' %}
+<div class="kpi"><div class="val">{{ empleo.cuantia_destacada }}</div><div class="etq">Ayuda por contrato</div></div>
+<div class="kpi"><div class="val">{{ empleo.contrato_destacado }}</div><div class="etq">Contrato</div></div>
+{% else %}
 <div class="kpi"><div class="val">{{ v('cuantia_max') }}</div><div class="etq">Ayuda máxima</div></div>
 <div class="kpi"><div class="val">{{ v('intensidad') }}</div><div class="etq">Intensidad</div></div>
+{% endif %}
 <div class="kpi"><div class="val">{{ v('plazo_fin') }}</div><div class="etq">Fin de plazo</div></div>
 </div></div>
 <div class="sec"><div class="sec-t">Datos destacados</div><div class="dest-grid">
 <div class="dest"><div class="dt">Beneficiarios</div><div class="dv">{{ v('benef_corto', v('beneficiarios')) }}</div></div>
+{% if tipo_ayuda == 'empleo' %}
+<div class="dest"><div class="dt">Personas destinatarias</div><div class="dv">{{ empleo.personas_destinatarias }}</div></div>
+<div class="dest"><div class="dt">Régimen de concesión</div><div class="dv">{{ v('regimen') }}</div></div>
+<div class="dest"><div class="dt">Ámbito territorial</div><div class="dv">{{ v('ambito') }}</div></div>
+{% else %}
 <div class="dest"><div class="dt">Régimen de concesión</div><div class="dv">{{ v('regimen') }}</div></div>
 <div class="dest"><div class="dt">Crédito presupuestario</div><div class="dv">{{ v('credito') }}</div></div>
 <div class="dest"><div class="dt">Ámbito territorial</div><div class="dv">{{ v('ambito') }}</div></div>
+{% endif %}
 </div></div>
+{% if tipo_ayuda == 'empleo' %}
+<div class="sec"><div class="sec-t">Requisitos de la contratación</div>
+{% if d.objeto and d.objeto != 'null' %}<p class="obj">{{ v('objeto') }}</p>{% endif %}
+{% if empleo.requisitos_contratacion %}<ul>{% for r in empleo.requisitos_contratacion %}<li>{{ r }}</li>{% endfor %}</ul>
+{% else %}<p class="obj" style="color:#a5a29a;font-style:italic">{{ no_disponible }}</p>{% endif %}
+</div>
+<div class="sec"><div class="sec-t">Cuantía por colectivo</div>
+{% if empleo.cuantias %}<ul>{% for c in empleo.cuantias %}<li>{% if c.colectivo %}<strong>{{ c.colectivo }}:</strong> {% endif %}{{ c.importe }}</li>{% endfor %}</ul>
+{% else %}<p class="obj" style="color:#a5a29a;font-style:italic">{{ no_disponible }}</p>{% endif %}
+</div>
+{% else %}
 <div class="sec"><div class="sec-t">Objeto y acciones subvencionables</div>
 <p class="obj">{{ v('objeto') }}</p>
 {% set acts = lista('actuaciones') %}
 {% if acts %}<ul>{% for a in acts %}<li>{{ a }}</li>{% endfor %}</ul>
 {% else %}<p class="obj" style="color:#a5a29a;font-style:italic">{{ no_disponible }}</p>{% endif %}
 </div>
+{% if tipo_ayuda == 'financiacion' %}
+<div class="sec"><div class="sec-t">Condiciones de financiación</div>
+<ul>{% for c in condiciones_financiacion %}<li><strong>{{ c.rotulo }}:</strong> {{ c.valor }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% endif %}
 <div class="cierre"><p>{{ v('cierre', 'Contacta con MOVA para analizar tu viabilidad como beneficiario de esta ayuda.') }}</p>
 <div class="pie">Análisis generado por MOVA Boletines Oficiales · MOVA Consultoría de Subvenciones · {{ generado }}</div></div>
 </div></body></html>

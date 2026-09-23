@@ -32,7 +32,12 @@ pago, que en un préstamo no encaja. El ampliado mantiene el resto de apartados
 (criterios, documentación, plazos, crédito, referencias) y conserva régimen,
 compatibilidades e incompatibilidades.
 
-La infografía no cambia, y las ayudas generales mantienen la estructura de
+La **infografía** también se adapta (1.12): en financiación, las cifras
+destacadas pasan a ser inversión máxima, financiación máxima y fin de plazo, y
+se añade el bloque completo de condiciones; en empleo, son la ayuda por contrato
+(el rango entre el importe menor y el mayor), el tipo de contrato y el fin de
+plazo, con las personas destinatarias, los requisitos de la contratación y la
+cuantía de cada colectivo. Las ayudas generales mantienen la estructura de
 siempre. Los documentos generados antes de esta versión no llevan tipo, así que
 se muestran como generales. Sigue la regla de la casa: una condición que no
 figure en la convocatoria se escribe con su aviso, nunca con un valor plausible.

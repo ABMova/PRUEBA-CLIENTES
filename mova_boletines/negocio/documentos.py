@@ -362,6 +362,7 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         "logo_oro": _imagen("logo-oro.png"), "logo_negro": _imagen("logo-negro.png"),
         "tipo_ayuda": _tipo_ayuda(datos),
         "condiciones_financiacion": _condiciones_financiacion(datos),
+        "fin": _financiacion_suelta(datos),
         "empleo": _datos_empleo(datos),
         "edificio": _imagen("edificio-fondo.png"),
         "no_disponible": NO_DISPONIBLE,
@@ -404,6 +405,34 @@ def _condiciones_financiacion(datos: dict) -> list[dict]:
     return condiciones
 
 
+def _financiacion_suelta(datos: dict) -> dict:
+    """Condiciones de financiacion una a una, para la infografia."""
+    bloque = datos.get("financiacion")
+    bloque = bloque if isinstance(bloque, dict) else {}
+    campos = ("inicio_proyecto", "financiacion_max", "intereses", "amortizacion", "carencia",
+              "tramo_no_reembolsable", "garantias", "comision_apertura")
+    return {campo: (NO_DISPONIBLE if _vacio(bloque.get(campo)) else item_a_texto(bloque[campo]))
+            for campo in campos}
+
+
+def _cuantia_destacada(cuantias: list[dict]) -> str:
+    """La cifra grande de la infografia: el importe, o el rango si hay varios."""
+    importes = [c["importe"] for c in cuantias if c.get("importe") and c["importe"] != NO_DISPONIBLE]
+    if not importes:
+        return NO_DISPONIBLE
+    if len(importes) == 1:
+        return importes[0]
+    def numero(texto: str) -> float:
+        digitos = re.sub(r"[^0-9,.]", "", texto).replace(".", "").replace(",", ".")
+        try:
+            return float(digitos)
+        except ValueError:
+            return 0.0
+    ordenados = sorted(importes, key=numero)
+    menor, mayor = ordenados[0], ordenados[-1]
+    return menor if menor == mayor else f"{menor} – {mayor}"
+
+
 def _datos_empleo(datos: dict) -> dict:
     """Apartados propios de las ayudas de empleo, ya listos para la plantilla."""
     bloque = datos.get("empleo")
@@ -435,6 +464,8 @@ def _datos_empleo(datos: dict) -> dict:
         "obligaciones_empresario": lista_de("obligaciones_empresario"),
         "condiciones_contrato": lista_de("condiciones_contrato"),
         "cuantias": cuantias,
+        "cuantia_destacada": _cuantia_destacada(cuantias),
+        "contrato_destacado": (lista_de("condiciones_contrato") or [NO_DISPONIBLE])[0],
     }
 
 
