@@ -263,12 +263,12 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     ejecucion = repositorio.ejecuciones(1)[0]
     comprobar(ejecucion["estado"] == "correcta", f"estado correcta (es {ejecucion['estado']})")
     comprobar(ejecucion["publicaciones_brutas"] == 4, "4 publicaciones brutas")
-    comprobar(ejecucion["candidatas"] == 3,
-              f"el filtro de palabras deja 3 candidatas (deja {ejecucion['candidatas']})")
+    comprobar(ejecucion["candidatas"] == 2,
+              f"quedan 2 candidatas: el nombramiento se aparta sin pagar al modelo "
+              f"(quedan {ejecucion['candidatas']})")
 
     guardadas = repositorio.publicaciones({}, limite=50)
-    comprobar(len(guardadas) == 2,
-              f"se guardan 2 (el nombramiento lo descarta el modelo); hay {len(guardadas)}")
+    comprobar(len(guardadas) == 2, f"se guardan las 2 ayudas; hay {len(guardadas)}")
 
     pyme = next((p for p in guardadas if "pymes industriales" in p["titulo"]), None)
     comprobar(pyme is not None and pyme["relevancia"] == "alta", "la ayuda a pymes es alta")
@@ -920,6 +920,54 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                            date(2026, 9, 25), {"consultados": ["DOGV"], "fallidos": []})
     comprobar(html.count("DESTINATARIO SIN CONFIRMAR") == 1,
               "en el correo, la de destinatario dudoso lleva su aviso")
+
+    print("\n25) El filtro previo aparta sin coste lo que nunca es una ayuda")
+    from negocio import prefiltro
+
+    nunca = [
+        ("ORDEN EYH/914/2026 por la que se anuncia convocatoria publica para cubrir, mediante el "
+         "sistema de libre designacion, el puesto de Jefe de Servicio", "empleo publico"),
+        ("Resolucio de convocatoria del concurs especific de merits per proveir el lloc de cap",
+         "empleo publico"),
+        ("Anuncio de modificacion de los miembros de la Mesa de Contratacion", "contratacion publica"),
+        ("Notificaciones. Notificacion de resolucion del procedimiento de acreditacion de "
+         "competencias profesionales", "tramite sin convocatoria"),
+        ("ANUNCIO por el que se somete a informacion publica la solicitud de autorizacion "
+         "administrativa de una instalacion fotovoltaica", "tramite sin convocatoria"),
+    ]
+    comprobar(all(prefiltro.motivo_ruido(t) == familia for t, familia in nunca),
+              "aparta puestos de trabajo, licitaciones y tramites")
+
+    ayudas = [
+        "Extracto de la Orden por la que se convocan subvenciones para la contratacion de personal investigador",
+        "Ayudas a la provision de puestos de trabajo en empresas de insercion",
+        "Bases reguladoras de las ayudas para la proteccion de los animales de compania",
+        "Convocatoria del XIX Premio de Cartografia y Territorio",
+        "Resolucion por la que se convocan ayudas al asesoramiento para jovenes agricultores",
+    ]
+    comprobar(all(prefiltro.motivo_ruido(t) is None for t in ayudas),
+              "y nunca aparta un titulo que nombre una ayuda, aunque hable de puestos o contratos")
+
+    PETICIONES_DOC.clear()
+    LLAMADAS["n"] = 0
+    _guion["publicaciones"] = [
+        PublicacionCruda(codigo_boletin="DOGV", titulo=nunca[0][0], organismo="Conselleria",
+                         seccion="II", url_oficial="https://dogv.gva.es/x1", url_pdf="",
+                         fecha="2026-09-26", texto=nunca[0][0], identificador="999201"),
+        PublicacionCruda(codigo_boletin="DOGV", titulo=ayudas[0], organismo="Conselleria",
+                         seccion="III", url_oficial="https://dogv.gva.es/x2", url_pdf="",
+                         fecha="2026-09-26", texto=ayudas[0], identificador="999202"),
+    ]
+    llamar_antes_pre = anthropic_cliente.llamar_json
+    relevancia.anthropic_cliente.llamar_json = _modelo_simulado
+    orquestador.lanzar(date(2026, 9, 26), "manual", "prueba", enviar_correo=False)
+    _esperar_fin()
+    relevancia.anthropic_cliente.llamar_json = llamar_antes_pre
+    ultima_pre = repositorio.ejecuciones(1)[0]
+    comprobar(ultima_pre["publicaciones_brutas"] == 2 and ultima_pre["candidatas"] == 1,
+              f"de 2 publicaciones solo 1 llega al modelo (llegaron {ultima_pre['candidatas']})")
+    comprobar("Apartadas sin coste 1" in (ultima_pre["registro"] or ""),
+              "y queda anotado en el registro de la ejecucion")
 
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:

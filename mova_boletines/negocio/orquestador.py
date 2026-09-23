@@ -15,7 +15,7 @@ from typing import Callable
 import config
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio import correo, deduplicador, palabras, relevancia, titulos
+from negocio import correo, deduplicador, palabras, prefiltro, relevancia, titulos
 from negocio.boletines import ADAPTADORES, ORDEN
 from negocio.boletines.base import ErrorBoletin
 from negocio.extraccion import normalizar_titulo, recortar
@@ -289,16 +289,30 @@ def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
     terminos = [fila["termino"] for fila in repositorio.palabras_clave(solo_activas=True)]
     candidatas: list[dict] = []
 
+    ruido: dict[str, int] = {}
+
     for publicacion in crudas:
         _comprobar_cancelacion()
         texto = f"{publicacion['titulo']} {publicacion.get('texto', '')}"
         coincidencia = palabras.buscar(texto, terminos)
-        if coincidencia.hay:
-            publicacion["terminos"] = ", ".join(coincidencia.terminos)
-            publicacion["contextos"] = repositorio.json_seguro(coincidencia.contextos)
-            publicacion["_puntuacion"] = coincidencia.puntuacion
-            candidatas.append(publicacion)
+        if not coincidencia.hay:
+            continue
+        # Puestos de trabajo, licitaciones y tramites llevan "convocatoria" o
+        # "resolucion" y pasaban el filtro de palabras: se apartan sin pagar al
+        # modelo. Si el titulo nombra una ayuda, no se descartan aqui.
+        motivo = prefiltro.motivo_ruido(publicacion["titulo"], publicacion.get("seccion", ""))
+        if motivo:
+            ruido[motivo] = ruido.get(motivo, 0) + 1
+            continue
+        publicacion["terminos"] = ", ".join(coincidencia.terminos)
+        publicacion["contextos"] = repositorio.json_seguro(coincidencia.contextos)
+        publicacion["_puntuacion"] = coincidencia.puntuacion
+        candidatas.append(publicacion)
 
+    if ruido:
+        detalle = ", ".join(f"{n} de {familia}" for familia, n in sorted(ruido.items()))
+        progreso.anotar(f"Apartadas sin coste {sum(ruido.values())} publicaciones que nunca son "
+                        f"ayudas: {detalle}")
     encontradas = len(candidatas)
     tope = repositorio.ajuste_int("max_candidatas_ejecucion", 150)
     if tope > 0 and encontradas > tope:
@@ -313,7 +327,7 @@ def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
     contadores["candidatas"] = len(candidatas)
     progreso.fijar_fase(2, porcentaje=38)
     progreso.anotar(f"Fase 2 terminada: {len(candidatas)} candidatas de {len(crudas)} "
-                    f"({encontradas} con coincidencia)")
+                    f"({encontradas} con coincidencia, {sum(ruido.values())} apartadas sin coste)")
     return candidatas
 
 

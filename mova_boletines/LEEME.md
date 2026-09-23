@@ -39,6 +39,24 @@ Medido con 40 publicaciones reales ya enviadas (22/09/2026): 24 no eran ayudas
 (sobre todo puestos de trabajo público), 7 iban a personas o administraciones y
 9 siguen llegando. El correo trae bastante menos ruido.
 
+**Filtro previo sin IA** (`negocio/prefiltro.py`, 1.9.3). Antes de llamar al
+modelo se apartan las publicaciones que nunca son ayudas: puestos de trabajo
+(libre designación, concursos de méritos, listas de admitidos, nombramientos),
+contratación pública (licitaciones, mesas de contratación) y trámites
+(notificaciones personales, información pública, impacto ambiental,
+expropiaciones). Pasaban el filtro de palabras clave porque llevan
+«convocatoria» o «resolución», y se pagaba al modelo por leerlas.
+
+> **Regla de oro:** si el título nombra una ayuda (subvención, ayuda, premio,
+> incentivo, bases reguladoras, BDNS…), **no se aparta aquí** aunque también
+> hable de puestos o contratos. En la duda decide el modelo: perder una
+> convocatoria cuesta mucho más que analizar una de más.
+
+Comprobado sobre las 669 publicaciones del histórico: apartaría 312 (46 %), de
+las que 193 ya las descartaba el modelo después de pagarlas. Las 119 restantes
+se revisaron una a una y ninguna era una ayuda. El ahorro esperado ronda la
+mitad del gasto mensual de la API.
+
 ### Novedades de la versión 1.7: el BOE
 
 Se vigila también el **Boletín Oficial del Estado**, por su API de datos abiertos.
