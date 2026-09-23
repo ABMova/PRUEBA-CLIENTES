@@ -76,13 +76,17 @@ REGLAS DE EXTRACCIÓN OBLIGATORIAS:
 8. No inventes datos que no estén en el texto, pero sé minucioso: extrae cada dato presente aunque esté disperso en distintos artículos o anexos.
 9. ACTUACIONES vs COSTES (distínguelos, NO los mezcles): "actuaciones" = las ACCIONES, proyectos o actividades subvencionables (QUÉ se puede hacer: p. ej. "digitalización del comercio minorista", "reforma del local"). "gastos_elegibles" = los COSTES o GASTOS subvencionables (QUÉ gastos se pueden financiar: p. ej. "licencias de software", "equipos informáticos", "obra civil"). Una actividad va SIEMPRE en "actuaciones"; un gasto o coste va SIEMPRE en "gastos_elegibles". Rellena AMBOS campos de forma diferenciada y completa; no dupliques el mismo contenido en los dos.
 10. EJECUCIÓN Y PAGO: en "ejecucion_pago" indica el PERIODO en el que las actuaciones subvencionadas deben estar REALIZADAS Y PAGADAS según la orden o la convocatoria (por ejemplo "entre el 01/01/2026 y el 31/12/2026" o "desde la resolución hasta el 30/09/2026"). Si el texto no lo especifica, usa null.
-11. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
+11. TIPO DE AYUDA: en "tipo_ayuda" escribe "financiacion" cuando lo que se concede sea un prestamo, credito, aval, garantia, linea de financiacion bonificada, bonificacion de intereses o participacion en capital (aunque lleve un tramo no reembolsable); "empleo" cuando lo subvencionado sea contratar personas, mantener el empleo, bonificar cuotas de la Seguridad Social, fomentar el autoempleo o formar trabajadores; y "general" en los demas casos. Si encajan las dos, elige la que sea el grueso de la ayuda.
+12. CONDICIONES DE FINANCIACION: rellena el objeto "financiacion" SOLO si "tipo_ayuda" es "financiacion". Cada campo con el dato tal como figura en el texto, o null: "inicio_proyecto" (cuanto antes de la solicitud puede haber empezado el proyecto), "financiacion_max" (porcentaje financiable, distinguiendo inversion y circulante si el texto lo distingue), "intereses" (indice y diferencial, p. ej. "Euribor a un ano + un diferencial entre el 0,50 y el 0,75%"), "amortizacion" (plazo de devolucion), "carencia", "tramo_no_reembolsable" (porcentaje, cuantia maxima y regimen si lo indica), "garantias", "comision_apertura". La inversion minima y maxima van, como siempre, en "inversion_min" e "inversion_max".
+13. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
 
 Estructura JSON requerida:
 {"nombre_ayuda":null,"organismo":null,"linea":null,"ambito":null,"regimen":null,"claim":null,"objeto":null,
+"tipo_ayuda":"general",
 "beneficiarios":null,"exclusiones":null,"benef_corto":null,
 "actuaciones":[],"gastos_elegibles":[],"gastos_excluidos":[],
 "cuantia_max":null,"cuantia_min":null,"intensidad":null,"inversion_min":null,"inversion_max":null,
+"financiacion":{"inicio_proyecto":null,"financiacion_max":null,"intereses":null,"amortizacion":null,"carencia":null,"tramo_no_reembolsable":null,"garantias":null,"comision_apertura":null},
 "credito":null,"criterios":[],"doc_solicitud":[],"doc_justificacion":[],
 "plazo_inicio":null,"plazo_fin":null,"plazo_ejecucion":null,"plazo_justificacion":null,"ejecucion_pago":null,
 "compatibilidades":null,"incompatibilidades":null,
@@ -354,10 +358,47 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         "criterios": criterios,
         "enlaces": [e for e in lista("enlaces") if e.startswith("http")],
         "logo_oro": _imagen("logo-oro.png"), "logo_negro": _imagen("logo-negro.png"),
+        "tipo_ayuda": _tipo_ayuda(datos),
+        "condiciones_financiacion": _condiciones_financiacion(datos),
         "edificio": _imagen("edificio-fondo.png"),
         "no_disponible": NO_DISPONIBLE,
         "generado": datetime.now().strftime("%d/%m/%Y"),
     }
+
+
+TIPOS_AYUDA = ("general", "financiacion", "empleo")
+
+# Apartado "Condiciones de financiacion" del resumen: rotulo y de donde sale.
+_CONDICIONES = (
+    ("Inversión mínima", "inversion_min", False),
+    ("Inversión máxima", "inversion_max", False),
+    ("Inicio del proyecto", "inicio_proyecto", True),
+    ("Financiación máxima", "financiacion_max", True),
+    ("Intereses", "intereses", True),
+    ("Amortización", "amortizacion", True),
+    ("Carencia", "carencia", True),
+    ("Tramo no reembolsable (TNR)", "tramo_no_reembolsable", True),
+    ("Garantías", "garantias", True),
+    ("Comisión de apertura", "comision_apertura", True),
+)
+
+
+def _tipo_ayuda(datos: dict) -> str:
+    """financiacion | empleo | general. Lo desconocido se trata como general."""
+    valor = str(datos.get("tipo_ayuda") or "").strip().lower()
+    return valor if valor in TIPOS_AYUDA else "general"
+
+
+def _condiciones_financiacion(datos: dict) -> list[dict]:
+    """Rotulo y valor de cada condicion; las que no figuren llevan el aviso de siempre."""
+    bloque = datos.get("financiacion")
+    bloque = bloque if isinstance(bloque, dict) else {}
+    condiciones = []
+    for rotulo, clave, es_del_bloque in _CONDICIONES:
+        valor = bloque.get(clave) if es_del_bloque else datos.get(clave)
+        condiciones.append({"rotulo": rotulo,
+                            "valor": NO_DISPONIBLE if _vacio(valor) else item_a_texto(valor)})
+    return condiciones
 
 
 def _entorno() -> Environment:

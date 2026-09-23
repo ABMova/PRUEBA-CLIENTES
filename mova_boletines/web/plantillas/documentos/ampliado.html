@@ -17,9 +17,17 @@
 {% if d.exclusiones and d.exclusiones != 'null' %}<h2>Exclusiones:</h2><p>{{ v('exclusiones') }}</p>{% endif %}
 <h2>Actuaciones Apoyables:</h2>
 {{ m.vinetas(lista('actuaciones'), 'dot') }}
-<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>
+{% if tipo_ayuda != 'financiacion' %}<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>{% endif %}
 <h2>Costes Apoyables:</h2>
 {{ m.vinetas(lista('gastos_elegibles'), 'chk') }}
+{% if tipo_ayuda == 'financiacion' %}
+{{ m.condiciones(condiciones_financiacion) }}
+<ul>
+<li class="dot"><strong>Régimen:</strong> {{ v('regimen') }}</li>
+<li class="dot"><strong>Compatibilidades:</strong> {{ v('compatibilidades') }}</li>
+<li class="dot"><strong>Incompatibilidades:</strong> {{ v('incompatibilidades') }}</li>
+</ul>
+{% else %}
 <h2>Tipo de Ayuda y Cuantía:</h2>
 <ul>
 <li class="dot"><strong>Cuantía máxima:</strong> {{ v('cuantia_max') }}</li>
@@ -30,6 +38,7 @@
 <li class="dot"><strong>Compatibilidades:</strong> {{ v('compatibilidades') }}</li>
 <li class="dot"><strong>Incompatibilidades:</strong> {{ v('incompatibilidades') }}</li>
 </ul>
+{% endif %}
 <h2>Criterios de valoración:</h2>
 {% if criterios %}<ul>{% for c in criterios %}<li class="dot"><strong>{{ c.criterio }}</strong>{% if c.puntos %} ({{ c.puntos }}){% endif %}{% if c.descripcion %}: {{ c.descripcion }}{% endif %}</li>{% endfor %}</ul>
 {% else %}<p class="nd">No especificados o concesión directa sin baremo.</p>{% endif %}

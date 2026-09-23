@@ -16,11 +16,12 @@
 <p>{{ v('beneficiarios') }}</p>
 <h2>Actuaciones Apoyables:</h2>
 {{ m.vinetas(lista('actuaciones'), 'dot') }}
-<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>
+{% if tipo_ayuda != 'financiacion' %}<p style="margin-top:6px">{{ ejecucion_frase }} {{ inversion_frase }}</p>{% endif %}
 <h2>Costes Apoyables:</h2>
 {{ m.vinetas(lista('gastos_elegibles'), 'chk') }}
-<h2>Tipo de Ayuda y Cuantía:</h2>
-<p>{{ tipo_cuantia }}</p>
+{% if tipo_ayuda == 'financiacion' %}{{ m.condiciones(condiciones_financiacion) }}
+{% else %}<h2>Tipo de Ayuda y Cuantía:</h2>
+<p>{{ tipo_cuantia }}</p>{% endif %}
 <h2>Plazo:</h2>
 <p>{{ plazo_txt }}</p>
 </div></td></tr></tbody>

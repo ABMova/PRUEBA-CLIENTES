@@ -17,6 +17,28 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.10: estructura propia para las ayudas de financiación
+
+Al analizar la convocatoria, la IA clasifica la ayuda como **financiación**
+(préstamos, líneas bonificadas, avales, bonificación de intereses, capital),
+**empleo** (contratación, cuotas, autoempleo, formación) o **general**.
+
+En las de **financiación**, el resumen corto y el ampliado sustituyen el apartado
+«Tipo de Ayuda y Cuantía» por **«Condiciones de financiación»**, con diez datos
+que antes no se extraían: inversión mínima y máxima, inicio del proyecto,
+financiación máxima, intereses, amortización, carencia, tramo no reembolsable,
+garantías y comisión de apertura. También desaparece la frase de ejecución y
+pago, que en un préstamo no encaja. El ampliado mantiene el resto de apartados
+(criterios, documentación, plazos, crédito, referencias) y conserva régimen,
+compatibilidades e incompatibilidades.
+
+La infografía no cambia, y las ayudas generales mantienen la estructura de
+siempre. Los documentos generados antes de esta versión no llevan tipo, así que
+se muestran como generales. Sigue la regla de la casa: una condición que no
+figure en la convocatoria se escribe con su aviso, nunca con un valor plausible.
+
+La estructura de las ayudas de **empleo** está pendiente del modelo del usuario.
+
 ### Novedades de la versión 1.9: solo ayudas para empresas y entidades privadas
 
 Al correo solo llegan las convocatorias dirigidas a **empresas, pymes, autónomos,

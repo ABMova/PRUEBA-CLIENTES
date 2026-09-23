@@ -969,6 +969,56 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("Apartadas sin coste 1" in (ultima_pre["registro"] or ""),
               "y queda anotado en el registro de la ejecucion")
 
+    print("\n26) Las ayudas de financiacion llevan su propia estructura")
+    datos_fin = {
+        "nombre_ayuda": "Linea de financiacion bonificada 2026", "tipo_ayuda": "financiacion",
+        "beneficiarios": "Pymes afectadas por el entorno arancelario",
+        "actuaciones": ["Proyectos de inversion", "Capital circulante"],
+        "gastos_elegibles": ["Maquinaria", "Software"],
+        "inversion_min": "50.000 €", "inversion_max": "1.500.000 €",
+        "financiacion": {"inicio_proyecto": "Hasta 12 meses antes de la solicitud",
+                         "financiacion_max": "80% en inversion y 100% en circulante",
+                         "intereses": "Euribor a un ano + 0,50-0,75%",
+                         "amortizacion": "Entre 5 y 10 anos", "carencia": "Hasta 2 anos",
+                         "tramo_no_reembolsable": "30%, maximo 200.000 € (minimis)",
+                         "garantias": "Segun calificacion economico-financiera",
+                         "comision_apertura": "0,5%"},
+    }
+    publicacion_fin = {"id": 9001, "codigo_boletin": "BOE", "titulo_resumido": "Financiacion"}
+    corto_fin = documentos.renderizar("corto", datos_fin, publicacion_fin)
+    rotulos = ("Inversión mínima", "Inversión máxima", "Inicio del proyecto", "Financiación máxima",
+               "Intereses", "Amortización", "Carencia", "Tramo no reembolsable (TNR)", "Garantías",
+               "Comisión de apertura")
+    comprobar("Condiciones de financiación:" in corto_fin and all(r in corto_fin for r in rotulos),
+              "el resumen corto cambia el apartado de cuantia por las 10 condiciones")
+    comprobar("Euribor a un ano + 0,50-0,75%" in corto_fin and "Hasta 2 anos" in corto_fin,
+              "con los datos extraidos de la convocatoria")
+    comprobar("Tipo de Ayuda y Cuantía" not in corto_fin
+              and "plazo en que las actuaciones" not in corto_fin,
+              "y sin el apartado de cuantia ni la frase de ejecucion")
+    ampliado_fin = documentos.renderizar("ampliado", datos_fin, publicacion_fin)
+    comprobar("Condiciones de financiación:" in ampliado_fin
+              and "Criterios de valoración:" in ampliado_fin
+              and "Documentación de justificación:" in ampliado_fin,
+              "el ampliado mantiene sus apartados y solo cambia ese bloque")
+    comprobar("Régimen:" in ampliado_fin and "Incompatibilidades:" in ampliado_fin,
+              "conservando regimen, compatibilidades e incompatibilidades")
+
+    datos_general = dict(datos_fin, tipo_ayuda="general", cuantia_max="50.000 €", intensidad="40%")
+    corto_general = documentos.renderizar("corto", datos_general, publicacion_fin)
+    comprobar("Tipo de Ayuda y Cuantía" in corto_general
+              and "Condiciones de financiación" not in corto_general,
+              "las demas ayudas siguen con la estructura de siempre")
+    comprobar("Condiciones de financiación" not in documentos.renderizar(
+        "infografia", datos_fin, publicacion_fin), "la infografia no cambia")
+
+    sin_tipo = documentos.renderizar("corto", {"nombre_ayuda": "Sin tipo"}, publicacion_fin)
+    comprobar("Tipo de Ayuda y Cuantía" in sin_tipo,
+              "un documento antiguo, sin tipo de ayuda, se trata como general")
+    faltan = documentos.renderizar("corto", {"tipo_ayuda": "financiacion"}, publicacion_fin)
+    comprobar(faltan.count(documentos.NO_DISPONIBLE) >= 10,
+              "las condiciones que no figuran en la convocatoria llevan su aviso")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)

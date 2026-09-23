@@ -7,3 +7,12 @@
 {% macro pie() -%}
 <footer class="pie"><div>Avenida Comunitat Valenciana nº 1<br>03201 Elche (Alicante)<br>966 092 955</div><div style="text-align:right">info@mova.es<br>www.mova.es</div></footer>
 {%- endmacro %}
+
+{# Apartado propio de las ayudas de financiacion (prestamos, lineas bonificadas):
+   sustituye a "Tipo de Ayuda y Cuantia" en el resumen corto y en el ampliado. #}
+{% macro condiciones(condiciones) %}
+<h2>Condiciones de financiación:</h2>
+<ul>
+{% for c in condiciones %}<li class="chk"><strong>{{ c.rotulo }}:</strong> {{ c.valor }}</li>
+{% endfor %}</ul>
+{% endmacro %}
