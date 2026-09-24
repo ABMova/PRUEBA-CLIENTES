@@ -107,6 +107,9 @@ def _tarea_copia_diaria() -> None:
     """En un servidor la herramienta pasa meses sin reiniciarse: la copia de
     arranque no basta. Se conservan las ultimas `copias_max` (10)."""
     try:
+        # De paso se tira lo caducado: el servicio pasa meses sin reiniciarse y
+        # la limpieza de arranque no llegaba nunca.
+        repositorio.limpiar_intentos_antiguos()
         destino = copias.crear_copia("diaria")
         registro.info("Copia de seguridad diaria: %s", destino.name)
     except Exception:  # noqa: BLE001 - un fallo aqui no debe parar el planificador

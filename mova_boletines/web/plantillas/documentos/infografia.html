@@ -55,16 +55,16 @@ addEventListener("DOMContentLoaded", function () {
 <div class="hero"><div class="titulo">{{ v('nombre_ayuda', 'Subvención pública') }}</div><div class="claim">{{ v('claim', 'Análisis de subvención pública') }}</div></div>
 <div class="sec"><div class="sec-t">Datos clave</div><div class="kpis">
 {% if tipo_ayuda == 'financiacion' %}
-<div class="kpi"><div class="val">{{ v('inversion_max') }}</div><div class="etq">Inversión máxima</div></div>
-<div class="kpi"><div class="val">{{ fin.financiacion_max }}</div><div class="etq">Financiación máxima</div></div>
+<div class="kpi"><div class="val">{{ kpi(v('inversion_max')) }}</div><div class="etq">Inversión máxima</div></div>
+<div class="kpi"><div class="val">{{ kpi(fin.financiacion_max) }}</div><div class="etq">Financiación máxima</div></div>
 {% elif tipo_ayuda == 'empleo' %}
-<div class="kpi"><div class="val">{{ empleo.cuantia_destacada }}</div><div class="etq">Ayuda por contrato</div></div>
-<div class="kpi"><div class="val">{{ empleo.contrato_destacado }}</div><div class="etq">Contrato</div></div>
+<div class="kpi"><div class="val">{{ kpi(empleo.cuantia_destacada) }}</div><div class="etq">Ayuda por contrato</div></div>
+<div class="kpi"><div class="val">{{ kpi(empleo.contrato_destacado) }}</div><div class="etq">Contrato</div></div>
 {% else %}
-<div class="kpi"><div class="val">{{ v('cuantia_max') }}</div><div class="etq">Ayuda máxima</div></div>
-<div class="kpi"><div class="val">{{ v('intensidad') }}</div><div class="etq">Intensidad</div></div>
+<div class="kpi"><div class="val">{{ kpi(v('cuantia_max')) }}</div><div class="etq">Ayuda máxima</div></div>
+<div class="kpi"><div class="val">{{ kpi(v('intensidad')) }}</div><div class="etq">Intensidad</div></div>
 {% endif %}
-<div class="kpi"><div class="val">{{ v('plazo_fin') }}</div><div class="etq">Fin de plazo</div></div>
+<div class="kpi"><div class="val">{{ kpi(v('plazo_fin')) }}</div><div class="etq">Fin de plazo</div></div>
 </div></div>
 <div class="sec"><div class="sec-t">Datos destacados</div><div class="dest-grid">
 <div class="dest"><div class="dt">Beneficiarios</div><div class="dv">{{ v('benef_corto', v('beneficiarios')) }}</div></div>

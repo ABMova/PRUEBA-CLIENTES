@@ -363,6 +363,7 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         # MOVA IA nuevo solo se usa en el correo, el panel y la pagina de espera.
         "logo_negro": _imagen("logo-negro.png"), "logo_oro": _imagen("logo-oro.png"),
         "tipo_ayuda": _tipo_ayuda(datos),
+        "kpi": _kpi,
         "condiciones_financiacion": _condiciones_financiacion(datos),
         "fin": _financiacion_suelta(datos),
         "empleo": _datos_empleo(datos),
@@ -387,6 +388,12 @@ _CONDICIONES = (
     ("Garantías", "garantias", True),
     ("Comisión de apertura", "comision_apertura", True),
 )
+
+
+def _kpi(valor: str) -> str:
+    """Cifra destacada de la infografia: la frase larga del dato que falta no
+    cabe en la caja, asi que se resume. El texto completo sigue en su apartado."""
+    return "Sin especificar" if not valor or valor == NO_DISPONIBLE else valor
 
 
 def _tipo_ayuda(datos: dict) -> str:

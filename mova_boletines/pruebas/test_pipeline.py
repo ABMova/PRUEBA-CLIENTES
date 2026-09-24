@@ -458,6 +458,10 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
         comprobar("calzado" not in ENVIADOS[0]["html"],
                   "y sin repetir lo que ya se envio por la manana")
 
+    semanal_html = correo.componer_semanal(FECHA, FECHA, [], [], 30, FECHA)
+    comprobar("cid:logo-mova" in semanal_html,
+              "el resumen semanal lleva el mismo logotipo que el correo diario")
+
     print("\n13) Resumen semanal")
     repositorio.guardar_ajuste("dias_vencimiento_semanal", "60")
     ENVIADOS.clear()
@@ -1104,6 +1108,15 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     vacia = documentos.renderizar("corto", {"tipo_ayuda": "empleo"}, publicacion_emp)
     comprobar(documentos.NO_DISPONIBLE in vacia and "Personas Destinatarias:" in vacia,
               "si la convocatoria no da esos datos, el apartado sale con su aviso")
+    comprobar('<p class="nd"></p>' not in vacia,
+              "y ningun apartado se queda con el aviso en blanco")
+    import re as _re
+    info_vacia = documentos.renderizar("infografia", {"tipo_ayuda": "financiacion"}, publicacion_emp)
+    cifras = _re.findall(r'class="val">([^<]*)', info_vacia)
+    comprobar(len(cifras) == 3 and all(c == "Sin especificar" for c in cifras),
+              f"las cifras destacadas sin dato se resumen, que la frase larga no cabe ({cifras})")
+    comprobar(documentos.NO_DISPONIBLE in info_vacia,
+              "y el aviso completo sigue en los apartados de abajo")
 
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:

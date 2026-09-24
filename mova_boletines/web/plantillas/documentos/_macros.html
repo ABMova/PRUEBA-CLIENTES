@@ -18,9 +18,11 @@
 {% endmacro %}
 
 {# Cuantia por colectivo de las ayudas de empleo: "Mujeres: 12.500 €". #}
+{# El aviso va escrito aqui: las macros se importan sin contexto y una
+   variable de la plantilla (no_disponible) llegaria vacia. #}
 {% macro cuantias(cuantias) %}
 {% if cuantias %}<ul>
 {% for c in cuantias %}<li class="dot">{% if c.colectivo %}<strong>{{ c.colectivo }}:</strong> {% endif %}{{ c.importe }}</li>
 {% endfor %}</ul>
-{% else %}<p class="nd">{{ no_disponible }}</p>{% endif %}
+{% else %}<p class="nd">Se establece en la correspondiente convocatoria.</p>{% endif %}
 {% endmacro %}
