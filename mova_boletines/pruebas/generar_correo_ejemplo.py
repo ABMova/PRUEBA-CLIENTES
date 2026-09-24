@@ -28,6 +28,7 @@ MUESTRA = [
         "id": 1, "comunidad": "Comunidad Valenciana", "codigo_boletin": "DOGV",
         "boletin_nombre": "Diari Oficial de la Generalitat Valenciana",
         "fecha_publicacion": "2026-09-17",
+        "titulo_resumido": "Subvenciones para la modernizacion de pymes industriales",
         "titulo": ("ORDEN 12/2026, de 15 de septiembre, de la Conselleria de Innovacion e "
                    "Industria, por la que se convocan subvenciones para la modernizacion e "
                    "inversion productiva de pymes industriales"),
@@ -46,6 +47,7 @@ MUESTRA = [
         "id": 2, "comunidad": "Andalucia", "codigo_boletin": "BOJA",
         "boletin_nombre": "Boletin Oficial de la Junta de Andalucia",
         "fecha_publicacion": "2026-09-17",
+        "titulo_resumido": "Incentivos a la digitalizacion y eficiencia energetica de pymes",
         "titulo": ("Orden de 10 de septiembre de 2026, por la que se aprueban las bases "
                    "reguladoras de incentivos a la digitalizacion y la eficiencia energetica "
                    "de la pyme andaluza"),
@@ -62,6 +64,7 @@ MUESTRA = [
         "id": 3, "comunidad": "Castilla y Leon", "codigo_boletin": "BOCYL",
         "boletin_nombre": "Boletin Oficial de Castilla y Leon",
         "fecha_publicacion": "2026-09-17",
+        "titulo_resumido": "Ayudas a entidades locales para actividades de formacion",
         "titulo": ("EXTRACTO de la Orden de 12 de septiembre de 2026, por la que se convocan "
                    "ayudas a entidades locales para actividades de formacion"),
         "resumen": "Ayudas a ayuntamientos para programas de formacion municipal.",
@@ -117,6 +120,8 @@ def main() -> int:
               "sin flexbox ni grid (compatible con Outlook)")
     comprobar("<table" in texto, "maquetado con tablas")
     comprobar("#b8892f" in texto, "acento dorado de la paleta MOVA")
+    comprobar(all(p["titulo_resumido"] in texto for p in MUESTRA),
+              "el titulo resumido de cada publicacion, lo primero que se ve")
     for campo in ("Titulo completo", "Organismo"):
         comprobar(f">{campo}<" in texto, f"campo '{campo}' presente")
     for campo in ("Resumen", "Plazo", "Beneficiarios", "Importe",
