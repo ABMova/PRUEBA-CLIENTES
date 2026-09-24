@@ -2,33 +2,33 @@
 <title>Infografía — {{ v('nombre_ayuda', 'Subvención') }}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#0b0b0d;color:#ece9e2}
-.page{max-width:940px;margin:30px auto;background:#121216;border:1px solid #26262e;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5)}
-.cab{background:linear-gradient(180deg,#17171d,#0f0f13);padding:24px 40px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #26262e}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#eef2f7;color:#18181b}
+.page{max-width:940px;margin:30px auto;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.cab{background:linear-gradient(180deg,#ffffff,#f7f7f8);padding:24px 40px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e4e4e7}
 .cab .logo-img{height:32px;display:block}
-.cab .sub{font-size:11px;color:#a5a29a;letter-spacing:1px;margin-top:5px}
-.hero{background:linear-gradient(135deg,#1a1a20,#121216);padding:36px 40px;border-bottom:1px solid #26262e}
-.hero .titulo{font-size:25px;font-weight:700;line-height:1.35;margin-bottom:14px;color:#e6cf97}
-.hero .claim{font-size:15px;color:#cfc9bd;border-left:3px solid #c8a45c;padding-left:16px;font-style:italic}
+.cab .sub{font-size:11px;color:#71717a;letter-spacing:1px;margin-top:5px}
+.hero{background:linear-gradient(135deg,#faf8f3,#ffffff);padding:36px 40px;border-bottom:1px solid #e4e4e7}
+.hero .titulo{font-size:25px;font-weight:700;line-height:1.35;margin-bottom:14px;color:#8a6420}
+.hero .claim{font-size:15px;color:#3f3f46;border-left:3px solid #b8892f;padding-left:16px;font-style:italic}
 .sec{padding:28px 40px}
-.sec-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#e6cf97;border-bottom:1px solid #c8a45c;padding-bottom:7px;margin-bottom:20px}
+.sec-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#8a6420;border-bottom:1px solid #b8892f;padding-bottom:7px;margin-bottom:20px}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.kpi{background:#1a1a20;border:1px solid #26262e;border-top:3px solid #c8a45c;border-radius:8px;padding:22px 14px;text-align:center}
-.kpi .val{font-size:20px;font-weight:800;color:#e6cf97;word-break:break-word}
-.kpi .etq{font-size:10px;color:#a5a29a;margin-top:6px;text-transform:uppercase;letter-spacing:1px}
+.kpi{background:#fbfaf8;border:1px solid #e4e4e7;border-top:3px solid #b8892f;border-radius:8px;padding:22px 14px;text-align:center}
+.kpi .val{font-size:20px;font-weight:800;color:#8a6420;word-break:break-word}
+.kpi .etq{font-size:10px;color:#71717a;margin-top:6px;text-transform:uppercase;letter-spacing:1px}
 .dest-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.dest{background:#1a1a20;border:1px solid #26262e;border-left:4px solid #c8a45c;border-radius:6px;padding:16px}
-.dest .dt{font-size:10px;font-weight:700;text-transform:uppercase;color:#a5a29a;margin-bottom:6px;letter-spacing:1px}
-.dest .dv{font-size:13px;color:#ece9e2;line-height:1.5}
+.dest{background:#fbfaf8;border:1px solid #e4e4e7;border-left:4px solid #b8892f;border-radius:6px;padding:16px}
+.dest .dt{font-size:10px;font-weight:700;text-transform:uppercase;color:#71717a;margin-bottom:6px;letter-spacing:1px}
+.dest .dv{font-size:13px;color:#18181b;line-height:1.5}
 ul{list-style:none}
-li{padding:9px 0;border-bottom:1px solid #26262e;font-size:13.5px;color:#d6d2c9;padding-left:22px;position:relative}
-li::before{content:"→";position:absolute;left:0;color:#c8a45c;font-weight:700}
+li{padding:9px 0;border-bottom:1px solid #ececef;font-size:13.5px;color:#27272a;padding-left:22px;position:relative}
+li::before{content:"→";position:absolute;left:0;color:#b8892f;font-weight:700}
 li:last-child{border:none}
-.obj{font-size:14px;color:#cfc9bd;line-height:1.7;margin-bottom:16px}
-.cierre{background:linear-gradient(180deg,#17171d,#0f0f13);padding:28px 40px;text-align:center;border-top:1px solid #26262e}
-.cierre p{font-size:15px;color:#e6cf97;line-height:1.7}
-.cierre .pie{margin-top:14px;font-size:11px;color:#7c7a72}
-@media print{body{background:#0b0b0d;-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{box-shadow:none;margin:0;border-radius:0;max-width:100%}}
+.obj{font-size:14px;color:#3f3f46;line-height:1.7;margin-bottom:16px}
+.cierre{background:linear-gradient(180deg,#faf8f3,#f7f7f8);padding:28px 40px;text-align:center;border-top:1px solid #e4e4e7}
+.cierre p{font-size:15px;color:#8a6420;line-height:1.7}
+.cierre .pie{margin-top:14px;font-size:11px;color:#8b8b93}
+@media print{body{background:#ffffff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{box-shadow:none;margin:0;border-radius:0;max-width:100%}}
 @media (max-width:700px){.kpis,.dest-grid{grid-template-columns:1fr}.sec,.hero,.cab{padding-left:18px;padding-right:18px}}
 {% if para_pdf %}
 .page{margin:0 auto;border:none;border-radius:0;box-shadow:none}
@@ -43,7 +43,7 @@ addEventListener("DOMContentLoaded", function () {
   var alto = Math.ceil(hoja.getBoundingClientRect().height) + 2;
   var estilo = document.createElement("style");
   estilo.textContent = "@page{size:" + ancho + "px " + alto + "px;margin:0}" +
-    "html,body{width:" + ancho + "px;background:#121216}";
+    "html,body{width:" + ancho + "px;background:#ffffff}";
   document.head.appendChild(estilo);
 });
 </script>
@@ -51,7 +51,7 @@ addEventListener("DOMContentLoaded", function () {
 </head><body>
 {% include "_barra.html" %}
 <div class="page">
-<div class="cab"><div><img class="logo-img" src="{{ logo_oro }}" alt="MOVA"><div class="sub">Consultoría de Subvenciones</div></div></div>
+<div class="cab"><div><img class="logo-img" src="{{ logo_negro }}" alt="MOVA"><div class="sub">Consultoría de Subvenciones</div></div></div>
 <div class="hero"><div class="titulo">{{ v('nombre_ayuda', 'Subvención pública') }}</div><div class="claim">{{ v('claim', 'Análisis de subvención pública') }}</div></div>
 <div class="sec"><div class="sec-t">Datos clave</div><div class="kpis">
 {% if tipo_ayuda == 'financiacion' %}
@@ -82,18 +82,18 @@ addEventListener("DOMContentLoaded", function () {
 <div class="sec"><div class="sec-t">Requisitos de la contratación</div>
 {% if d.objeto and d.objeto != 'null' %}<p class="obj">{{ v('objeto') }}</p>{% endif %}
 {% if empleo.requisitos_contratacion %}<ul>{% for r in empleo.requisitos_contratacion %}<li>{{ r }}</li>{% endfor %}</ul>
-{% else %}<p class="obj" style="color:#a5a29a;font-style:italic">{{ no_disponible }}</p>{% endif %}
+{% else %}<p class="obj" style="color:#71717a;font-style:italic">{{ no_disponible }}</p>{% endif %}
 </div>
 <div class="sec"><div class="sec-t">Cuantía por colectivo</div>
 {% if empleo.cuantias %}<ul>{% for c in empleo.cuantias %}<li>{% if c.colectivo %}<strong>{{ c.colectivo }}:</strong> {% endif %}{{ c.importe }}</li>{% endfor %}</ul>
-{% else %}<p class="obj" style="color:#a5a29a;font-style:italic">{{ no_disponible }}</p>{% endif %}
+{% else %}<p class="obj" style="color:#71717a;font-style:italic">{{ no_disponible }}</p>{% endif %}
 </div>
 {% else %}
 <div class="sec"><div class="sec-t">Objeto y acciones subvencionables</div>
 <p class="obj">{{ v('objeto') }}</p>
 {% set acts = lista('actuaciones') %}
 {% if acts %}<ul>{% for a in acts %}<li>{{ a }}</li>{% endfor %}</ul>
-{% else %}<p class="obj" style="color:#a5a29a;font-style:italic">{{ no_disponible }}</p>{% endif %}
+{% else %}<p class="obj" style="color:#71717a;font-style:italic">{{ no_disponible }}</p>{% endif %}
 </div>
 {% if tipo_ayuda == 'financiacion' %}
 <div class="sec"><div class="sec-t">Condiciones de financiación</div>

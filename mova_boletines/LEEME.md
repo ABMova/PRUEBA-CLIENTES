@@ -32,7 +32,8 @@ pago, que en un préstamo no encaja. El ampliado mantiene el resto de apartados
 (criterios, documentación, plazos, crédito, referencias) y conserva régimen,
 compatibilidades e incompatibilidades.
 
-La **infografía** también se adapta (1.12): en financiación, las cifras
+La **infografía** pasa a fondo claro desde la 1.14 (papel blanco, texto negro y el dorado
+corporativo como acento; el logo, en negro). Y se adapta al tipo de ayuda (1.12): en financiación, las cifras
 destacadas pasan a ser inversión máxima, financiación máxima y fin de plazo, y
 se añade el bloque completo de condiciones; en empleo, son la ayuda por contrato
 (el rango entre el importe menor y el mayor), el tipo de contrato y el fin de
