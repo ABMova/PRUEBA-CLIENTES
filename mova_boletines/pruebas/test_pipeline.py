@@ -331,7 +331,12 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                             "fallidos": [{"codigo": "BORM", "motivo": "reto anti-bot"}]}, tokens)
     comprobar("Comunidad Valenciana" in html and "Andalucia" in html,
               "el correo lleva cabecera por comunidad autonoma")
-    comprobar("ALTA RELEVANCIA" in html, "el correo marca las de alta relevancia")
+    comprobar("ALTA RELEVANCIA" not in html,
+              "el correo ya no lleva etiqueta de relevancia (el usuario la quito)")
+    comprobar(">Publicacion oficial<" in html and ">PDF oficial<" in html
+              and ">Comunidad<" not in html and ">Boletin<" not in html
+              and ">Fecha publicacion<" not in html and ">Enlaces<" not in html,
+              "la ficha deja titulo, organismo y botones")
     comprobar(html.count("Descartar esta publicacion") >= 2,
               "cada publicacion lleva su enlace de descarte")
     comprobar("/descartar/" in html, "los enlaces de descarte apuntan a la ruta con token")

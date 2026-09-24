@@ -2,7 +2,7 @@
 
 Escribe _DATOS/correo_ejemplo.html (DATOS/correo_ejemplo.html al ejecutarse
 empaquetado) con datos de muestra de tres comunidades, y verifica que salen
-las cabeceras por comunidad, la etiqueta de alta relevancia, los enlaces de
+las cabeceras por comunidad, los botones de cada publicacion, los enlaces de
 descarte y el marcador de dato ausente.
 
     .venv\\Scripts\\python.exe pruebas\\generar_correo_ejemplo.py
@@ -104,23 +104,23 @@ def main() -> int:
     comprobar("Comunidad Valenciana" in texto, "cabecera de Comunidad Valenciana")
     comprobar("Andalucia" in texto, "cabecera de Andalucia")
     comprobar("Castilla y Leon" in texto, "cabecera de Castilla y Leon")
-    comprobar(texto.count("ALTA RELEVANCIA") == 2, "dos etiquetas de alta relevancia")
+    comprobar("ALTA RELEVANCIA" not in texto, "sin etiqueta de relevancia (se quito a peticion)")
     comprobar(config.MARCADOR_REVISION in texto, "etiqueta de revision manual")
     comprobar(texto.count("Descartar esta publicacion") == 3, "tres enlaces de descarte")
     comprobar(all(f"/descartar/{t}" in texto for t in tokens.values()),
               "cada enlace lleva su token")
     comprobar("BORM" in texto and "anti-bot" in texto, "dice que el BORM ha fallado")
-    comprobar("Enlace" in texto or "Publicacion oficial" in texto, "enlaces a la publicacion")
-    comprobar("PDF" in texto, "enlaces al PDF")
+    comprobar(texto.count(">Publicacion oficial<") == 3, "boton a la publicacion oficial")
+    comprobar(texto.count(">PDF oficial<") == 3, "boton al PDF oficial")
     comprobar("<img" not in texto, "sin imagenes externas")
     comprobar("display:flex" not in texto and "display:grid" not in texto,
               "sin flexbox ni grid (compatible con Outlook)")
     comprobar("<table" in texto, "maquetado con tablas")
     comprobar("#b8892f" in texto, "acento dorado de la paleta MOVA")
-    for campo in ("Comunidad", "Boletin", "Fecha publicacion", "Titulo completo", "Organismo",
-                  "Enlaces"):
+    for campo in ("Titulo completo", "Organismo"):
         comprobar(f">{campo}<" in texto, f"campo '{campo}' presente")
-    for campo in ("Resumen", "Plazo", "Beneficiarios", "Importe"):
+    for campo in ("Resumen", "Plazo", "Beneficiarios", "Importe",
+                  "Comunidad", "Boletin", "Fecha publicacion", "Enlaces"):
         comprobar(f">{campo}<" not in texto, f"campo '{campo}' retirado")
     for tipo in ("corto", "ampliado", "infografia"):
         comprobar(texto.count(f"/documento/{tipo}") == 3,

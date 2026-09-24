@@ -101,10 +101,9 @@
         <tr>
           <td style="padding:8px 24px 10px 24px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid {% if p.relevancia == 'alta' %}#e0c98a{% else %}#e4e4e7{% endif %}; background-color:{% if p.relevancia == 'alta' %}#fdfaf1{% else %}#ffffff{% endif %};">
-              {% if p.relevancia == 'alta' or p.revision_manual or p.destinatario == 'no_consta' %}
+              {% if p.revision_manual or p.destinatario == 'no_consta' %}
               <tr>
                 <td colspan="2" style="padding:8px 12px 0 12px;">
-                  {% if p.relevancia == 'alta' %}<span style="display:inline-block; background-color:#b8892f; color:#ffffff; font-family:Segoe UI,Arial,sans-serif; font-size:10px; font-weight:700; letter-spacing:.6px; padding:3px 9px; border-radius:10px;">ALTA RELEVANCIA</span>{% endif %}
                   {% if p.revision_manual %}<span style="display:inline-block; background-color:#d97706; color:#ffffff; font-family:Segoe UI,Arial,sans-serif; font-size:10px; font-weight:700; padding:3px 9px; border-radius:10px;">{{ marcador_revision }}</span>{% endif %}
                   {% if p.destinatario == 'no_consta' %}<span style="display:inline-block; background-color:#f4f4f5; color:#52525b; border:1px solid #d4d4d8; font-family:Segoe UI,Arial,sans-serif; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;">DESTINATARIO SIN CONFIRMAR</span>{% endif %}
                 </td>
@@ -123,9 +122,6 @@
               {% set valor = "padding:6px 12px; font-family:Segoe UI,Arial,sans-serif; font-size:13px; color:#18181b; vertical-align:top; border-bottom:1px solid #f1f1f3;" %}
               {% set ambar = "padding:6px 12px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; color:#92400e; background-color:#fef3c7; vertical-align:top; border-bottom:1px solid #f1f1f3;" %}
 
-              <tr><td style="{{ etiqueta }}">Comunidad</td><td style="{{ valor }}">{{ p.comunidad }}</td></tr>
-              <tr><td style="{{ etiqueta }}">Boletin</td><td style="{{ valor }}">{{ p.boletin_nombre }} ({{ p.codigo_boletin }})</td></tr>
-              <tr><td style="{{ etiqueta }}">Fecha publicacion</td><td style="{{ valor }}">{{ p.fecha_publicacion }}</td></tr>
               <tr><td style="{{ etiqueta }}">Titulo completo</td><td style="{{ valor }} font-size:12px; color:#3f3f46;">{{ p.titulo }}</td></tr>
               <tr><td style="{{ etiqueta }}">Organismo</td><td style="{% if p.organismo == marcador %}{{ ambar }}{% else %}{{ valor }}{% endif %}">{{ p.organismo }}</td></tr>
               {% if modo == 'alerta' and p.dias_restantes is not none %}
@@ -133,18 +129,30 @@
                 <span style="display:inline-block; background-color:{% if p.dias_restantes <= 15 %}#dc2626{% else %}#b8892f{% endif %}; color:#ffffff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">Vence el {{ p.plazo_fin_texto }} &middot; {% if p.dias_restantes == 0 %}hoy{% elif p.dias_restantes == 1 %}manana{% else %}en {{ p.dias_restantes }} dias{% endif %}{% if p.plazo_estimado %} (estimado){% endif %}</span>
               </td></tr>
               {% endif %}
-              <tr>
-                <td style="{{ etiqueta }}">Enlaces</td>
-                <td style="{{ valor }}">
-                  {% if p.url_oficial %}<a href="{{ p.url_oficial }}" style="color:#b8892f; font-weight:600; text-decoration:underline;">Publicacion oficial</a>{% else %}<span style="color:#92400e;">{{ marcador }}</span>{% endif %}
-                  {% if p.url_pdf %}&nbsp;&nbsp;|&nbsp;&nbsp;<a href="{{ p.url_pdf }}" style="color:#b8892f; font-weight:600; text-decoration:underline;">PDF</a>{% endif %}
-                </td>
-              </tr>
-              {% if p.url_documentos %}
+              {# Todo en botones: los dos del boletin (gris oscuro) y los tres de MOVA. #}
               <tr>
                 <td colspan="2" style="padding:10px 12px 4px 12px;">
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                     <tr>
+                      {% if p.url_oficial %}
+                      <td style="padding:0 6px 6px 0;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                          <td bgcolor="#52525b" style="background-color:#52525b; border-radius:6px;">
+                            <a href="{{ p.url_oficial }}" style="display:inline-block; padding:7px 14px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:#ffffff; text-decoration:none;">Publicacion oficial</a>
+                          </td>
+                        </tr></table>
+                      </td>
+                      {% endif %}
+                      {% if p.url_pdf %}
+                      <td style="padding:0 6px 6px 0;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                          <td bgcolor="#52525b" style="background-color:#52525b; border-radius:6px;">
+                            <a href="{{ p.url_pdf }}" style="display:inline-block; padding:7px 14px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:#ffffff; text-decoration:none;">PDF oficial</a>
+                          </td>
+                        </tr></table>
+                      </td>
+                      {% endif %}
+                      {% if p.url_documentos %}
                       {% for clave, rotulo in [('corto', 'Resumen corto'), ('ampliado', 'Resumen ampliado'), ('infografia', 'Infografia')] %}
                       <td style="padding:0 6px 6px 0;">
                         <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -154,11 +162,11 @@
                         </tr></table>
                       </td>
                       {% endfor %}
+                      {% endif %}
                     </tr>
                   </table>
                 </td>
               </tr>
-              {% endif %}
               {% if p.url_descarte %}
               <tr>
                 <td colspan="2" style="padding:8px 12px 10px 12px; text-align:right; border-top:1px solid #f1f1f3;">
