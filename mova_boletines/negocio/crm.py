@@ -57,11 +57,16 @@ def reparto(destinatarios: list[str]) -> tuple[list[str], list[str]]:
 
 
 def enlaces(token: str) -> dict[str, str]:
-    """Direcciones del CRM a las que apuntan los dos botones del correo."""
+    """Direcciones del CRM a las que apuntan los dos botones del correo.
+
+    "programa" abre el alta del programa para revisarla; "tarea" (el boton
+    Acciones) crea directamente una tarea a nombre de quien pulsa.
+    """
     if not activo() or not token:
         return {}
-    base = f"{url()}/Programas/DesdeBoletin?o={quote(token)}"
-    return {"programa": base, "tarea": f"{base}&accion=tarea"}
+    clave = quote(token)
+    return {"programa": f"{url()}/Programas/DesdeBoletin?o={clave}",
+            "tarea": f"{url()}/Programas/TareaDesdeBoletin?o={clave}"}
 
 
 def clave_valida(recibida: str | None) -> bool:
