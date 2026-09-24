@@ -176,6 +176,23 @@
                       {% endif %}
                     </tr>
                   </table>
+                  {% if p.url_crm %}
+                  {# Alta en el CRM. Solo lo ven los destinatarios autorizados y,
+                     al pulsar, el CRM pide entrar con el usuario de cada uno. #}
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:2px;">
+                    <tr>
+                      {% for clave, rotulo in [('programa', 'Enviar al CRM'), ('tarea', 'Acciones')] %}
+                      <td style="padding:0 6px 6px 0;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                          <td bgcolor="#ffffff" style="background-color:#ffffff; border-radius:6px; border:1px solid #b8892f;">
+                            <a href="{{ p.url_crm[clave] }}" style="display:inline-block; padding:6px 13px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:#b8892f; text-decoration:none;">{{ rotulo }}</a>
+                          </td>
+                        </tr></table>
+                      </td>
+                      {% endfor %}
+                    </tr>
+                  </table>
+                  {% endif %}
                 </td>
               </tr>
               {% if p.url_descarte %}

@@ -15,7 +15,7 @@ from typing import Callable
 import config
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio import correo, deduplicador, palabras, prefiltro, relevancia, titulos
+from negocio import correo, crm, deduplicador, palabras, prefiltro, relevancia, titulos
 from negocio.boletines import ADAPTADORES, ORDEN
 from negocio.boletines.base import ErrorBoletin
 from negocio.extraccion import normalizar_titulo, recortar
@@ -542,6 +542,42 @@ def _avisos_del_dia(fecha: date, contadores: dict) -> list[str]:
     return avisos
 
 
+def _enviar_correo(destinatarios: list[str], hacer_html, asunto: str, ejecucion_id: int | None,
+                   nombre_copia: str, publicaciones_n: int, enviar_correo: bool,
+                   urgente: bool = False) -> tuple[bool, str, list]:
+    """Envia el correo. Si solo algunos ven los botones del CRM, salen dos correos.
+
+    El HTML no puede ser el mismo para todos: los botones de alta en el CRM solo
+    se pintan a los destinatarios autorizados (ajuste `crm_correos`). Cuando no
+    hay CRM, o lo ve todo el equipo, sigue saliendo un unico correo.
+    """
+    con_crm, sin_crm = crm.reparto(destinatarios)
+    grupos = [(grupo, marca) for grupo, marca in ((con_crm, True), (sin_crm, False)) if grupo]
+    if not grupos:
+        return False, "No hay destinatarios activos", []
+
+    exito_global = False
+    detalles: list[str] = []
+    rutas = []
+    for grupo, con in grupos:
+        html = hacer_html(con)
+        sufijo = "-crm" if con and len(grupos) > 1 else ""
+        ruta = correo.guardar_copia(html, nombre_copia.format(sufijo=sufijo))
+        rutas.append(ruta)
+        if not enviar_correo:
+            repositorio.registrar_envio(ejecucion_id, ", ".join(grupo), asunto, "omitido", 0,
+                                        "Envio omitido por peticion", publicaciones_n, str(ruta))
+            detalles.append("omitido")
+            continue
+        exito, detalle, intentos = correo.enviar(grupo, asunto, html, urgente=urgente)
+        repositorio.registrar_envio(ejecucion_id, ", ".join(grupo), asunto,
+                                    "enviado" if exito else "error", intentos, detalle,
+                                    publicaciones_n, str(ruta))
+        exito_global = exito_global or exito
+        detalles.append(detalle)
+    return exito_global, "; ".join(detalles), rutas
+
+
 def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos: list[dict],
            ejecucion_id: int, enviar_correo: bool, tipo: str = "manual",
            avisos: list[str] | None = None) -> None:
@@ -578,25 +614,25 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
 
     _alertas(guardadas, tokens, destinatarios, ejecucion_id, enviar_correo)
 
-    html = correo.componer(guardadas, fecha,
-                           {"consultados": consultados, "fallidos": fallidos}, tokens, modo=modo,
-                           retraso=retraso, avisos=avisos or [])
+    def hacer_html(con_crm: bool) -> str:
+        return correo.componer(guardadas, fecha,
+                               {"consultados": consultados, "fallidos": fallidos}, tokens,
+                               modo=modo, retraso=retraso, avisos=avisos or [], con_crm=con_crm)
+
     sufijo = "-tarde" if modo == "tarde" else ""
-    ruta = correo.guardar_copia(html, f"correo-{fecha:%Y%m%d}-{ejecucion_id}{sufijo}.html")
     asunto = correo.asunto(fecha, len(guardadas),
                            sum(1 for f in guardadas if f["relevancia"] == "alta"), modo=modo,
                            retraso=retraso)
+    exito, detalle, rutas = _enviar_correo(
+        destinatarios, hacer_html, asunto, ejecucion_id,
+        f"correo-{fecha:%Y%m%d}-{ejecucion_id}{sufijo}{{sufijo}}.html", len(guardadas),
+        enviar_correo)
 
     if not enviar_correo:
-        repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto, "omitido", 0,
-                                    "Envio omitido por peticion", len(guardadas), str(ruta))
-        progreso.anotar(f"Correo generado sin enviar: {ruta.name}")
+        if rutas:
+            progreso.anotar(f"Correo generado sin enviar: {rutas[0].name}")
         return
 
-    exito, detalle, intentos = correo.enviar(destinatarios, asunto, html)
-    repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto,
-                                "enviado" if exito else "error", intentos, detalle,
-                                len(guardadas), str(ruta))
     if exito:
         repositorio.marcar_enviadas([f["id"] for f in guardadas if f.get("id")])
         progreso.anotar(f"Correo enviado: {detalle}")
@@ -622,22 +658,21 @@ def _alertas(guardadas: list[dict], tokens: dict[int, str], destinatarios: list[
     if not urgentes:
         return
 
-    html = correo.componer(urgentes, hoy, {"consultados": [], "fallidos": []}, tokens,
-                           modo="alerta")
+    def hacer_html(con_crm: bool) -> str:
+        return correo.componer(urgentes, hoy, {"consultados": [], "fallidos": []}, tokens,
+                               modo="alerta", con_crm=con_crm)
+
     asunto = correo.asunto(hoy, len(urgentes), len(urgentes), modo="alerta")
-    ruta = correo.guardar_copia(html, f"alerta-{hoy:%Y%m%d}-{ejecucion_id}.html")
     progreso.anotar(f"ALERTA: {len(urgentes)} convocatoria(s) de alta relevancia vencen en "
                     f"{dias} dias o menos")
+    exito, detalle, _rutas = _enviar_correo(
+        destinatarios, hacer_html, asunto, ejecucion_id,
+        f"alerta-{hoy:%Y%m%d}-{ejecucion_id}{{sufijo}}.html", len(urgentes), enviar_correo,
+        urgente=True)
 
     if not enviar_correo:
-        repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto, "omitido", 0,
-                                    "Envio omitido por peticion", len(urgentes), str(ruta))
         return
 
-    exito, detalle, intentos = correo.enviar(destinatarios, asunto, html, urgente=True)
-    repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios), asunto,
-                                "enviado" if exito else "error", intentos, detalle,
-                                len(urgentes), str(ruta))
     if exito:
         repositorio.marcar_alertadas([u["id"] for u in urgentes])
         progreso.anotar(f"Alerta enviada: {detalle}")

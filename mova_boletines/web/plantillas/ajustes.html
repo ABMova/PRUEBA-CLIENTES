@@ -216,6 +216,34 @@
   </div>
 </div>
 
+<div class="fila">
+  <div class="card">
+    <h2>Conexion con el CRM de MOVA</h2>
+    <p class="apoyo">Anade al correo dos botones por ayuda ("Enviar al CRM" y "Acciones") que abren
+    el alta del programa en el CRM. El CRM pide entrar con el usuario de cada uno: los botones no
+    dan permiso por si solos.</p>
+    <div class="campo-linea">
+      <div class="campo"><label for="crm_activo">Estado</label>
+        <select id="crm_activo" name="crm_activo">
+          <option value="1" {% if ajustes.crm_activo == '1' %}selected{% endif %}>Activada</option>
+          <option value="0" {% if ajustes.crm_activo != '1' %}selected{% endif %}>Desactivada</option>
+        </select></div>
+      <div class="campo"><label for="crm_url">Direccion del CRM</label>
+        <input type="text" id="crm_url" name="crm_url" value="{{ ajustes.crm_url }}"
+               placeholder="https://crm.movaia.es"></div>
+    </div>
+    <div class="campo"><label for="crm_correos">Quien ve los botones</label>
+      <input type="text" id="crm_correos" name="crm_correos" value="{{ ajustes.crm_correos }}"
+             placeholder="antonio@mova.es, j.javier@mova.es">
+      <span class="apoyo">Correos separados por comas. Al resto del equipo le llega el mismo correo
+      sin esos botones. Vacio = los ve todo el mundo.</span></div>
+    <div class="campo"><label>Clave que usa el CRM</label>
+      <span class="apoyo">{% if crm_clave_guardada %}Guardada (cifrada). Solo se puede sustituir por
+      una nueva, no consultar.{% else %}Sin configurar: el CRM no puede leer las ayudas todavia.
+      {% endif %}</span></div>
+  </div>
+</div>
+
 <div class="card">
   <button type="submit" class="principal">Guardar ajustes</button>
 </div>
@@ -229,6 +257,10 @@
     </form>
     <form method="post" action="{{ url_for('web.probar_correo') }}" style="display:inline-block;">
       <button type="submit">Enviar correo de prueba</button>
+    </form>
+    <form method="post" action="{{ url_for('web.generar_clave_crm') }}" style="display:inline-block; margin-left:8px;"
+          onsubmit="return confirm('Se creara una clave nueva para el CRM. La anterior dejara de valer hasta que copies la nueva en el CRM. Continuar?');">
+      <button type="submit">Generar clave para el CRM</button>
     </form>
     <p class="apoyo" style="margin-top:10px;">
       Datos que salen del sistema: solo el texto publico de las publicaciones oficiales.

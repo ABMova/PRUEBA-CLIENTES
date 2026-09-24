@@ -27,6 +27,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import config
 from datos import copias, repositorio
 from negocio import orquestador, recuperacion
+from web.api_crm import api_crm as plano_api_crm
 from web.rutas import web as plano_web
 
 registro = logging.getLogger("mova")
@@ -207,7 +208,7 @@ class SesionSegunConexion(SecureCookieSessionInterface):
 
 # Lo unico que se sirve a quien llega desde la direccion publica: los botones
 # del correo (documentos con clave y descartes), sus estaticos y /salud.
-RUTAS_PUBLICAS = ("/d/", "/descartar/", "/estaticos/", "/salud")
+RUTAS_PUBLICAS = ("/d/", "/descartar/", "/estaticos/", "/salud", "/api/crm/")
 HOSTS_LOCALES = ("127.0.0.1", "localhost", "::1", "")
 
 
@@ -278,6 +279,7 @@ def crear_aplicacion() -> Flask:
         clave_provisional=provisional,
     )
     aplicacion.register_blueprint(plano_web)
+    aplicacion.register_blueprint(plano_api_crm)
     if config.DETRAS_DE_PROXY:
         # Un solo salto (Nginx o el tunel): IP, esquema y host reales del visitante.
         aplicacion.wsgi_app = ProxyFix(aplicacion.wsgi_app, x_for=1, x_proto=1, x_host=1)

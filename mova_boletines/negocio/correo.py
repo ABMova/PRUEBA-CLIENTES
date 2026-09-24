@@ -14,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import config
 from datos import repositorio
+from negocio import crm as crm_mova
 from negocio import plazos
 
 registro = logging.getLogger(__name__)
@@ -62,7 +63,8 @@ def fecha_corta(valor: str | None) -> str:
         return valor
 
 
-def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None = None) -> dict:
+def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None = None,
+                  con_crm: bool = False) -> dict:
     """Anade a la fila lo que la plantilla necesita: enlace de descarte y vencimiento."""
     fila = dict(publicacion)
     fila["url_descarte"] = f"{url_publica()}/descartar/{token}" if token else ""
@@ -86,12 +88,15 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
                                   for tipo in ("corto", "ampliado", "infografia")}
     else:
         fila["url_documentos"] = None
+    # Botones del CRM: solo para los destinatarios autorizados (ver negocio/crm.py).
+    fila["url_crm"] = crm_mova.enlaces(token) if (con_crm and token) else {}
     return fila
 
 
 def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
              tokens: dict[int, str] | None = None, modo: str = "diario",
-             retraso: bool = False, avisos: list[str] | None = None) -> str:
+             retraso: bool = False, avisos: list[str] | None = None,
+             con_crm: bool = False) -> str:
     """Genera el HTML del correo. tokens: {publicacion_id: token}.
 
     modo: "diario" (el de las 07:45), "tarde" (comprobacion de las 20:00) o
@@ -101,7 +106,8 @@ def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
     por_comunidad: dict[str, list[dict]] = {}
     for publicacion in publicaciones:
         comunidad = publicacion.get("comunidad") or "Sin comunidad"
-        fila = preparar_fila(publicacion, tokens.get(publicacion.get("id")))
+        fila = preparar_fila(publicacion, tokens.get(publicacion.get("id")),
+                             con_crm=con_crm)
         por_comunidad.setdefault(comunidad, []).append(fila)
 
     for filas in por_comunidad.values():

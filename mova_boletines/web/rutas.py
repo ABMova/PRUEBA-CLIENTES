@@ -17,7 +17,7 @@ import config
 from datos import copias as copias_datos
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio import correo, documentos, orquestador
+from negocio import correo, crm, documentos, orquestador
 from negocio.boletines import fichas
 from negocio.extraccion import tesseract_disponible
 from web import auth
@@ -820,7 +820,8 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "tarde_activa", "hora_tarde", "alerta_activa", "dias_alerta",
                   "semanal_activo", "dia_semanal", "hora_semanal", "dias_vencimiento_semanal",
                   "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur",
-                  "modelo_documentos", "max_tokens_documentos")
+                  "modelo_documentos", "max_tokens_documentos",
+                  "crm_activo", "crm_url", "crm_correos")
 
 
 @web.route("/ajustes", methods=["GET", "POST"])
@@ -866,6 +867,7 @@ def ajustes():
         modelos=config.MODELOS_DISPONIBLES,
         pista_api=(clave[:7] + "..." + clave[-4:]) if clave else "",
         smtp_clave_guardada=repositorio.ajuste_esta_definido("smtp_clave"),
+        crm_clave_guardada=bool(crm.clave()),
         hay_api=anthropic_cliente.hay_clave(),
         smtp_ok=correo.smtp_configurado(),
         hay_ocr=tesseract_disponible(),
@@ -875,6 +877,22 @@ def ajustes():
         proxima_tarde=_proxima_ejecucion("vigilancia_tarde"),
         proxima_semanal=_proxima_ejecucion("resumen_semanal"),
         gasto_mes=repositorio.gasto_mes_usd())
+
+
+@web.route("/ajustes/crm-clave", methods=["POST"])
+@auth.requiere("administrar")
+def generar_clave_crm():
+    """Crea la clave que el CRM usara para leer las ayudas y la ensena una vez.
+
+    Se genera aqui para que nadie tenga que inventarse una: hay que copiarla en
+    el appsettings del CRM. Despues queda cifrada y ya no se puede volver a ver.
+    """
+    nueva = secrets.token_urlsafe(32)
+    repositorio.guardar_ajuste("crm_clave", nueva)
+    repositorio.registrar_auditoria(auth.usuario_actual()["usuario"], "guardar_ajustes",
+                                    "crm_clave", "Clave del CRM regenerada", auth.ip_peticion())
+    flash(f"Clave nueva (copiala ahora en el CRM, no se vuelve a mostrar): {nueva}", "ok")
+    return redirect(url_for("web.ajustes"))
 
 
 @web.route("/ajustes/probar-api", methods=["POST"])

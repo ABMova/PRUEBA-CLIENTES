@@ -9,6 +9,7 @@ sesion, cambio obligatorio de contrasena del usuario inicial y permisos.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -170,13 +171,45 @@ def main() -> int:  # noqa: PLR0915 - prueba lineal
         comprobar("MOVA Boletines Oficiales" in falso.text,
                   "la pagina de descarte lleva la identidad visual")
 
-        print("\n10) Cierre de sesion")
+        print("\n10) La API que lee el CRM")
+        publico = {"Host": HOST_PUBLICO}
+        r = requests.get(f"{BASE}/api/crm/salud", headers=publico, timeout=10)
+        comprobar(r.status_code == 503, "sin configurar, la API dice que no esta activada")
+
+        sesion.post(f"{BASE}/ajustes", data={"crm_activo": "1",
+                                             "crm_url": "https://crm.prueba.es",
+                                             "crm_correos": "antonio@mova.es"}, timeout=15)
+        generada = sesion.post(f"{BASE}/ajustes/crm-clave", timeout=15)
+        encontrada = re.search(r"no se vuelve a mostrar\): ([A-Za-z0-9_-]+)", generada.text)
+        comprobar(encontrada is not None, "el panel genera la clave y la ensena una sola vez")
+        clave_crm = encontrada.group(1) if encontrada else ""
+        comprobar(len(clave_crm) >= 32, f"la clave es larga ({len(clave_crm)} caracteres)")
+        comprobar(clave_crm not in sesion.get(f"{BASE}/ajustes", timeout=10).text,
+                  "y al volver a entrar en Ajustes ya no se ve")
+
+        r = requests.get(f"{BASE}/api/crm/salud", headers=publico, timeout=10)
+        comprobar(r.status_code == 401, "desde internet, sin clave no se entrega nada")
+        r = requests.get(f"{BASE}/api/crm/salud",
+                         headers={**publico, "X-Clave-CRM": clave_crm + "x"}, timeout=10)
+        comprobar(r.status_code == 401, "con una clave parecida tampoco")
+        r = requests.get(f"{BASE}/api/crm/salud",
+                         headers={**publico, "X-Clave-CRM": clave_crm}, timeout=10)
+        comprobar(r.status_code == 200 and r.json().get("estado") == "ok",
+                  "con la clave correcta responde")
+        r = requests.get(f"{BASE}/api/crm/publicacion/claveInventadaQueNoExiste",
+                         headers={**publico, "X-Clave-CRM": clave_crm}, timeout=10)
+        comprobar(r.status_code == 404, "un enlace inventado no devuelve ninguna ayuda")
+        r = requests.post(f"{BASE}/api/crm/publicacion/loquesea",
+                          headers={**publico, "X-Clave-CRM": clave_crm}, timeout=10)
+        comprobar(r.status_code == 405, "la API es de solo lectura: no admite escrituras")
+
+        print("\n11) Cierre de sesion")
         salida = sesion.get(f"{BASE}/salir", allow_redirects=False, timeout=10)
         comprobar(salida.status_code == 302, "salir redirige")
         tras_salir = sesion.get(f"{BASE}/", allow_redirects=False, timeout=10)
         comprobar(tras_salir.status_code == 302, "tras salir, el panel vuelve a pedir acceso")
 
-        print("\n11) Proteccion para publicarla en internet")
+        print("\n12) Proteccion para publicarla en internet")
         cookie = requests.get(f"{BASE}/login", timeout=10)
         falsa_ip = requests.post(f"{BASE}/login", data={"usuario": "nadie", "clave": "x"},
                                  headers={"X-Forwarded-For": "203.0.113.77"}, timeout=10)
@@ -203,8 +236,7 @@ def main() -> int:  # noqa: PLR0915 - prueba lineal
                   and "Secure" not in cookie.headers.get("Set-Cookie", ""),
                   "en http local la cookie no se marca Secure (con https si)")
 
-        print("\n12) Desde internet solo responden los enlaces del correo")
-        publico = {"Host": HOST_PUBLICO}
+        print("\n13) Desde internet solo responden los enlaces del correo")
         for ruta in ("/login", "/", "/publicaciones", "/ajustes", "/usuarios", "/api/progreso"):
             r = requests.get(f"{BASE}{ruta}", headers=publico, allow_redirects=False, timeout=10)
             comprobar(r.status_code == 404 and "Direccion reservada" in r.text,

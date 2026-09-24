@@ -1190,6 +1190,40 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar((date(2030, 2, 5), "boletin_recuperado") in pendientes_caido,
               "y ese dia se reintenta al dia siguiente")
 
+    print("\n29) Los botones del CRM solo para quien puede usarlos")
+    from negocio import crm as _crm
+
+    repositorio.guardar_ajuste("crm_activo", "1")
+    repositorio.guardar_ajuste("crm_url", "https://crm.prueba.es")
+    repositorio.guardar_ajuste("crm_clave", "clave-larga-de-prueba-para-el-crm")
+    repositorio.guardar_ajuste("crm_correos", "antonio@mova.es")
+
+    con_crm, sin_crm = _crm.reparto(["antonio@mova.es", "paola@mova.es", "j.javier@mova.es"])
+    comprobar(con_crm == ["antonio@mova.es"]
+              and sin_crm == ["paola@mova.es", "j.javier@mova.es"],
+              "el correo se parte: solo los autorizados llevan los botones del CRM")
+    comprobar(_crm.clave_valida("clave-larga-de-prueba-para-el-crm")
+              and not _crm.clave_valida("otra") and not _crm.clave_valida(""),
+              "la clave del CRM se comprueba entera")
+
+    alguna = repositorio.publicaciones({}, limite=1)
+    fila_crm = dict(alguna[0])
+    hoy_crm = date.today()
+    html_con = correo.componer([fila_crm], hoy_crm, {"consultados": [], "fallidos": []},
+                               con_crm=True)
+    html_sin = correo.componer([fila_crm], hoy_crm, {"consultados": [], "fallidos": []})
+    comprobar("Enviar al CRM" in html_con and "Acciones" in html_con
+              and "crm.prueba.es/Programas/DesdeBoletin" in html_con,
+              "quien puede darlas de alta ve los dos botones")
+    comprobar("Enviar al CRM" not in html_sin and "crm.prueba.es" not in html_sin,
+              "y quien no, recibe el mismo correo sin ellos")
+    comprobar("Resumen corto" in html_sin and "Publicacion oficial" in html_sin,
+              "el resto del correo llega igual para todos")
+
+    repositorio.guardar_ajuste("crm_activo", "0")
+    comprobar(_crm.reparto(["antonio@mova.es"]) == ([], ["antonio@mova.es"]),
+              "con el CRM desactivado vuelve a salir un unico correo para todos")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)

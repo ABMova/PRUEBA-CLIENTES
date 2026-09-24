@@ -376,8 +376,12 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('max_tokens_documentos', '16000',   'Limite de tokens de la extraccion para los documentos'),
  ('dias_token_documento',  '90',      'Caducidad de los botones de documentos del correo (dias)'),
  ('recuperacion_activa',   '1',       'Si el equipo estaba apagado a la hora, hacer lo pendiente al encenderlo'),
- ('dias_recuperacion',     '7',       'Dias hacia atras que se recuperan como mucho');
+ ('dias_recuperacion',     '7',       'Dias hacia atras que se recuperan como mucho'),
+ ('crm_activo',            '0',       'Botones del correo para dar de alta la ayuda en el CRM de MOVA'),
+ ('crm_url',               'https://crm.movaia.es', 'Direccion del CRM que recibe las ayudas'),
+ ('crm_correos',           '',        'Correos que ven los botones del CRM, separados por comas (vacio = todos)');
 
 INSERT OR IGNORE INTO ajustes (clave, valor, cifrado, descripcion) VALUES
  ('anthropic_api_key', '', 1, 'Clave de API de Anthropic (cifrada con Fernet)'),
- ('smtp_clave',        '', 1, 'Contrasena SMTP (cifrada con Fernet)');
+ ('smtp_clave',        '', 1, 'Contrasena SMTP (cifrada con Fernet)'),
+ ('crm_clave',         '', 1, 'Clave con la que el CRM lee las ayudas de esta herramienta (cifrada)');

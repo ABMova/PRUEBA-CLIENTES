@@ -14,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 NOMBRE_APP = "MOVA Boletines Oficiales"
-VERSION = "1.16.0"
+VERSION = "1.17.0"
 LEMA = "Vigilancia diaria de ayudas y subvenciones en boletines autonomicos"
 
 
