@@ -76,8 +76,11 @@ MAX_PALABRAS_TITULO_RESUMIDO = 20
 # duda se envia: mejor una de mas que perder una ayuda para empresas).
 DESTINATARIOS = ("privado", "publico", "personas", "no_consta")
 DESTINATARIOS_FUERA = ("publico", "personas")
-# Red de seguridad: si el titulo o los beneficiarios nombran a una empresa o
-# entidad privada, cuenta como privado aunque el modelo diga otra cosa.
+# Red de seguridad: si lo que el modelo ha escrito SOBRE LOS DESTINATARIOS
+# nombra a una empresa o entidad privada, cuenta como privado aunque luego se
+# clasifique de otra manera. No se mira el titulo del boletin: ahi aparece el
+# organismo que convoca ("Consejeria de Economia, Empresas y Empleo") y colaba
+# como privada cualquier beca o ayuda a ayuntamientos de esas consejerias.
 _SENALES_PRIVADO = ("empresa", "pyme", "autonomos", "trabajo autonomo", "trabajadores autonomos",
                     "cooperativa", "fundacion", "asociacion", "sin animo de lucro",
                     "tercer sector", "entidades privadas", "emprendedor", "startup",
@@ -252,9 +255,10 @@ def destinatario(datos: dict, publicacion: dict) -> str:
     if valor not in DESTINATARIOS:
         valor = "no_consta"
     if valor in DESTINATARIOS_FUERA:
+        # titulo_resumido dice "que se financia y para quien" sin la referencia
+        # normativa, y beneficiarios es quien cobra: ninguno lleva el organismo.
         texto = normalizar(" ".join(str(x or "") for x in (
-            publicacion.get("titulo"), datos.get("titulo"), datos.get("titulo_resumido"),
-            datos.get("beneficiarios"))))
+            datos.get("titulo_resumido"), datos.get("beneficiarios"))))
         if any(senal in texto for senal in _SENALES_PRIVADO):
             return "privado"
     return valor

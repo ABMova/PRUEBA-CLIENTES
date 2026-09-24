@@ -374,14 +374,24 @@ def regenerar_documento(publicacion_id: int):
 # Quien recibe el correo puede generar y ver los tres documentos de ESA
 # publicacion. La clave no da acceso a nada mas de la herramienta, no permite
 # regenerar (la IA se paga una vez por publicacion) y caduca a los 90 dias.
-INTENTOS_MAX_DOCUMENTO = 200  # por IP y ventana: la pagina de espera se refresca sola
+INTENTOS_MAX_DOCUMENTO = 200  # aperturas de enlaces del correo, por IP y ventana
+# La pagina de espera pregunta "ya esta?" cada pocos segundos. Va en su propio
+# contador, mucho mas alto: si compartiera el de las aperturas, una oficina que
+# sale a internet por una sola IP se bloquearia sola mientras espera documentos.
+INTENTOS_MAX_ESPERA = 2000
 
 
-def _publicacion_por_clave(token: str, tipo: str):
-    """Devuelve (fila, None) si la clave vale, o (None, respuesta de error)."""
+def _publicacion_por_clave(token: str, tipo: str, contar: bool = True):
+    """Devuelve (fila, None) si la clave vale, o (None, respuesta de error).
+
+    contar=False para la consulta de la pagina de espera: no gasta el limite de
+    aperturas ni suma un uso al enlace, pero sigue comprobando la clave.
+    """
     ip = auth.ip_peticion()
-    repositorio.registrar_intento_ip(ip, "documento")
-    if repositorio.intentos_recientes(ip, VENTANA_INTENTOS, "documento") > INTENTOS_MAX_DOCUMENTO:
+    recurso = "documento" if contar else "documento_espera"
+    maximo = INTENTOS_MAX_DOCUMENTO if contar else INTENTOS_MAX_ESPERA
+    repositorio.registrar_intento_ip(ip, recurso)
+    if repositorio.intentos_recientes(ip, VENTANA_INTENTOS, recurso) > maximo:
         return None, (render_template("descarte_ok.html", titulo_pagina="Documentos",
                                       titulo_resultado="Demasiadas peticiones", clase="error",
                                       mensaje="Espera unos minutos y vuelve a intentarlo.",
@@ -398,7 +408,8 @@ def _publicacion_por_clave(token: str, tipo: str):
                                       mensaje="Este enlace no es valido o ha caducado. Pide a "
                                               "alguien de MOVA que te reenvie la publicacion.",
                                       publicacion=""), 404)
-    repositorio.usar_token_documento(token, ip)
+    if contar:
+        repositorio.usar_token_documento(token, ip)
     return fila, None
 
 
@@ -446,7 +457,7 @@ def documento_por_clave(token: str, tipo: str):
 @web.route("/d/<token>/<tipo>/listo")
 def documento_por_clave_listo(token: str, tipo: str):
     """Lo consulta la pagina de espera cada pocos segundos: ya esta, o ha fallado."""
-    fila, error = _publicacion_por_clave(token, tipo)
+    fila, error = _publicacion_por_clave(token, tipo, contar=False)
     if error:
         return jsonify({"listo": False, "error": True}), 404
     doc = repositorio.documento(fila["id"])

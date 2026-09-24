@@ -48,17 +48,33 @@ h1{font-size:19px;font-weight:600;margin-bottom:10px}
 </main>
 {% if estado == 'generando' %}
 <script>
+/* Pregunta si ya esta: cada 4 s los dos primeros minutos y cada 15 s despues.
+   A los 10 minutos deja de insistir y ofrece recargar, para que una pestana
+   olvidada no siga llamando al servidor indefinidamente. */
 (function () {
   var url = {{ url_listo|tojson }};
-  var intentos = 0;
+  var desde = Date.now();
+  function reintentar() {
+    var transcurrido = Date.now() - desde;
+    if (transcurrido > 600000) { rendirse(); return; }
+    setTimeout(comprobar, transcurrido < 120000 ? 4000 : 15000);
+  }
+  function rendirse() {
+    var nota = document.querySelector(".nota");
+    if (nota) {
+      nota.innerHTML = 'Esta tardando mas de lo normal. ' +
+        '<a href="" style="color:#1a1a1a;">Vuelve a cargar la pagina</a> para comprobarlo.';
+    }
+    var giro = document.querySelector(".giro");
+    if (giro) { giro.style.display = "none"; }
+  }
   function comprobar() {
-    intentos += 1;
     fetch(url, {cache: "no-store"}).then(function (r) { return r.json(); }).then(function (d) {
       if (d.listo || d.error) { location.replace(location.pathname); return; }
-      setTimeout(comprobar, intentos < 60 ? 3000 : 10000);
-    }).catch(function () { setTimeout(comprobar, 5000); });
+      reintentar();
+    }).catch(reintentar);
   }
-  setTimeout(comprobar, 3000);
+  setTimeout(comprobar, 4000);
 })();
 </script>
 {% endif %}

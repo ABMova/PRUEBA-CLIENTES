@@ -739,6 +739,13 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "la pagina de espera sabe cuando ya esta el documento")
     comprobar(anonimo.get("/d/claveInventadaQueNoExiste1234567/ampliado/listo").status_code == 404,
               "y esa consulta no responde a un enlace inventado")
+    usos_antes = repositorio.token_documento(clave)["usos"]
+    for _ in range(5):
+        anonimo.get(f"/d/{clave}/ampliado/listo")
+    comprobar(repositorio.token_documento(clave)["usos"] == usos_antes,
+              "preguntar si ya esta no cuenta como abrir el enlace")
+    comprobar(repositorio.intentos_recientes("127.0.0.1", 10, "documento_espera") >= 5,
+              "esas consultas van a su propio contador, no al de las aperturas")
     listo = anonimo.get(f"/d/{clave}/ampliado").get_data(as_text=True)
     comprobar("Criterios de valoración:" in listo and "barra-mova" in listo,
               "y luego muestra el documento")
@@ -879,12 +886,19 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "en el correo va delante de las comunidades")
 
     print("\n24) Solo llegan las ayudas para empresas, pymes, fundaciones o entidades privadas")
-    comprobar(relevancia.destinatario({"destinatario": "publico"},
-                                      {"titulo": "Ayudas a ayuntamientos y empresas para el comercio"})
-              == "privado", "si el titulo nombra a empresas cuenta como privado aunque el modelo dude")
-    comprobar(relevancia.destinatario({"destinatario": "publico"},
-                                      {"titulo": "Subvencion a la Comunidad Autonoma de Canarias"})
-              == "publico", "'Comunidad Autonoma' no se confunde con 'autonomos'")
+    comprobar(relevancia.destinatario(
+        {"destinatario": "publico", "titulo_resumido": "Ayudas a ayuntamientos y empresas para el comercio"},
+        {"titulo": "Orden de 1 de septiembre"}) == "privado",
+        "si el resumen del modelo nombra a empresas cuenta como privado aunque el modelo dude")
+    comprobar(relevancia.destinatario(
+        {"destinatario": "publico", "titulo_resumido": "Subvencion a la Comunidad Autonoma de Canarias"},
+        {}) == "publico", "'Comunidad Autonoma' no se confunde con 'autonomos'")
+    comprobar(relevancia.destinatario(
+        {"destinatario": "personas", "titulo_resumido": "Becas para estudiantes de formacion profesional",
+         "beneficiarios": "Estudiantes"},
+        {"titulo": "Resolucion de la Consejeria de Economia, Empresas y Empleo por la que se convocan becas"})
+        == "personas",
+        "el organismo que convoca ('Consejeria de ... Empresas ...') ya no cuela la ayuda como privada")
     comprobar(relevancia.destinatario({}, {"titulo": "Ayudas"}) == "no_consta"
               and relevancia.destinatario({"destinatario": "cualquiera"}, {}) == "no_consta",
               "sin dato o con un valor raro queda como 'no consta'")
