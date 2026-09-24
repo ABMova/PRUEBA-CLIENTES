@@ -344,9 +344,10 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               "el correo dice expresamente que boletin ha fallado")
     comprobar("<table" in html and "flex" not in html.lower(),
               "el HTML usa tablas y no flexbox (compatible con Outlook)")
-    comprobar("http://" not in html.replace("http://boletines.interno:8770", "")
-              .replace("http://www.juntadeandalucia.es", "")
-              or "<img" not in html, "no hay imagenes externas incrustadas")
+    comprobar('src="http' not in html and "cid:logo-mova" in html,
+              "el logotipo va incrustado (cid), sin imagenes que se bajen de internet")
+    comprobar("data:image/png;base64," in correo.logo_incrustado(html),
+              "y en la copia que se guarda se ve, con la imagen dentro del fichero")
 
     ruta = correo.guardar_copia(html, "correo_ejemplo.html")
     comprobar(ruta.exists() and ruta.stat().st_size > 2000,

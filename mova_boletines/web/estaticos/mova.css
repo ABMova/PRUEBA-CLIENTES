@@ -52,17 +52,9 @@ a:hover { text-decoration:underline; }
 .lema-app { font-size:0.88rem; opacity:.82; margin:2px 0 0 0; }
 
 .logotipo { white-space:nowrap; line-height:1; }
-.logotipo .marca {
-  font-size:2.1rem; font-weight:300; letter-spacing:.22em; color:#ffffff;
-  font-family:"Segoe UI Light","Segoe UI",system-ui,Arial,sans-serif; text-transform:uppercase;
-}
-.logotipo .ia {
-  font-size:0.84rem; font-weight:300; letter-spacing:.18em; color:var(--gold);
-  font-family:"Segoe UI Light","Segoe UI",system-ui,Arial,sans-serif; text-transform:uppercase;
-}
+.logotipo img { height:34px; width:auto; display:block; }
 @media (max-width:820px) {
-  .logotipo .marca { font-size:1.36rem; }
-  .logotipo .ia { font-size:0.55rem; }
+  .logotipo img { height:24px; }
   .icono-cerebro { height:42px; }
   .titulo-app { font-size:1.1rem; }
 }

@@ -359,7 +359,9 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         "ejecucion_frase": ejecucion_frase, "inversion_frase": inversion_frase,
         "criterios": criterios,
         "enlaces": [e for e in lista("enlaces") if e.startswith("http")],
-        "logo_oro": _imagen("logo-oro.png"), "logo_negro": _imagen("logo-negro.png"),
+        # Logotipo MOVA IA: el negro va sobre fondo claro y el blanco sobre oscuro.
+        "logo_negro": _imagen("mova-ia-negro.png"),
+        "logo_blanco": _imagen("mova-ia-blanco.png"),
         "tipo_ayuda": _tipo_ayuda(datos),
         "condiciones_financiacion": _condiciones_financiacion(datos),
         "fin": _financiacion_suelta(datos),

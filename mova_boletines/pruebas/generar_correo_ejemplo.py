@@ -115,7 +115,10 @@ def main() -> int:
     comprobar("BORM" in texto and "anti-bot" in texto, "dice que el BORM ha fallado")
     comprobar(texto.count(">Publicacion oficial<") == 3, "boton a la publicacion oficial")
     comprobar(texto.count(">PDF oficial<") == 3, "boton al PDF oficial")
-    comprobar("<img" not in texto, "sin imagenes externas")
+    comprobar('src="http' not in texto and "url(" not in texto,
+              "sin imagenes que se descarguen de internet")
+    comprobar(texto.count("data:image/png;base64,") == 1 and "<img" in texto,
+              "el logotipo MOVA IA viaja dentro del correo, no como enlace")
     comprobar("display:flex" not in texto and "display:grid" not in texto,
               "sin flexbox ni grid (compatible con Outlook)")
     comprobar("<table" in texto, "maquetado con tablas")

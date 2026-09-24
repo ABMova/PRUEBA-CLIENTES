@@ -1,6 +1,7 @@
 """Fase 6 - composicion del correo HTML y envio por SMTP."""
 from __future__ import annotations
 
+import base64
 import logging
 import smtplib
 import ssl
@@ -223,6 +224,10 @@ def enviar(destinatarios: list[str], asunto_correo: str, html: str,
         "Este correo contiene la vigilancia diaria de boletines oficiales en formato HTML. "
         "Abrelo en un cliente que admita HTML.")
     mensaje.add_alternative(html, subtype="html")
+    if f"cid:{CID_LOGO}" in html and RUTA_LOGO.exists():
+        mensaje.get_payload()[-1].add_related(
+            RUTA_LOGO.read_bytes(), maintype="image", subtype="png",
+            cid=f"<{CID_LOGO}>", filename="mova-ia.png", disposition="inline")
 
     espera = 2.0
     ultimo = ""
@@ -277,8 +282,25 @@ def _traducir_smtp(error: Exception) -> str:
     return f"Fallo de envio: {str(error)[:200]}"
 
 
+CID_LOGO = "logo-mova"
+RUTA_LOGO = config.RUTA_ESTATICOS / "marca" / "mova-ia-blanco.png"
+
+
+def logo_incrustado(html: str) -> str:
+    """Cambia la referencia cid: por la imagen dentro del propio HTML.
+
+    Al enviar, el logotipo viaja como adjunto en linea (cid), que es lo que
+    entienden Outlook y Gmail. Pero la copia que se guarda en disco es un
+    fichero suelto: ahi hace falta la imagen incrustada para poder verla.
+    """
+    if f"cid:{CID_LOGO}" not in html or not RUTA_LOGO.exists():
+        return html
+    datos = base64.b64encode(RUTA_LOGO.read_bytes()).decode("ascii")
+    return html.replace(f"cid:{CID_LOGO}", f"data:image/png;base64,{datos}")
+
+
 def guardar_copia(html: str, nombre: str = "correo_ejemplo.html"):
     config.preparar_carpetas()
     destino = config.DATOS / nombre
-    destino.write_text(html, encoding="utf-8")
+    destino.write_text(logo_incrustado(html), encoding="utf-8")
     return destino

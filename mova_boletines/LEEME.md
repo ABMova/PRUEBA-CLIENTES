@@ -17,6 +17,18 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.15: el logotipo MOVA IA en todas partes
+
+Donde antes se escribía «MOVA» con tipografía, ahora va el logotipo de la marca
+(`web/estaticos/marca/mova-ia-negro.png` y `mova-ia-blanco.png`), en la versión
+que corresponda al fondo: el negro sobre claro (resúmenes, infografía, página de
+espera de los botones) y el blanco sobre oscuro (cabecera del panel y del correo).
+
+En el correo el logotipo viaja **dentro del mensaje** como adjunto en línea
+(`cid:logo-mova`), no como enlace a internet: así lo muestran Outlook y Gmail sin
+pedir permiso para descargar imágenes. La copia que se guarda en disco lleva la
+imagen incrustada en el propio fichero para poder verla suelta.
+
 ### Novedades de la versión 1.10: estructura propia para financiación y empleo
 
 Al analizar la convocatoria, la IA clasifica la ayuda como **financiación**

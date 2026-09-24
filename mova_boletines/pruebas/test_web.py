@@ -69,8 +69,8 @@ def main() -> int:  # noqa: PLR0915 - prueba lineal
                   "la respuesta de /login lleva la cabecera MOVA")
         comprobar("Vigilancia diaria de ayudas y subvenciones" in login.text,
                   "la cabecera lleva el lema de la herramienta")
-        comprobar("MOVA</span>" in login.text and "IA</span>" in login.text,
-                  "el logotipo MOVA IA se dibuja en la cabecera")
+        comprobar("marca/mova-ia-blanco.png" in login.text,
+                  "la cabecera lleva el logotipo MOVA IA (version para fondo oscuro)")
 
         print("\n2) Sin sesion, las rutas protegidas redirigen (302)")
         for ruta in ("/", "/publicaciones", "/ejecuciones", "/ajustes", "/usuarios", "/copias"):
