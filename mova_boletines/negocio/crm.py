@@ -56,12 +56,11 @@ def reparto(destinatarios: list[str]) -> tuple[list[str], list[str]]:
     return con, sin
 
 
-def enlaces(token: str) -> dict[str, str]:
-    """Direcciones del CRM a las que apuntan los dos botones del correo."""
+def enlace(token: str) -> str:
+    """Direccion del CRM a la que apunta el boton del correo."""
     if not activo() or not token:
-        return {}
-    base = f"{url()}/Programas/DesdeBoletin?o={quote(token)}"
-    return {"programa": base, "tarea": f"{base}&accion=tarea"}
+        return ""
+    return f"{url()}/Programas/DesdeBoletin?o={quote(token)}"
 
 
 def clave_valida(recibida: str | None) -> bool:

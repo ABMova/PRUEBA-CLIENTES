@@ -1212,9 +1212,9 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     html_con = correo.componer([fila_crm], hoy_crm, {"consultados": [], "fallidos": []},
                                con_crm=True)
     html_sin = correo.componer([fila_crm], hoy_crm, {"consultados": [], "fallidos": []})
-    comprobar("Enviar al CRM" in html_con and "Acciones" in html_con
+    comprobar("Enviar al CRM" in html_con
               and "crm.prueba.es/Programas/DesdeBoletin" in html_con,
-              "quien puede darlas de alta ve los dos botones")
+              "quien puede darlas de alta ve el boton")
     comprobar("Enviar al CRM" not in html_sin and "crm.prueba.es" not in html_sin,
               "y quien no, recibe el mismo correo sin ellos")
     comprobar("Resumen corto" in html_sin and "Publicacion oficial" in html_sin,

@@ -88,8 +88,8 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
                                   for tipo in ("corto", "ampliado", "infografia")}
     else:
         fila["url_documentos"] = None
-    # Botones del CRM: solo para los destinatarios autorizados (ver negocio/crm.py).
-    fila["url_crm"] = crm_mova.enlaces(token) if (con_crm and token) else {}
+    # Boton del CRM: solo para los destinatarios autorizados (ver negocio/crm.py).
+    fila["url_crm"] = crm_mova.enlace(token) if (con_crm and token) else ""
     return fila
 
 
