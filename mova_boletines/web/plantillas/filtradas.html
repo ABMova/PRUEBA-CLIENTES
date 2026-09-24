@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block contenido %}
+<div class="card">
+  <h2>Filtradas: lo que no llegó al correo</h2>
+  <p class="apoyo">Todo lo que no llegó al correo, con su motivo. Está aquí para poder comprobar
+     que no se escapa ninguna ayuda. Si alguna no debía estar, recupérala.</p>
+
+  <form method="get" class="campo-linea" style="align-items:flex-end;">
+    <div class="campo"><label for="dias">Últimos días</label>
+      <input type="number" id="dias" name="dias" value="{{ dias }}" min="1" max="90"></div>
+    <div class="campo"><button type="submit" class="boton">Ver</button></div>
+  </form>
+
+  <h3>Apartadas antes de la IA ({{ apartadas|length }})</h3>
+  <p class="apoyo">Puestos de trabajo, licitaciones y trámites. No han costado nada: el filtro las
+     aparta por el título. <strong>Analizar</strong> la pasa por la IA (unos 0,01 $) y, si resulta
+     ser una ayuda, entra en el histórico.</p>
+  {% if apartadas %}
+  <div class="tabla-desplazable"><table class="datos">
+    <thead><tr><th>Fecha</th><th>Boletín</th><th>Motivo</th><th>Título</th><th></th></tr></thead>
+    <tbody>
+      {% for a in apartadas %}
+      <tr>
+        <td style="white-space:nowrap">{{ a.fecha_publicacion }}</td>
+        <td>{{ a.codigo_boletin }}</td>
+        <td><span class="pildora">{{ a.motivo }}</span></td>
+        <td>
+          {% if a.url_oficial %}<a href="{{ a.url_oficial }}" target="_blank" rel="noopener">{{ a.titulo[:180] }}</a>
+          {% else %}{{ a.titulo[:180] }}{% endif %}
+        </td>
+        <td style="white-space:nowrap">
+          {% if a.estado == 'analizada' %}<span class="pildora ok">analizada</span>
+          {% elif puede_ejecutar %}
+          <form method="post" action="{{ url_for('web.analizar_filtrada', apartada_id=a.id) }}"
+                style="display:inline" onsubmit="return confirm('Analizar esta publicacion con la IA? Tiene coste.');">
+            <button type="submit" class="boton">Analizar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="apoyo">Nada apartado en este periodo.</p>{% endif %}
+
+  <h3 style="margin-top:26px;">Descartadas por la IA ({{ ocultas|length }})</h3>
+  <p class="apoyo">Ya se analizaron y se pagaron: o no eran una convocatoria, o iban a
+     administraciones públicas o a personas. <strong>Recuperar</strong> las devuelve al histórico
+     sin volver a pagar.</p>
+  {% if ocultas %}
+  <div class="tabla-desplazable"><table class="datos">
+    <thead><tr><th>Fecha</th><th>Boletín</th><th>Motivo</th><th>Título</th><th></th></tr></thead>
+    <tbody>
+      {% for p in ocultas %}
+      <tr>
+        <td style="white-space:nowrap">{{ p.fecha_publicacion }}</td>
+        <td>{{ p.codigo_boletin }}</td>
+        <td>
+          {% if p.estado == 'no_convocatoria' %}<span class="pildora">no es convocatoria</span>
+          {% else %}<span class="pildora">{{ 'administraciones' if p.destinatario == 'publico' else 'personas' }}</span>{% endif %}
+        </td>
+        <td>
+          {% if p.url_oficial %}<a href="{{ p.url_oficial }}" target="_blank" rel="noopener">{{ (p.titulo_resumido or p.titulo)[:180] }}</a>
+          {% else %}{{ (p.titulo_resumido or p.titulo)[:180] }}{% endif %}
+          {% if p.justificacion %}<div class="apoyo">{{ p.justificacion[:160] }}</div>{% endif %}
+        </td>
+        <td style="white-space:nowrap">
+          {% if puede_ejecutar %}
+          <form method="post" action="{{ url_for('web.recuperar_filtrada', publicacion_id=p.id) }}" style="display:inline">
+            <button type="submit" class="boton">Recuperar</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="apoyo">Nada descartado por la IA en este periodo.</p>{% endif %}
+</div>
+{% endblock %}

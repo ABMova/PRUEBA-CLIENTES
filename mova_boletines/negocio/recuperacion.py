@@ -37,10 +37,11 @@ registro = logging.getLogger("mova")
 
 MARGEN = timedelta(minutes=10)      # el planificador normal tiene prioridad a su hora
 INTENTOS_MAX = 3
+TIPO_BOLETIN = "boletin_recuperado"
 ESPERA_MAXIMA_EJECUCION_S = 3 * 3600
 TIPO_MANANA = "recuperada"
 TIPO_TARDE = "tarde_recuperada"
-TIPOS_RECUPERADOS = (TIPO_MANANA, TIPO_TARDE)
+TIPOS_RECUPERADOS = (TIPO_MANANA, TIPO_TARDE, TIPO_BOLETIN)
 _BUENOS = ("correcta", "con_avisos")
 # Hosts de boletines vigilados: basta con que responda uno para dar la red por buena.
 _PRUEBA_RED = (("dogv.gva.es", 443), ("www.bocm.es", 443), ("www.juntadeandalucia.es", 443))
@@ -130,7 +131,7 @@ def pendientes(ahora: datetime | None = None) -> list[tuple[date, str]]:
                    _disparos(repositorio.ajuste("hora_tarde", "20:00"), dias, zona, desde, hasta)]
     tareas.sort()
 
-    resultado = []
+    resultado = _dias_con_boletin_caido(desde.date(), (ahora - timedelta(days=1)).date())
     for disparo, tipo in tareas:
         filas = repositorio.ejecuciones_de_fecha(disparo.date().isoformat())
         if any(f["estado"] == "en_curso" for f in filas):
@@ -146,6 +147,29 @@ def pendientes(ahora: datetime | None = None) -> list[tuple[date, str]]:
             continue
         resultado.append((disparo.date(), tipo))
     return resultado
+
+
+def _dias_con_boletin_caido(desde: date, hasta: date) -> list[tuple[date, str]]:
+    """Dias ya cerrados en los que algun boletin no respondio en ninguna pasada.
+
+    Es la unica via por la que se pierde un dia entero de un boletin, asi que se
+    vuelve a intentar al dia siguiente. La deduplicacion evita pagar dos veces
+    por lo que ya se analizo de los demas boletines.
+    """
+    pendientes = []
+    dia = desde
+    while dia <= hasta:
+        caidos = repositorio.boletines_sin_exito(dia.isoformat())
+        if caidos:
+            filas = repositorio.ejecuciones_de_fecha(dia.isoformat())
+            intentos = sum(1 for f in filas if f["tipo"] == TIPO_BOLETIN)
+            en_curso = any(f["estado"] == "en_curso" for f in filas)
+            if intentos < INTENTOS_MAX and not en_curso:
+                registro.info("%s no respondio en ninguna pasada del %s: se reintenta",
+                              ", ".join(caidos), f"{dia:%d/%m/%Y}")
+                pendientes.append((dia, TIPO_BOLETIN))
+        dia += timedelta(days=1)
+    return pendientes
 
 
 def semanal_pendiente(ahora: datetime | None = None) -> date | None:
@@ -201,7 +225,9 @@ def recuperar(comprobar_red=hay_internet) -> list[str]:
                               "se reintenta en unos minutos", len(lista))
                 return hecho
             fecha, tipo = lista[0]
-            nombre = "comprobacion de la tarde" if tipo == TIPO_TARDE else "vigilancia"
+            nombre = {TIPO_TARDE: "comprobacion de la tarde",
+                      TIPO_BOLETIN: "vigilancia (un boletin no respondio ese dia)"}.get(
+                          tipo, "vigilancia")
             aceptada, mensaje = orquestador.lanzar(fecha, tipo, "recuperacion")
             registro.info("Recuperando la %s del %s (el equipo no estaba encendido): %s",
                           nombre, f"{fecha:%d/%m/%Y}", mensaje)

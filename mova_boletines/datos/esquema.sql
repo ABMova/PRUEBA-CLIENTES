@@ -80,6 +80,31 @@ CREATE TABLE IF NOT EXISTS ejecuciones (
 CREATE INDEX IF NOT EXISTS ix_ejecuciones_fecha ON ejecuciones(fecha_objetivo);
 CREATE INDEX IF NOT EXISTS ix_ejecuciones_estado ON ejecuciones(estado);
 
+-- Lo que el filtro previo aparta sin llamar a la IA. Se guarda para poder
+-- revisarlo en el panel y recuperar lo que no debia estar aqui: es la unica
+-- forma de comprobar que no se escapa ninguna ayuda.
+CREATE TABLE IF NOT EXISTS apartadas (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    ejecucion_id   INTEGER REFERENCES ejecuciones(id) ON DELETE SET NULL,
+    codigo_boletin TEXT NOT NULL,
+    comunidad      TEXT NOT NULL DEFAULT '',
+    boletin_nombre TEXT NOT NULL DEFAULT '',
+    fecha_publicacion TEXT NOT NULL,
+    titulo         TEXT NOT NULL,
+    seccion        TEXT NOT NULL DEFAULT '',
+    organismo      TEXT NOT NULL DEFAULT '',
+    url_oficial    TEXT NOT NULL DEFAULT '',
+    url_pdf        TEXT NOT NULL DEFAULT '',
+    texto          TEXT NOT NULL DEFAULT '',
+    identificador  TEXT NOT NULL DEFAULT '',
+    motivo         TEXT NOT NULL,
+    estado         TEXT NOT NULL DEFAULT 'apartada',
+    creado_en      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_apartadas_fecha ON apartadas(fecha_publicacion);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_apartadas_unica
+    ON apartadas(codigo_boletin, fecha_publicacion, titulo);
+
 CREATE TABLE IF NOT EXISTS logs_scraping (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     ejecucion_id   INTEGER REFERENCES ejecuciones(id) ON DELETE CASCADE,
@@ -291,6 +316,12 @@ INSERT OR IGNORE INTO boletines (codigo, nombre, comunidad, url_base, via_acceso
 
 INSERT OR IGNORE INTO palabras_clave (termino, refuerzo) VALUES
  ('ayudas', 0), ('subvenciones', 0), ('convocatoria', 0), ('orden', 0),
+ -- v1.16: el buscador exige palabra completa, asi que 'ayudas' no encuentra
+ -- 'ayuda'. Faltaban los singulares y la forma en que se publican los
+ -- extractos de la BDNS, por donde salen casi todas las convocatorias.
+ ('ayuda', 0), ('subvencion', 0), ('premio', 0), ('premios', 0), ('extracto', 0),
+ ('bdns', 0), ('prestamo', 0), ('prestamos', 0), ('aval', 0), ('avales', 0),
+ ('bonificacion', 0), ('linea de financiacion', 0), ('subvencionable', 0),
  ('bases reguladoras', 0), ('incentivos', 0), ('financiacion', 0),
  ('financiacion publica', 0), ('programa de ayudas', 0), ('programa de subvenciones', 0),
  ('concurrencia competitiva', 0), ('concesion directa', 0), ('modernizacion', 0),

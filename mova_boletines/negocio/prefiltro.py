@@ -11,6 +11,10 @@ REGLA DE ORO: si el titulo nombra una ayuda (subvencion, ayuda, premio,
 incentivo, bases reguladoras, BDNS...), NO se descarta aqui aunque tambien
 hable de puestos o contratos. En la duda decide el modelo, como hasta ahora:
 perder una convocatoria cuesta mucho mas que analizar una de mas.
+
+La excepcion es RUIDO_SIEMPRE: tramites que nombran ayudas todos los dias
+("Notificacion ... de resolucion de ayudas", "mesa de contratacion") pero que
+nunca son una convocatoria a la que se pueda optar.
 """
 from __future__ import annotations
 
@@ -23,6 +27,23 @@ SENALES_AYUDA = (
     "bdns", "concesion directa", "linea de financiacion", "prestamo", "credito fiscal",
     "convocatoria de ayudas", "convocatoria de subvenciones", "fondo perdido",
 )
+
+# Estas ganan a la regla de oro: son tramites personales o de contratacion que
+# citan ayudas constantemente. Se eligen por ser inequivocas.
+RUIDO_SIEMPRE: dict[str, tuple[str, ...]] = {
+    "tramite sin convocatoria": (
+        "notificaciones.", "notificacion de resolucion", "edicto de notificacion",
+        "anuncio de notificacion", "notificacion por comparecencia",
+        "al no haber podido practicar la notificacion",
+    ),
+    "contratacion publica": (
+        "mesa de contratacion", "mesa de contractacio", "perfil del contratante",
+        "perfil de contractant", "formalizacion del contrato",
+    ),
+    # Solo lo inequivoco: una lista de admitidos o un concurso de meritos si
+    # pueden aparecer en el titulo de una convocatoria de ayudas.
+    "empleo publico": ("libre designacion", "lliure designacio"),
+}
 
 # Lo que nunca es una ayuda, por familias (castellano, catalan y valenciano).
 RUIDO: dict[str, tuple[str, ...]] = {
@@ -69,6 +90,9 @@ def motivo_ruido(titulo: str, seccion: str = "") -> str | None:
     texto = normalizar(f"{titulo} {seccion}")
     if not texto:
         return None
+    for familia, expresiones in RUIDO_SIEMPRE.items():
+        if any(expresion in texto for expresion in expresiones):
+            return familia
     if any(senal in texto for senal in SENALES_AYUDA):
         return None
     for familia, expresiones in RUIDO.items():

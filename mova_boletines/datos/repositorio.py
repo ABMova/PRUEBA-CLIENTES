@@ -441,6 +441,15 @@ def registrar_scraping(ejecucion_id: int | None, codigo: str, fecha: str, estado
     )
 
 
+def boletines_sin_exito(fecha: str) -> list[str]:
+    """Boletines que ese dia fallaron en TODAS las pasadas: ahi si se pierde algo."""
+    filas = _consulta(
+        "SELECT codigo_boletin FROM logs_scraping WHERE fecha_objetivo=? "
+        "GROUP BY codigo_boletin "
+        "HAVING SUM(CASE WHEN estado IN ('correcto','vacio') THEN 1 ELSE 0 END) = 0", (fecha,))
+    return [fila["codigo_boletin"] for fila in filas]
+
+
 def logs_scraping(ejecucion_id: int) -> list[sqlite3.Row]:
     return _consulta("SELECT * FROM logs_scraping WHERE ejecucion_id=? ORDER BY id", (ejecucion_id,))
 
@@ -463,6 +472,47 @@ def titulos_recientes(dias: int) -> list[sqlite3.Row]:
 # ni se ven en el panel. "fuera_destinatario": para administraciones o personas.
 ESTADOS_OCULTOS = ("no_convocatoria", "fuera_destinatario")
 _SQL_VISIBLES = "estado NOT IN ('no_convocatoria', 'fuera_destinatario')"
+
+
+def guardar_apartada(datos: dict[str, Any]) -> None:
+    """Lo que el filtro previo deja fuera. Si ya estaba, no se duplica."""
+    columnas = ("ejecucion_id", "codigo_boletin", "comunidad", "boletin_nombre",
+                "fecha_publicacion", "titulo", "seccion", "organismo", "url_oficial",
+                "url_pdf", "texto", "identificador", "motivo")
+    _escribir(
+        f"INSERT OR IGNORE INTO apartadas ({','.join(columnas)}) "
+        f"VALUES ({','.join('?' for _ in columnas)})",
+        [datos.get(col) if col != "texto" else (datos.get(col) or "")[:2000] for col in columnas])
+
+
+def apartadas(dias: int = 15, limite: int = 500) -> list[sqlite3.Row]:
+    return _consulta(
+        "SELECT * FROM apartadas WHERE date(fecha_publicacion) >= date('now', ?) "
+        "ORDER BY fecha_publicacion DESC, codigo_boletin, id LIMIT ?",
+        (f"-{int(dias)} day", limite))
+
+
+def apartada(apartada_id: int) -> sqlite3.Row | None:
+    return _uno("SELECT * FROM apartadas WHERE id=?", (apartada_id,))
+
+
+def marcar_apartada(apartada_id: int, estado: str) -> None:
+    _escribir("UPDATE apartadas SET estado=? WHERE id=?", (estado, apartada_id))
+
+
+def publicaciones_ocultas(dias: int = 15, limite: int = 500) -> list[sqlite3.Row]:
+    """Las que descarto la IA: no son convocatoria, o van a administraciones/personas."""
+    return _consulta(
+        "SELECT * FROM publicaciones WHERE estado IN ('no_convocatoria','fuera_destinatario') "
+        "AND date(fecha_publicacion) >= date('now', ?) "
+        "ORDER BY fecha_publicacion DESC, id DESC LIMIT ?", (f"-{int(dias)} day", limite))
+
+
+def recuperar_publicacion(publicacion_id: int) -> None:
+    """Saca del cajon una publicacion que la IA habia descartado."""
+    _escribir("UPDATE publicaciones SET estado='nueva', actualizado_en=datetime('now') "
+              "WHERE id=? AND estado IN ('no_convocatoria','fuera_destinatario')",
+              (publicacion_id,))
 
 
 def guardar_publicacion(datos: dict[str, Any]) -> int:

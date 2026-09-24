@@ -15,9 +15,11 @@ LONGITUD_CONTEXTO = 300
 # ("orden", "empleo", "contratacion"...) aparecen en casi cualquier
 # publicacion oficial, asi que sirven para no perderse nada pero no para
 # decidir a que se le dedica presupuesto de modelo.
-TERMINOS_NUCLEO = ("ayudas", "subvenciones", "convocatoria", "bases reguladoras",
-                   "incentivos", "programa de ayudas", "programa de subvenciones",
-                   "concurrencia competitiva", "concesion directa", "financiacion publica")
+TERMINOS_NUCLEO = ("ayudas", "ayuda", "subvenciones", "subvencion", "convocatoria",
+                   "bases reguladoras", "incentivos", "programa de ayudas",
+                   "programa de subvenciones", "concurrencia competitiva",
+                   "concesion directa", "financiacion publica", "extracto", "bdns",
+                   "premio", "premios")
 
 
 @dataclass

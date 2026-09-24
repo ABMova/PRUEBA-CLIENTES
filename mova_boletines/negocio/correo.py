@@ -91,7 +91,7 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
 
 def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
              tokens: dict[int, str] | None = None, modo: str = "diario",
-             retraso: bool = False) -> str:
+             retraso: bool = False, avisos: list[str] | None = None) -> str:
     """Genera el HTML del correo. tokens: {publicacion_id: token}.
 
     modo: "diario" (el de las 07:45), "tarde" (comprobacion de las 20:00) o
@@ -114,6 +114,7 @@ def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
         modo=modo,
         aviso_modo=MODOS.get(modo, ""),
         retraso=retraso,
+        avisos=avisos or [],
         fecha=fecha_larga(fecha),
         por_comunidad=dict(sorted(por_comunidad.items(),
                                   key=lambda par: (not par[0].startswith("Estatal"), par[0]))),

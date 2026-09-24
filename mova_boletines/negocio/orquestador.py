@@ -165,9 +165,10 @@ def _ejecutar(fecha: date, tipo: str, usuario: str, enviar_correo: bool) -> None
     try:
         progreso.anotar(f"Ejecucion {ejecucion_id} ({tipo}) para el {fecha:%d/%m/%Y}")
         crudas, consultados, fallidos = _fase1(fecha, ejecucion_id, contadores)
-        candidatas = _fase2(crudas, contadores)
+        candidatas = _fase2(crudas, contadores, ejecucion_id)
         guardadas = _fases345(candidatas, ejecucion_id, contadores)
-        _fase6(guardadas, fecha, consultados, fallidos, ejecucion_id, enviar_correo, tipo)
+        _fase6(guardadas, fecha, consultados, fallidos, ejecucion_id, enviar_correo, tipo,
+               _avisos_del_dia(fecha, contadores))
 
         coste = repositorio.coste_de_ejecucion(ejecucion_id)
         if coste:
@@ -276,7 +277,7 @@ def _fase1(fecha: date, ejecucion_id: int, contadores: dict):
     return crudas, consultados, fallidos
 
 
-def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
+def _fase2(crudas: list[dict], contadores: dict, ejecucion_id: int | None = None) -> list[dict]:
     """Filtro determinista. Pasa lo que tenga al menos una palabra clave.
 
     Un boletin como el BOCM publica su texto integro y terminos como "orden" o
@@ -303,6 +304,12 @@ def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
         motivo = prefiltro.motivo_ruido(publicacion["titulo"], publicacion.get("seccion", ""))
         if motivo:
             ruido[motivo] = ruido.get(motivo, 0) + 1
+            # Se guarda para poder revisarlo en el panel y recuperarlo si hizo falta.
+            try:
+                repositorio.guardar_apartada(dict(publicacion, motivo=motivo,
+                                                  ejecucion_id=ejecucion_id))
+            except Exception as error:  # noqa: BLE001 - no tumba la ejecucion
+                progreso.anotar(f"No se pudo guardar la apartada: {error}")
             continue
         publicacion["terminos"] = ", ".join(coincidencia.terminos)
         publicacion["contextos"] = repositorio.json_seguro(coincidencia.contextos)
@@ -319,6 +326,7 @@ def _fase2(crudas: list[dict], contadores: dict) -> list[dict]:
         candidatas.sort(key=lambda p: p.get("_puntuacion", 0), reverse=True)
         descartadas = encontradas - tope
         candidatas = candidatas[:tope]
+        contadores["sin_analizar"] = descartadas
         progreso.anotar(
             f"AVISO: {encontradas} candidatas superan el tope de {tope}. Se analizan las "
             f"{tope} con coincidencias mas fuertes y quedan {descartadas} sin analizar. "
@@ -518,18 +526,42 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
     return guardadas
 
 
+def _avisos_del_dia(fecha: date, contadores: dict) -> list[str]:
+    """Lo que hay que decirle al usuario porque puede haberse perdido algo."""
+    avisos = []
+    sin_exito = repositorio.boletines_sin_exito(fecha.strftime("%Y-%m-%d"))
+    if sin_exito:
+        avisos.append(
+            f"{', '.join(sin_exito)} no ha respondido en ninguna pasada de hoy: lo que publicara "
+            f"ese dia no se ha revisado. Se reintenta manana automaticamente.")
+    sin_analizar = contadores.pop("sin_analizar", 0)
+    if sin_analizar:
+        avisos.append(
+            f"{sin_analizar} publicacion(es) con palabras clave se han quedado sin analizar por el "
+            f"tope diario. Sube el tope en Ajustes si quieres cubrirlas.")
+    return avisos
+
+
 def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos: list[dict],
-           ejecucion_id: int, enviar_correo: bool, tipo: str = "manual") -> None:
+           ejecucion_id: int, enviar_correo: bool, tipo: str = "manual",
+           avisos: list[str] | None = None) -> None:
     progreso.fijar_fase(6, porcentaje=86)
     destinatarios = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
     dias_token = repositorio.ajuste_int("dias_token_descarte", 90)
     modo = "tarde" if tipo in ("tarde", "tarde_recuperada") else "diario"
+    # Un dia que se repite porque un boletin estaba caido solo escribe si trae algo.
+    if tipo == "boletin_recuperado" and not guardadas and not avisos:
+        progreso.anotar("Reintento del boletin caido sin novedades: no se envia correo")
+        repositorio.registrar_envio(ejecucion_id, "", "Reintento de boletin caido", "omitido", 0,
+                                    "Sin publicaciones nuevas", 0, "")
+        progreso.fijar_fase(6, porcentaje=100)
+        return
     # Recuperada al encender el equipo: el correo avisa de que llega tarde.
-    retraso = tipo in ("recuperada", "tarde_recuperada")
+    retraso = tipo in ("recuperada", "tarde_recuperada", "boletin_recuperado")
 
     # La comprobacion de la tarde solo escribe si ha aparecido algo nuevo desde
     # la manana: un segundo "sin novedades" al dia seria ruido.
-    if modo == "tarde" and not guardadas:
+    if modo == "tarde" and not guardadas and not avisos:
         repositorio.registrar_envio(ejecucion_id, ", ".join(destinatarios),
                                     "Comprobacion de la tarde", "omitido", 0,
                                     "Sin publicaciones nuevas desde la manana: no se envia correo",
@@ -548,7 +580,7 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
 
     html = correo.componer(guardadas, fecha,
                            {"consultados": consultados, "fallidos": fallidos}, tokens, modo=modo,
-                           retraso=retraso)
+                           retraso=retraso, avisos=avisos or [])
     sufijo = "-tarde" if modo == "tarde" else ""
     ruta = correo.guardar_copia(html, f"correo-{fecha:%Y%m%d}-{ejecucion_id}{sufijo}.html")
     asunto = correo.asunto(fecha, len(guardadas),
@@ -611,6 +643,72 @@ def _alertas(guardadas: list[dict], tokens: dict[int, str], destinatarios: list[
         progreso.anotar(f"Alerta enviada: {detalle}")
     else:
         progreso.anotar(f"Alerta NO enviada: {detalle}")
+
+
+def analizar_apartada(apartada_id: int, usuario: str = "sistema") -> tuple[bool, str]:
+    """Pasa por la IA una publicacion que el filtro previo habia apartado.
+
+    Es lo que ocurre al pulsar "Analizar" en la pantalla de descartadas: cuesta
+    una llamada al modelo y, si resulta ser una ayuda, entra en el historico.
+    """
+    fila = repositorio.apartada(apartada_id)
+    if fila is None:
+        return False, "Esa publicacion apartada ya no existe"
+    if fila["estado"] == "analizada":
+        return False, "Ya se analizo"
+    if not anthropic_cliente.hay_clave():
+        return False, "No hay clave de API configurada"
+
+    publicacion = {
+        "codigo_boletin": fila["codigo_boletin"], "comunidad": fila["comunidad"],
+        "boletin_nombre": fila["boletin_nombre"], "fecha_publicacion": fila["fecha_publicacion"],
+        "titulo": fila["titulo"], "seccion": fila["seccion"], "organismo": fila["organismo"],
+        "url_oficial": fila["url_oficial"], "url_pdf": fila["url_pdf"],
+        "texto": fila["texto"] or fila["titulo"], "terminos": "", "contextos": "",
+    }
+    modelo = repositorio.ajuste("modelo_extraccion", "claude-haiku-4-5-20251001")
+    tokens = repositorio.ajuste_int("max_tokens_extraccion", 2000)
+    extraccion = relevancia.extraer(publicacion, modelo, tokens)
+    datos = extraccion.datos
+    clasificacion = relevancia.clasificar(
+        publicacion, datos, repositorio.ajuste("modelo_relevancia", "claude-haiku-4-5-20251001"),
+        repositorio.ajuste_int("max_tokens_relevancia", 600),
+        [t.strip() for t in repositorio.ajuste("terminos_refuerzo", "").split(",") if t.strip()])
+
+    plazo_fin, plazo_origen = relevancia.fin_de_plazo(datos, fila["fecha_publicacion"])
+    hash_contenido = deduplicador.calcular_hash(fila["codigo_boletin"], fila["titulo"])
+    guardada = {
+        "ejecucion_id": None, "codigo_boletin": fila["codigo_boletin"],
+        "comunidad": fila["comunidad"], "boletin_nombre": fila["boletin_nombre"],
+        "fecha_publicacion": fila["fecha_publicacion"],
+        "titulo": datos.get("titulo") or fila["titulo"],
+        "titulo_resumido": datos.get("titulo_resumido") or titulos.resumir(fila["titulo"]),
+        "resumen": datos.get("resumen", config.MARCADOR_PENDIENTE),
+        "organismo": datos.get("organismo_convocante") or fila["organismo"],
+        "plazo": datos.get("plazo_solicitud", config.MARCADOR_PENDIENTE),
+        "plazo_fin": plazo_fin, "plazo_fin_origen": plazo_origen,
+        "beneficiarios": datos.get("beneficiarios", config.MARCADOR_PENDIENTE),
+        "importe": datos.get("importe", config.MARCADOR_PENDIENTE),
+        "url_oficial": fila["url_oficial"], "url_pdf": fila["url_pdf"],
+        "seccion": fila["seccion"], "relevancia": clasificacion.get("relevancia", "media"),
+        "sectores": ", ".join(clasificacion.get("sectores", [])),
+        "justificacion": clasificacion.get("justificacion", ""),
+        "confianza": datos.get("confianza", ""), "motivo_confianza": datos.get("motivo_confianza", ""),
+        "hash_contenido": hash_contenido,
+        "titulo_normalizado": normalizar_titulo(fila["titulo"]),
+        "terminos": "", "contextos": "", "texto_incompleto": 0,
+        "revision_manual": int(extraccion.revision_manual), "motivo_revision": extraccion.motivo,
+        "duplicado_de": None, "destinatario": datos.get("destinatario", "no_consta"),
+        "estado": "nueva", "json_modelo": relevancia.json_crudo(datos, clasificacion),
+    }
+    if repositorio.existe_hash(hash_contenido):
+        repositorio.marcar_apartada(apartada_id, "analizada")
+        return False, "Esa publicacion ya estaba en el historico"
+    repositorio.guardar_publicacion(guardada)
+    repositorio.marcar_apartada(apartada_id, "analizada")
+    repositorio.registrar_auditoria(usuario, "apartada_analizada", str(apartada_id),
+                                    guardada["titulo"][:120])
+    return True, f"Analizada y guardada como {clasificacion.get('relevancia', 'media')} relevancia"
 
 
 # --------------------------------------------------------------- resumen semanal --

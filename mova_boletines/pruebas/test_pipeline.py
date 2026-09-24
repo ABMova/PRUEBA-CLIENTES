@@ -26,7 +26,7 @@ os.environ["MOVA_RECUPERACION"] = "0"  # se prueba llamando a mano, no con el re
 import config  # noqa: E402
 from datos import repositorio  # noqa: E402
 from integraciones import anthropic_cliente  # noqa: E402
-from negocio import correo, deduplicador, orquestador, relevancia  # noqa: E402
+from negocio import correo, deduplicador, orquestador, palabras, relevancia  # noqa: E402
 from negocio.boletines import ADAPTADORES  # noqa: E402
 from negocio.boletines.base import ErrorBoletin, PublicacionCruda  # noqa: E402
 
@@ -1117,6 +1117,78 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               f"las cifras destacadas sin dato se resumen, que la frase larga no cabe ({cifras})")
     comprobar(documentos.NO_DISPONIBLE in info_vacia,
               "y el aviso completo sigue en los apartados de abajo")
+
+    print("\n28) Para que no se escape ninguna ayuda")
+    from negocio import prefiltro as _prefiltro
+
+    comprobar(_prefiltro.motivo_ruido(
+        "Notificaciones. Notificacion de 16/09/2026, de la Delegacion Provincial, sobre ayudas de la PAC")
+        == "tramite sin convocatoria",
+        "una notificacion personal se aparta aunque nombre ayudas")
+    comprobar(_prefiltro.motivo_ruido(
+        "Resolucion por la que se convocan ayudas y se publica la lista de admitidos") is None,
+        "pero un titulo que convoca ayudas nunca se aparta por nombrar una lista de admitidos")
+
+    terminos_hoy = [f["termino"] for f in repositorio.palabras_clave(solo_activas=True)]
+    for titulo in ("EXTRACTO de la Resolucion por la que se convoca el premio Jose Maria Yturralde",
+                   "Resolucion por la que se concede una subvencion directa a la empresa X",
+                   "Convocatoria de una ayuda al establecimiento de jovenes agricultores"):
+        comprobar(palabras.buscar(titulo, terminos_hoy).hay,
+                  f"entra por palabras clave: {titulo[:58]}")
+
+    # Lo que aparta el filtro previo se guarda y se puede revisar y recuperar.
+    PETICIONES_DOC.clear()
+    _guion["publicaciones"] = [
+        PublicacionCruda(codigo_boletin="DOGV", titulo="Convocatoria publica para cubrir, mediante "
+                         "libre designacion, un puesto de jefe de servicio", organismo="Conselleria",
+                         seccion="II", url_oficial="https://dogv.gva.es/x9", url_pdf="",
+                         fecha="2026-09-27", texto="", identificador="999301"),
+    ]
+    llamar_antes_ap = anthropic_cliente.llamar_json
+    relevancia.anthropic_cliente.llamar_json = _modelo_simulado
+    orquestador.lanzar(date(2026, 9, 27), "manual", "prueba", enviar_correo=False)
+    _esperar_fin()
+    apartadas = [a for a in repositorio.apartadas(dias=3650)
+                 if "jefe de servicio" in a["titulo"]]
+    comprobar(len(apartadas) == 1 and apartadas[0]["motivo"] == "empleo publico"
+              and apartadas[0]["estado"] == "apartada",
+              f"lo que aparta el filtro previo queda guardado con su motivo ({len(apartadas)})")
+
+    aceptada, mensaje = orquestador.analizar_apartada(apartadas[0]["id"], "prueba")
+    relevancia.anthropic_cliente.llamar_json = llamar_antes_ap
+    comprobar(aceptada, f"y se puede mandar a la IA desde el panel ({mensaje})")
+    comprobar(repositorio.apartada(apartadas[0]["id"])["estado"] == "analizada",
+              "queda marcada como analizada, para no pagarla dos veces")
+    comprobar(any("libre designacion" in (f["titulo"] or "").lower()
+                  for f in repositorio.publicaciones({}, limite=1000)),
+              "y aparece en el historico si resulta ser una ayuda")
+
+    # Las que descarto la IA se pueden recuperar sin volver a pagar.
+    ocultas = repositorio.publicaciones_ocultas(dias=3650)
+    comprobar(bool(ocultas), "las descartadas por la IA se listan para revisarlas")
+    repositorio.recuperar_publicacion(ocultas[0]["id"])
+    comprobar(repositorio.publicacion(ocultas[0]["id"])["estado"] == "nueva",
+              "y se recuperan con un boton, sin coste")
+
+    # Un boletin caido todo el dia: aviso en el correo y reintento al dia siguiente.
+    ejecucion_caida = repositorio.crear_ejecucion("2030-02-05", "programada", "prueba")
+    repositorio.registrar_scraping(ejecucion_caida, "BORM", "2030-02-05", "fallido", 0, 3, 10, "", "caido")
+    repositorio.cerrar_ejecucion(ejecucion_caida, "con_avisos", "", "", {"boletines_ok": 7})
+    comprobar(repositorio.boletines_sin_exito("2030-02-05") == ["BORM"],
+              "se sabe que boletin no respondio en ninguna pasada de un dia")
+    avisos = orquestador._avisos_del_dia(date(2030, 2, 5), {"sin_analizar": 12})  # noqa: SLF001
+    comprobar(len(avisos) == 2 and "BORM" in avisos[0] and "12" in avisos[1],
+              "el correo avisa del boletin caido y de lo que se quedo sin analizar")
+    html_avisos = correo.componer([], date(2030, 2, 5), {"consultados": [], "fallidos": []},
+                                  avisos=avisos)
+    comprobar("ATENCION" in html_avisos and "BORM" in html_avisos,
+              "y los avisos salen destacados en el correo")
+
+    repositorio.guardar_ajuste("recuperacion_desde", "2030-02-01")
+    repositorio.guardar_ajuste("recuperacion_activa", "1")
+    pendientes_caido = recuperacion.pendientes(_dt(2030, 2, 6, 10, 0, tzinfo=madrid))
+    comprobar((date(2030, 2, 5), "boletin_recuperado") in pendientes_caido,
+              "y ese dia se reintenta al dia siguiente")
 
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:

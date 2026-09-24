@@ -268,6 +268,42 @@ def api_progreso():
     return orquestador.progreso.instantanea()
 
 
+# ---------------------------------------------------------------- filtradas --
+@web.route("/filtradas")
+@auth.requiere("ver")
+def filtradas():
+    """Lo que no llego al correo, con su motivo: para comprobar que no se escapa nada."""
+    try:
+        dias = max(1, min(90, int(request.args.get("dias", 15))))
+    except ValueError:
+        dias = 15
+    return render_template(
+        "filtradas.html", titulo_pagina="Filtradas", dias=dias,
+        apartadas=repositorio.apartadas(dias),
+        ocultas=repositorio.publicaciones_ocultas(dias),
+        puede_ejecutar=auth.tiene_permiso("ejecutar"))
+
+
+@web.route("/filtradas/<int:apartada_id>/analizar", methods=["POST"])
+@auth.requiere("ejecutar")
+def analizar_filtrada(apartada_id: int):
+    usuario = auth.usuario_actual()
+    hecho, mensaje = orquestador.analizar_apartada(apartada_id, usuario["usuario"])
+    flash(mensaje, "ok" if hecho else "warn")
+    return redirect(url_for("web.filtradas", dias=request.args.get("dias", 15)))
+
+
+@web.route("/filtradas/<int:publicacion_id>/recuperar", methods=["POST"])
+@auth.requiere("ejecutar")
+def recuperar_filtrada(publicacion_id: int):
+    usuario = auth.usuario_actual()
+    repositorio.recuperar_publicacion(publicacion_id)
+    repositorio.registrar_auditoria(usuario["usuario"], "recuperar_filtrada",
+                                    str(publicacion_id), "", auth.ip_peticion())
+    flash("Recuperada: vuelve al historico y saldra en el resumen semanal", "ok")
+    return redirect(url_for("web.filtradas", dias=request.args.get("dias", 15)))
+
+
 # ----------------------------------------------------------- publicaciones --
 @web.route("/publicaciones")
 @auth.requiere("ver")

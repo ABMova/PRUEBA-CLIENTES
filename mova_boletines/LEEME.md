@@ -17,6 +17,22 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de la versión 1.16: que no se escape ninguna ayuda
+
+Cinco cambios para poder **comprobar** que no se pierde nada, no solo confiarlo:
+
+| Cambio | Por qué |
+|---|---|
+| **Palabras clave nuevas**: ayuda, subvención, premio, premios, extracto, BDNS, préstamo, aval, bonificación, línea de financiación, subvencionable | El buscador exige palabra completa, así que «ayudas» no encontraba «ayuda». Faltaba también «extracto», que es como se publican los extractos de la BDNS. Medido sobre tres días reales: entraban 27 publicaciones más, unos 1,50 $ al mes |
+| **Trámites que nombran ayudas**: las notificaciones personales, la mesa de contratación y la libre designación se apartan aunque el título hable de ayudas | «Notificación de resolución sobre ayudas de la PAC» se salvaba por la regla de oro y se pagaba al modelo para que la descartara |
+| **Pantalla *Filtradas*** | Todo lo que no llegó al correo, con su motivo. Lo que apartó el filtro previo se puede **Analizar** (pasa por la IA, ~0,01 $) y lo que descartó la IA se puede **Recuperar** sin volver a pagar |
+| **Avisos en el correo** | Si un boletín no respondió en ninguna pasada del día, o si el tope diario dejó publicaciones sin analizar, sale destacado arriba. Antes solo se veía en el registro de la ejecución |
+| **Reintento del boletín caído** | Un boletín que falla todo el día se vuelve a intentar al día siguiente (hasta tres veces). Era la única vía por la que se perdía un día entero |
+
+Lo que aparta el filtro previo se guarda en la tabla `apartadas`, sin coste y sin
+tocar el histórico, y eso es lo que hace auditable el sistema: antes no quedaba
+ni rastro de lo que se descartaba por el título.
+
 ### Novedades de la versión 1.15: el logotipo MOVA IA en todas partes
 
 Donde antes se escribía «MOVA» con tipografía, ahora va el logotipo de la marca
