@@ -21,8 +21,9 @@ enviado y sin mostrar lo descartado.
 
 Donde antes se escribía «MOVA» con tipografía, ahora va el logotipo de la marca
 (`web/estaticos/marca/mova-ia-negro.png` y `mova-ia-blanco.png`), en la versión
-que corresponda al fondo: el negro sobre claro (resúmenes, infografía, página de
-espera de los botones) y el blanco sobre oscuro (cabecera del panel y del correo).
+que corresponda al fondo: el negro sobre claro (página de espera de los botones)
+y el blanco sobre oscuro (cabecera del panel y del correo). **Los resúmenes y la
+infografía mantienen el logotipo anterior**, por decisión del usuario.
 
 En el correo el logotipo viaja **dentro del mensaje** como adjunto en línea
 (`cid:logo-mova`), no como enlace a internet: así lo muestran Outlook y Gmail sin

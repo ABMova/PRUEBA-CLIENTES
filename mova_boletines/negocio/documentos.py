@@ -359,9 +359,9 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         "ejecucion_frase": ejecucion_frase, "inversion_frase": inversion_frase,
         "criterios": criterios,
         "enlaces": [e for e in lista("enlaces") if e.startswith("http")],
-        # Logotipo MOVA IA: el negro va sobre fondo claro y el blanco sobre oscuro.
-        "logo_negro": _imagen("mova-ia-negro.png"),
-        "logo_blanco": _imagen("mova-ia-blanco.png"),
+        # Los resumenes y la infografia mantienen el logotipo de siempre: el
+        # MOVA IA nuevo solo se usa en el correo, el panel y la pagina de espera.
+        "logo_negro": _imagen("logo-negro.png"), "logo_oro": _imagen("logo-oro.png"),
         "tipo_ayuda": _tipo_ayuda(datos),
         "condiciones_financiacion": _condiciones_financiacion(datos),
         "fin": _financiacion_suelta(datos),
