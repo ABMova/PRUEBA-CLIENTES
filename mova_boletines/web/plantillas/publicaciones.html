@@ -66,6 +66,7 @@
             {% else %}{{ p.titulo }}{% endif %}
             {% if p.revision_manual %}<br><span class="pildora aviso">{{ marcador_revision }}</span>
             <span class="apoyo">{{ p.motivo_revision[:120] }}</span>{% endif %}
+            {% if crm_hecho.get(p.id) %}<br><span class="pildora hecha">{{ crm_hecho[p.id] }}</span>{% endif %}
           </td>
           <td>{% if p.organismo == marcador %}<span class="dato-pendiente">{{ marcador }}</span>{% else %}{{ p.organismo }}{% endif %}</td>
           <td class="celda-estrecha">

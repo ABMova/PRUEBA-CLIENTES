@@ -208,7 +208,8 @@ class SesionSegunConexion(SecureCookieSessionInterface):
 
 # Lo unico que se sirve a quien llega desde la direccion publica: los botones
 # del correo (documentos con clave y descartes), sus estaticos y /salud.
-RUTAS_PUBLICAS = ("/d/", "/descartar/", "/estaticos/", "/salud", "/api/crm/")
+RUTAS_PUBLICAS = ("/d/", "/descartar/", "/estaticos/", "/salud", "/api/crm/",
+                  "/crm/estado/")
 HOSTS_LOCALES = ("127.0.0.1", "localhost", "::1", "")
 
 

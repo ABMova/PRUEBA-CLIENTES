@@ -900,6 +900,36 @@ def usar_token_documento(token: str, ip: str) -> None:
               "actualizado_en=datetime('now') WHERE token=?", (ip, token))
 
 
+# ------------------------------------------------ lo hecho con el CRM de MOVA --
+def registrar_crm(publicacion_id: int, accion: str, usuario: str, detalle: str = "") -> None:
+    """Deja constancia de que el CRM dio de alta el programa o la tarea de una ayuda."""
+    _escribir(
+        "INSERT INTO crm_ejecuciones (publicacion_id, accion, usuario, detalle) VALUES (?,?,?,?) "
+        "ON CONFLICT(publicacion_id, accion, usuario) DO UPDATE SET "
+        "detalle=excluded.detalle, creado_en=datetime('now')",
+        (publicacion_id, accion.strip().lower(), usuario.strip().lower(), detalle[:500]))
+
+
+def crm_de_publicacion(publicacion_id: int) -> list[sqlite3.Row]:
+    return _consulta(
+        "SELECT accion, usuario, detalle, creado_en FROM crm_ejecuciones "
+        "WHERE publicacion_id=? ORDER BY creado_en", (publicacion_id,))
+
+
+def crm_de_publicaciones(ids: list[int]) -> dict[int, list[sqlite3.Row]]:
+    """Lo hecho en el CRM de varias publicaciones a la vez (para el correo y el panel)."""
+    if not ids:
+        return {}
+    marcas = ",".join("?" for _ in ids)
+    filas = _consulta(
+        f"SELECT publicacion_id, accion, usuario, creado_en FROM crm_ejecuciones "
+        f"WHERE publicacion_id IN ({marcas}) ORDER BY creado_en", tuple(ids))
+    resultado: dict[int, list[sqlite3.Row]] = {}
+    for fila in filas:
+        resultado.setdefault(fila["publicacion_id"], []).append(fila)
+    return resultado
+
+
 def intentos_de_recurso(recurso: str, minutos: int) -> int:
     """Intentos de un recurso desde cualquier IP (p. ej. fallos de un mismo usuario)."""
     fila = _uno("SELECT COUNT(*) AS n FROM intentos_ip WHERE recurso=? "

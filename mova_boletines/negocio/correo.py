@@ -90,6 +90,12 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
         fila["url_documentos"] = None
     # Botones del CRM: solo para los destinatarios autorizados (ver negocio/crm.py).
     fila["url_crm"] = crm_mova.enlaces(token) if (con_crm and token) else {}
+    # Lo que ya se ha hecho con esta ayuda en el CRM. El texto sirve para los
+    # correos que salgan a partir de ahora; la imagen es la unica forma de que un
+    # correo ya entregado se entere, porque la vuelve a pedir al abrirlo.
+    fila["crm_hecho"] = (crm_mova.resumen_hecho(repositorio.crm_de_publicacion(identificador))
+                         if (fila["url_crm"] and identificador) else "")
+    fila["url_crm_marca"] = f"{url_publica()}/crm/estado/{token}.png" if fila["url_crm"] else ""
     return fila
 
 

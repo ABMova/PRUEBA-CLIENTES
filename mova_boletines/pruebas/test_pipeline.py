@@ -1221,6 +1221,27 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("Resumen corto" in html_sin and "Publicacion oficial" in html_sin,
               "el resto del correo llega igual para todos")
 
+    # Cuando el CRM avisa de que ya lo ha hecho, el correo lo ensena en verde.
+    from negocio import insignia as _insignia
+
+    identificador = fila_crm["id"]
+    repositorio.registrar_crm(identificador, "programa", "antonio@mova.es", "Programa 7")
+    repositorio.registrar_crm(identificador, "tarea", "j.javier@mova.es", "Revisar")
+    repositorio.registrar_crm(identificador, "programa", "antonio@mova.es", "otra vez")
+    marcas = repositorio.crm_de_publicacion(identificador)
+    comprobar(len(marcas) == 2, "avisar dos veces de lo mismo no duplica la marca")
+    texto = _crm.resumen_hecho(marcas)
+    comprobar("En el CRM" in texto and "Tarea creada" in texto
+              and "Antonio" in texto and "J. Javier" in texto,
+              f"la marca dice que se hizo y quien lo hizo ({texto})")
+
+    html_hecho = correo.componer([fila_crm], hoy_crm, {"consultados": [], "fallidos": []},
+                                 con_crm=True)
+    comprobar("#dff5e4" in html_hecho and "/crm/estado/" in html_hecho,
+              "el boton sale verde y lleva la marca que se actualiza al abrir el correo")
+    comprobar(len(_insignia.verde(texto)) > 500 and len(_insignia.transparente()) < 200,
+              "la marca verde se dibuja y la vacia es un punto invisible")
+
     repositorio.guardar_ajuste("crm_activo", "0")
     comprobar(_crm.reparto(["antonio@mova.es"]) == ([], ["antonio@mova.es"]),
               "con el CRM desactivado vuelve a salir un unico correo para todos")

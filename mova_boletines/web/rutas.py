@@ -17,7 +17,7 @@ import config
 from datos import copias as copias_datos
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio import correo, crm, documentos, orquestador
+from negocio import correo, crm, documentos, insignia, orquestador
 from negocio.boletines import fichas
 from negocio.extraccion import tesseract_disponible
 from web import auth
@@ -320,6 +320,8 @@ def publicaciones():
         "publicaciones.html", titulo_pagina="Publicaciones",
         publicaciones=filas,
         documentos=repositorio.documentos_de([fila["id"] for fila in filas]),
+        crm_hecho={identificador: crm.resumen_hecho(marcas) for identificador, marcas
+                   in repositorio.crm_de_publicaciones([f["id"] for f in filas]).items()},
         boletines=repositorio.boletines(),
         filtros=filtros,
         puede_editar=auth.tiene_permiso("editar"),
@@ -447,6 +449,27 @@ def _publicacion_por_clave(token: str, tipo: str, contar: bool = True):
     if contar:
         repositorio.usar_token_documento(token, ip)
     return fila, None
+
+
+@web.route("/crm/estado/<token>.png")
+def marca_crm(token: str):
+    """La marca verde del correo: dice si esa ayuda ya se llevo al CRM y quien.
+
+    Es lo unico que un correo ya entregado vuelve a pedirle al servidor, asi que
+    es la via para que el equipo vea desde la bandeja de entrada lo que ya esta
+    hecho. Sin token valido o sin nada hecho, se devuelve un punto invisible: el
+    correo no se rompe y no se filtra nada.
+    """
+    clave = repositorio.token_documento(token)
+    filas = repositorio.crm_de_publicacion(clave["publicacion_id"]) if clave else []
+    texto = crm.resumen_hecho(filas)
+    contenido = insignia.verde(texto) if texto else insignia.transparente()
+    respuesta = Response(contenido, mimetype="image/png")
+    # Sin esto, Outlook enseñaria siempre la primera imagen que descargo.
+    respuesta.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    respuesta.headers["Pragma"] = "no-cache"
+    respuesta.headers["Expires"] = "0"
+    return respuesta
 
 
 @web.route("/d/<token>/<tipo>")

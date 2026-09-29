@@ -69,6 +69,37 @@ def enlaces(token: str) -> dict[str, str]:
             "tarea": f"{url()}/Programas/TareaDesdeBoletin?o={clave}"}
 
 
+ACCIONES = {"programa": "En el CRM", "tarea": "Tarea creada"}
+
+
+def nombre_de(correo: str) -> str:
+    """De 'j.javier@mova.es' a 'J. Javier': el correo entero no cabe en la marca."""
+    usuario = (correo or "").split("@")[0].replace("_", ".").replace("-", ".")
+    partes = [t for t in usuario.split(".") if t]
+    return " ".join(t.capitalize() if len(t) > 1 else t.upper() + "." for t in partes)
+
+
+def resumen_hecho(filas) -> str:
+    """Texto de la marca verde del correo, o cadena vacia si no se ha hecho nada.
+
+    Sale el nombre de quien lo hizo para que el resto del equipo no repita el
+    trabajo: es justo lo que se quiere ver desde la bandeja de entrada.
+    """
+    if not filas:
+        return ""
+    acciones = []
+    personas = []
+    for fila in filas:
+        rotulo = ACCIONES.get(fila["accion"], fila["accion"])
+        if rotulo not in acciones:
+            acciones.append(rotulo)
+        nombre = nombre_de(fila["usuario"])
+        if nombre and nombre not in personas:
+            personas.append(nombre)
+    texto = " y ".join(acciones)
+    return f"{texto} - {', '.join(personas)}" if personas else texto
+
+
 def clave_valida(recibida: str | None) -> bool:
     guardada = clave()
     if not guardada or not recibida:

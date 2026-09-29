@@ -247,6 +247,20 @@ CREATE TABLE IF NOT EXISTS tokens_descarte (
 );
 CREATE INDEX IF NOT EXISTS ix_tokens_pub ON tokens_descarte(publicacion_id);
 
+-- Lo que se ha hecho con cada ayuda en el CRM de MOVA. Lo avisa el propio CRM
+-- al dar de alta el programa o la tarea, y sirve para que en el correo y en el
+-- panel se vea de un vistazo lo que ya esta hecho y quien lo hizo.
+CREATE TABLE IF NOT EXISTS crm_ejecuciones (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    publicacion_id INTEGER NOT NULL REFERENCES publicaciones(id) ON DELETE CASCADE,
+    accion         TEXT NOT NULL,              -- programa | tarea
+    usuario        TEXT NOT NULL DEFAULT '',
+    detalle        TEXT NOT NULL DEFAULT '',
+    creado_en      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_crm_unica ON crm_ejecuciones(publicacion_id, accion, usuario);
+CREATE INDEX IF NOT EXISTS ix_crm_pub ON crm_ejecuciones(publicacion_id);
+
 CREATE TABLE IF NOT EXISTS destinatarios (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     correo         TEXT NOT NULL UNIQUE,

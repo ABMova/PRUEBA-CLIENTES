@@ -164,6 +164,8 @@ textarea { min-height:90px; font-family:Consolas,Menlo,monospace; font-size:0.8r
 .pildora.aviso     { background:var(--warn); }
 .pildora.error     { background:var(--err); }
 .pildora.alta      { background:linear-gradient(90deg,var(--gold-2),var(--gold)); color:var(--gold-txt); }
+/* Ya llevado al CRM: verde claro, el mismo de la marca del correo. */
+.pildora.hecha     { background:#dff5e4; color:#166539; border:1px solid #228b4e; }
 
 .dato-pendiente {
   display:inline-block; background:var(--chip); color:var(--warn);

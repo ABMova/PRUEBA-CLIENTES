@@ -28,6 +28,9 @@ VENTANA_INTENTOS = 15  # minutos
 INTENTOS_MAX = 300
 RECURSO = "api_crm"
 
+# Lo que el CRM puede marcar como hecho.
+ACCIONES = ("programa", "tarea")
+
 
 def _rechazo(mensaje: str, codigo: int):
     return jsonify({"error": mensaje}), codigo
@@ -79,6 +82,35 @@ def publicacion(token: str):
     repositorio.registrar_auditoria("crm", "api_crm", str(fila["id"]),
                                     "Ficha entregada al CRM", auth.ip_peticion())
     return jsonify(crm.ficha(fila))
+
+
+@api_crm.route("/publicacion/<token>/hecho", methods=["POST"])
+def hecho(token: str):
+    """El CRM avisa de que ya ha dado de alta el programa o la tarea de esta ayuda.
+
+    Es la unica escritura de toda la API, y solo escribe eso: quien hizo que y
+    cuando, para que el correo y el panel lo enseñen. No toca la publicacion.
+    """
+    error = _comprobar_clave()
+    if error:
+        return error
+    fila, error = _publicacion(token)
+    if error:
+        return error
+
+    datos = request.get_json(silent=True) or {}
+    accion = str(datos.get("accion") or "").strip().lower()
+    if accion not in ACCIONES:
+        return _rechazo("Accion desconocida", 400)
+    usuario = str(datos.get("usuario") or "")[:120]
+    detalle = str(datos.get("detalle") or "")[:500]
+
+    repositorio.registrar_crm(fila["id"], accion, usuario, detalle)
+    repositorio.registrar_auditoria("crm", "api_crm", str(fila["id"]),
+                                    f"{accion} por {usuario or 'sin identificar'}",
+                                    auth.ip_peticion())
+    registro.info("El CRM ha dado de alta %s de la publicacion %s (%s)", accion, fila["id"], usuario)
+    return jsonify({"estado": "ok"})
 
 
 @api_crm.route("/publicacion/<token>/documento/<tipo>")
