@@ -1199,6 +1199,10 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(_pf.motivo_ruido("Convocatoria del Premio Jose Maria Yturralde", "",
                                "Universidad de Alicante") == "premio de universidad",
               "aunque la universidad solo aparezca en el organismo")
+    comprobar(_pf.motivo_ruido("Orden por la que se convocan los premios Fermina Orduna a la "
+                               "innovacion tecnologica", "",
+                               "Consejeria de Educacion, Ciencia y Universidades") is None,
+              "una consejeria «de Universidades» no es una universidad: sus premios entran")
     comprobar(_pf.motivo_ruido("Extracto de la convocatoria de premios a la innovacion empresarial",
                                "", "Conselleria de Innovacion") is None,
               "pero un premio de la Conselleria a empresas sigue entrando")

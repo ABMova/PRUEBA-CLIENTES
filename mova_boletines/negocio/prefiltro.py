@@ -33,11 +33,27 @@ SENALES_INTERES = (
     "hoja de ruta", "full de ruta", "plan de accion", "pla d'accio",
 )
 
-# Universidades: sus premios no interesan (los pidio quitar el usuario).
+# Universidades: sus premios no interesan (los pidio quitar el usuario). Quien
+# convoca manda: una consejeria "de Educacion, Ciencia y Universidades" NO es una
+# universidad, y sus premios a la innovacion si interesan.
 UNIVERSIDAD = (
     "universidad", "universitat", "universidade", "university", "rectorado", "rectorat",
-    "vicerrectorado", "vicerectorat", "rector de la", "facultad de", "facultat de",
-    "campus de", "escuela universitaria", "escola universitaria",
+    "vicerrectorado", "vicerectorat", "facultad", "facultat", "campus",
+    "escuela universitaria", "escola universitaria",
+)
+# Cuando no consta el organismo hay que mirar el titulo, y ahi "universidades"
+# aparece en el nombre de muchas consejerias: solo valen los indicios claros.
+UNIVERSIDAD_EN_TITULO = (
+    "universidad de", "universitat de", "universidade de", "universitat politecnica",
+    "universidad politecnica", "de la universidad", "de la universitat", "del rectorado",
+    "del rector", "de la facultad", "de la facultat", "vicerrectorado",
+)
+# Si convoca una administracion, no es un premio universitario aunque la palabra
+# "universidades" salga en su nombre.
+ADMINISTRACION = (
+    "consejeria", "conselleria", "conselleria d", "ministerio", "departamento",
+    "departament", "generalitat", "junta de", "diputacion", "diputacio", "ayuntamiento",
+    "ajuntament", "gobierno de", "govern", "xunta", "comunidad autonoma", "instituto",
 )
 PREMIO = ("premio", "premios", "premi ", "premis", "certamen", "certamenes")
 
@@ -106,21 +122,27 @@ RUIDO: dict[str, tuple[str, ...]] = {
 }
 
 
-def es_premio_de_universidad(texto: str) -> bool:
-    """Premios, certamenes y concursos que convoca una universidad."""
-    return (any(palabra in texto for palabra in PREMIO)
-            and any(palabra in texto for palabra in UNIVERSIDAD))
+def es_premio_de_universidad(texto: str, organismo: str = "") -> bool:
+    """Premios y certamenes convocados por una universidad (no por una consejeria)."""
+    if not any(palabra in texto for palabra in PREMIO):
+        return False
+    if organismo:
+        if any(palabra in organismo for palabra in ADMINISTRACION):
+            return False
+        return any(palabra in organismo for palabra in UNIVERSIDAD)
+    return any(palabra in texto for palabra in UNIVERSIDAD_EN_TITULO)
 
 
 def motivo_ruido(titulo: str, seccion: str = "", organismo: str = "") -> str | None:
     """Familia de ruido si el titulo no es una ayuda; None si puede serlo."""
-    texto = normalizar(f"{titulo} {seccion} {organismo}")
+    texto = normalizar(f"{titulo} {seccion}")
+    quien = normalizar(organismo)
     if not texto:
         return None
     for familia, expresiones in RUIDO_SIEMPRE.items():
         if any(expresion in texto for expresion in expresiones):
             return familia
-    if es_premio_de_universidad(texto):
+    if es_premio_de_universidad(texto, quien):
         return "premio de universidad"
     if any(senal in texto for senal in SENALES_AYUDA):
         return None
