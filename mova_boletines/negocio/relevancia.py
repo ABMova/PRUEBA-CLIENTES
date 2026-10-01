@@ -52,7 +52,7 @@ Reglas:
   listas de reserva, listas reordenadas, nuevos beneficiarios tras resolver recursos, suplentes que entran;
   aumentos del credito o del importe global maximo, ampliaciones de la dotacion;
   correcciones de errores y modificaciones de unas bases reguladoras o de una convocatoria;
-  resoluciones que resuelven la convocatoria (conceden o deniegan a los solicitantes);
+  resoluciones que resuelven una convocatoria ya publicada: conceden, deniegan, excluyen o publican la lista de beneficiarios, aunque solo sea un listado de concedidas y denegadas;
   subvenciones directas o nominativas que se conceden a una entidad concreta.
   NO es seguimiento (y entonces no interesa) una notificacion a un interesado, un reintegro, un requerimiento de justificacion, una orden de pago ni un tramite interno. Tampoco nada de empleo publico o contratacion.
   En "titulo_resumido" di en pocas palabras que cambia y de que convocatoria. "es_convocatoria_ayuda" sigue siendo false en estos casos: no se abre un plazo nuevo.
