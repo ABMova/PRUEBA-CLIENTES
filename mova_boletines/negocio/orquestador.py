@@ -809,14 +809,17 @@ def reenviar(ids: list[int], usuario: str) -> tuple[bool, str]:
         fila["id"], destinatarios[0] if destinatarios else "", dias_token) for fila in filas}
 
     fecha_ref = date.today()
-    html = correo.componer(filas, fecha_ref,
-                           {"consultados": sorted({f["codigo_boletin"] for f in filas}),
-                            "fallidos": []}, tokens)
+
+    def hacer_html(con_crm: bool) -> str:
+        return correo.componer(filas, fecha_ref,
+                               {"consultados": sorted({f["codigo_boletin"] for f in filas}),
+                                "fallidos": []}, tokens, con_crm=con_crm)
+
+    # Como el correo diario: los botones del CRM solo para quien puede usarlos.
     asunto = f"[MOVA Boletines] Reenvio manual - {len(filas)} publicacion(es)"
-    exito, detalle, intentos = correo.enviar(destinatarios, asunto, html)
-    repositorio.registrar_envio(None, ", ".join(destinatarios), asunto,
-                                "enviado" if exito else "error", intentos, detalle,
-                                len(filas), "")
+    exito, detalle, _rutas = _enviar_correo(destinatarios, hacer_html, asunto, None,
+                                            f"reenvio-{fecha_ref:%Y%m%d}{{sufijo}}.html",
+                                            len(filas), True)
     repositorio.registrar_auditoria(usuario, "reenvio_manual", ",".join(str(i) for i in ids),
                                     detalle, resultado="ok" if exito else "error")
     return exito, detalle
