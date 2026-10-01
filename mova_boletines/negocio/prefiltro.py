@@ -14,11 +14,32 @@ perder una convocatoria cuesta mucho mas que analizar una de mas.
 
 La excepcion es RUIDO_SIEMPRE: tramites que nombran ayudas todos los dias
 ("Notificacion ... de resolucion de ayudas", "mesa de contratacion") pero que
-nunca son una convocatoria a la que se pueda optar.
+nunca son una convocatoria a la que se pueda optar. Ahi estan tambien los
+premios que convocan las universidades, que el usuario no quiere recibir.
+
+Al margen de las ayudas, hay publicaciones que interesan por lo que anuncian:
+los planes estrategicos y las estrategias de las administraciones marcan por
+donde iran las ayudas de los proximos anos. SENALES_INTERES evita que se
+descarten aqui; de decidir si valen se encarga el modelo.
 """
 from __future__ import annotations
 
 from negocio.extraccion import normalizar
+
+# Publicaciones que no son ayudas pero interesan: planes y estrategias.
+SENALES_INTERES = (
+    "plan estrategico", "pla estrategic", "planes estrategicos", "plans estrategics",
+    "estrategia", "estrategies", "estrategia valenciana", "plan director", "pla director",
+    "hoja de ruta", "full de ruta", "plan de accion", "pla d'accio",
+)
+
+# Universidades: sus premios no interesan (los pidio quitar el usuario).
+UNIVERSIDAD = (
+    "universidad", "universitat", "universidade", "university", "rectorado", "rectorat",
+    "vicerrectorado", "vicerectorat", "rector de la", "facultad de", "facultat de",
+    "campus de", "escuela universitaria", "escola universitaria",
+)
+PREMIO = ("premio", "premios", "premi ", "premis", "certamen", "certamenes")
 
 # Si aparece cualquiera de estas, el titulo puede ser una ayuda: no se descarta.
 SENALES_AYUDA = (
@@ -85,15 +106,25 @@ RUIDO: dict[str, tuple[str, ...]] = {
 }
 
 
-def motivo_ruido(titulo: str, seccion: str = "") -> str | None:
+def es_premio_de_universidad(texto: str) -> bool:
+    """Premios, certamenes y concursos que convoca una universidad."""
+    return (any(palabra in texto for palabra in PREMIO)
+            and any(palabra in texto for palabra in UNIVERSIDAD))
+
+
+def motivo_ruido(titulo: str, seccion: str = "", organismo: str = "") -> str | None:
     """Familia de ruido si el titulo no es una ayuda; None si puede serlo."""
-    texto = normalizar(f"{titulo} {seccion}")
+    texto = normalizar(f"{titulo} {seccion} {organismo}")
     if not texto:
         return None
     for familia, expresiones in RUIDO_SIEMPRE.items():
         if any(expresion in texto for expresion in expresiones):
             return familia
+    if es_premio_de_universidad(texto):
+        return "premio de universidad"
     if any(senal in texto for senal in SENALES_AYUDA):
+        return None
+    if any(senal in texto for senal in SENALES_INTERES):
         return None
     for familia, expresiones in RUIDO.items():
         for expresion in expresiones:

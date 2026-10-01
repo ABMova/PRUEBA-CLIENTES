@@ -51,7 +51,7 @@ def main() -> int:
     destinatarios_1 = repositorio.destinatarios(solo_activos=False)
     comprobar(len(boletines_1) == 8, f"8 boletines precargados: BOE y 7 autonomicos (hay {len(boletines_1)})")
     de_filtro = [p["termino"] for p in palabras_1 if not p["refuerzo"]]
-    comprobar(len(de_filtro) == 38, f"38 palabras clave de filtro precargadas (hay {len(de_filtro)})")
+    comprobar(len(de_filtro) == 44, f"44 palabras clave de filtro precargadas (hay {len(de_filtro)})")
     comprobar(all(t in de_filtro for t in ("ayuda", "ayudas", "subvencion", "subvenciones",
                                            "premio", "extracto", "bdns")),
               "con los singulares y los extractos de la BDNS, que antes faltaban")

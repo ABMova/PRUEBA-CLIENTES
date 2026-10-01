@@ -1190,6 +1190,35 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar((date(2030, 2, 5), "boletin_recuperado") in pendientes_caido,
               "y ese dia se reintenta al dia siguiente")
 
+    print("\n30) Premios de universidad fuera, planes estrategicos dentro")
+    from negocio import prefiltro as _pf
+
+    comprobar(_pf.motivo_ruido("Resolucion por la que se convocan los Premios de la Universitat "
+                               "Politecnica a la mejor tesis") == "premio de universidad",
+              "un premio de universidad se aparta sin pagar al modelo")
+    comprobar(_pf.motivo_ruido("Convocatoria del Premio Jose Maria Yturralde", "",
+                               "Universidad de Alicante") == "premio de universidad",
+              "aunque la universidad solo aparezca en el organismo")
+    comprobar(_pf.motivo_ruido("Extracto de la convocatoria de premios a la innovacion empresarial",
+                               "", "Conselleria de Innovacion") is None,
+              "pero un premio de la Conselleria a empresas sigue entrando")
+
+    terminos_plan = [f["termino"] for f in repositorio.palabras_clave(solo_activas=True)]
+    for titulo in ("ACUERDO por el que se aprueba la Estrategia Valenciana de Industria 2030",
+                   "Informacion publica del Plan Estrategico de la Comunitat Valenciana"):
+        comprobar(_pf.motivo_ruido(titulo) is None, f"no se aparta: {titulo[:52]}")
+        comprobar(palabras.buscar(titulo, terminos_plan).hay,
+                  f"y entra por palabras clave: {titulo[:44]}")
+
+    # Una estrategia llega al correo aunque no sea convocatoria ni se dirija a
+    # empresas: avisa de por donde iran las ayudas que vengan despues.
+    fila_plan = dict(repositorio.publicaciones({}, limite=1)[0])
+    fila_plan["es_estrategia"] = 1
+    fila_plan["destinatario"] = "publico"
+    html_plan = correo.componer([fila_plan], date.today(), {"consultados": [], "fallidos": []})
+    comprobar("PLAN O ESTRATEGIA" in html_plan,
+              "y en el correo se distingue de una ayuda con su etiqueta")
+
     print("\n29) Los botones del CRM solo para quien puede usarlos")
     from negocio import crm as _crm
 

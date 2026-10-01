@@ -26,6 +26,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON valido, sin texto antes ni despues, con e
 
 {
   "es_convocatoria_ayuda": true,
+  "es_estrategia": false,
   "titulo": "texto literal del titulo de la publicacion",
   "titulo_resumido": "maximo 15 palabras: que se subvenciona y a quien",
   "resumen": "maximo 5 lineas, objeto de la ayuda y a quien se dirige",
@@ -46,6 +47,8 @@ Reglas:
   contratacion publica: contratos, anuncios de licitacion, mesas de contratacion, perfil del contratante;
   tramites sin convocatoria nueva: notificaciones a interesados, correcciones de errores sin contenido nuevo, resoluciones que solo conceden, deniegan o reintegran ayudas de una convocatoria ya publicada, y ampliaciones del plazo para resolver.
   Una ampliacion del plazo para PRESENTAR solicitudes si es true, y unas bases reguladoras de ayudas son siempre true aunque todavia no abran el plazo.
+- "es_estrategia" es true cuando la publicacion aprueba, publica o somete a informacion publica un plan estrategico, una estrategia, un plan director, una hoja de ruta o un plan de accion de una administracion (por ejemplo "Estrategia Valenciana de Industria 2030" o "Plan Estrategico de Innovacion"). Interesan porque anuncian por donde iran las ayudas, aunque no convoquen ninguna todavia. En ese caso el resumen explica que ambitos cubre el plan y a que sector afecta. Un plan estrategico NO es una convocatoria de ayudas: "es_convocatoria_ayuda" seguira siendo false salvo que ademas convoque ayudas.
+- Los premios, certamenes y concursos convocados por universidades no interesan: "es_convocatoria_ayuda" es false.
 - El resumen no supera 5 lineas ni incluye valoraciones propias.
 - El titulo se copia literal de la publicacion.
 - "titulo_resumido" es una sola linea de 15 palabras como maximo que diga que se financia y para quien, sin la referencia normativa (nada de "Orden 12/2026, de 15 de septiembre, de la Conselleria..."). Usa solo informacion del titulo o del texto. Ejemplo: "Subvenciones para la digitalizacion de pymes industriales".
@@ -66,7 +69,7 @@ Asigna media cuando se dirige a fundaciones, asociaciones u otras entidades priv
 Asigna baja cuando el interes para una empresa o una entidad privada es escaso.
 No justifiques mas de dos frases."""
 
-_CAMPOS = ("es_convocatoria_ayuda", "titulo", "titulo_resumido", "resumen",
+_CAMPOS = ("es_convocatoria_ayuda", "es_estrategia", "titulo", "titulo_resumido", "resumen",
            "organismo_convocante", "plazo_solicitud", "fecha_fin_plazo", "beneficiarios",
            "importe", "confianza", "motivo_confianza")
 
@@ -215,6 +218,7 @@ def extraer(publicacion: dict, modelo: str, max_tokens: int, llamar=None) -> Res
 def _esqueleto(publicacion: dict) -> dict:
     return {
         "es_convocatoria_ayuda": True,
+        "es_estrategia": False,
         "titulo": publicacion.get("titulo", ""),
         "titulo_resumido": titulos.resumir(publicacion.get("titulo", "")),
         "resumen": PENDIENTE,
@@ -233,6 +237,7 @@ def _completar(datos: dict, publicacion: dict) -> dict:
     """Rellena huecos con el marcador, nunca con valores plausibles."""
     completo = dict(datos)
     completo.setdefault("es_convocatoria_ayuda", True)
+    completo.setdefault("es_estrategia", False)
     if not str(completo.get("titulo", "")).strip():
         completo["titulo"] = publicacion.get("titulo", "")
     resumido = str(completo.get("titulo_resumido", "") or "").strip()

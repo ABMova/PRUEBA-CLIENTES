@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS publicaciones (
     estado             TEXT NOT NULL DEFAULT 'nueva',
     json_modelo        TEXT NOT NULL DEFAULT '',
     destinatario       TEXT NOT NULL DEFAULT '',
+    es_estrategia      INTEGER NOT NULL DEFAULT 0,
     creado_en          TEXT NOT NULL DEFAULT (datetime('now')),
     actualizado_en     TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -334,6 +335,8 @@ INSERT OR IGNORE INTO palabras_clave (termino, refuerzo) VALUES
  -- 'ayuda'. Faltaban los singulares y la forma en que se publican los
  -- extractos de la BDNS, por donde salen casi todas las convocatorias.
  ('ayuda', 0), ('subvencion', 0), ('premio', 0), ('premios', 0), ('extracto', 0),
+ ('plan estrategico', 0), ('planes estrategicos', 0), ('estrategia', 0), ('estrategias', 0),
+ ('plan director', 0), ('hoja de ruta', 0),
  ('bdns', 0), ('prestamo', 0), ('prestamos', 0), ('aval', 0), ('avales', 0),
  ('bonificacion', 0), ('linea de financiacion', 0), ('subvencionable', 0),
  ('bases reguladoras', 0), ('incentivos', 0), ('financiacion', 0),

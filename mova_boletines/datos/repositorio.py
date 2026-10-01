@@ -105,6 +105,8 @@ _COLUMNAS_ESPERADAS: dict[str, dict[str, str]] = {
         "alerta_enviada": "INTEGER NOT NULL DEFAULT 0",
         # v1.9: a quien se dirige (privado | publico | personas | no_consta)
         "destinatario": "TEXT NOT NULL DEFAULT ''",
+        # v1.18: plan estrategico o estrategia, que entra aunque no sea una ayuda
+        "es_estrategia": "INTEGER NOT NULL DEFAULT 0",
     },
     "ejecuciones": {
         "llamadas_modelo": "INTEGER NOT NULL DEFAULT 0",
@@ -523,7 +525,7 @@ def guardar_publicacion(datos: dict[str, Any]) -> int:
         "url_pdf", "seccion", "relevancia", "sectores", "justificacion", "confianza",
         "motivo_confianza", "hash_contenido", "titulo_normalizado", "terminos", "contextos",
         "texto_incompleto", "revision_manual", "motivo_revision", "duplicado_de", "estado",
-        "json_modelo", "destinatario",
+        "json_modelo", "destinatario", "es_estrategia",
     ]
     valores = [datos.get(col) for col in columnas]
     marcadores = ",".join("?" for _ in columnas)

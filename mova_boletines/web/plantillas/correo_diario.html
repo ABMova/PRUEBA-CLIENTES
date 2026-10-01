@@ -112,9 +112,12 @@
         <tr>
           <td style="padding:8px 24px 10px 24px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid {% if p.relevancia == 'alta' %}#e0c98a{% else %}#e4e4e7{% endif %}; background-color:{% if p.relevancia == 'alta' %}#fdfaf1{% else %}#ffffff{% endif %};">
-              {% if p.revision_manual or p.destinatario == 'no_consta' %}
+              {% if p.revision_manual or p.destinatario == 'no_consta' or p.es_estrategia %}
               <tr>
                 <td colspan="2" style="padding:8px 12px 0 12px;">
+                  {# No es una ayuda: es un plan o una estrategia, y se avisa para
+                     que no se confunda con una convocatoria a la que optar. #}
+                  {% if p.es_estrategia %}<span style="display:inline-block; background-color:#1e3a5f; color:#ffffff; font-family:Segoe UI,Arial,sans-serif; font-size:10px; font-weight:700; padding:3px 9px; border-radius:10px;">PLAN O ESTRATEGIA</span>{% endif %}
                   {% if p.revision_manual %}<span style="display:inline-block; background-color:#d97706; color:#ffffff; font-family:Segoe UI,Arial,sans-serif; font-size:10px; font-weight:700; padding:3px 9px; border-radius:10px;">{{ marcador_revision }}</span>{% endif %}
                   {% if p.destinatario == 'no_consta' %}<span style="display:inline-block; background-color:#f4f4f5; color:#52525b; border:1px solid #d4d4d8; font-family:Segoe UI,Arial,sans-serif; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;">DESTINATARIO SIN CONFIRMAR</span>{% endif %}
                 </td>

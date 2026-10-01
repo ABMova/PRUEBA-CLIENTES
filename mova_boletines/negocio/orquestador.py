@@ -301,7 +301,8 @@ def _fase2(crudas: list[dict], contadores: dict, ejecucion_id: int | None = None
         # Puestos de trabajo, licitaciones y tramites llevan "convocatoria" o
         # "resolucion" y pasaban el filtro de palabras: se apartan sin pagar al
         # modelo. Si el titulo nombra una ayuda, no se descartan aqui.
-        motivo = prefiltro.motivo_ruido(publicacion["titulo"], publicacion.get("seccion", ""))
+        motivo = prefiltro.motivo_ruido(publicacion["titulo"], publicacion.get("seccion", ""),
+                                        publicacion.get("organismo", ""))
         if motivo:
             ruido[motivo] = ruido.get(motivo, 0) + 1
             # Se guarda para poder revisarlo en el panel y recuperarlo si hizo falta.
@@ -408,7 +409,10 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
                              "justificacion": config.MARCADOR_PENDIENTE, "llamadas": 0}
         else:
             extraccion = relevancia.extraer(publicacion, modelo_extraccion, tokens_extraccion)
-            if not extraccion.datos.get("es_convocatoria_ayuda", True):
+            # Los planes estrategicos y las estrategias entran aunque no convoquen
+            # ayudas: anuncian por donde iran las de los proximos anos.
+            es_estrategia = bool(extraccion.datos.get("es_estrategia"))
+            if not extraccion.datos.get("es_convocatoria_ayuda", True) and not es_estrategia:
                 # No es una convocatoria (nombramiento, licitacion, correccion...).
                 # Se guarda igualmente con estado 'no_convocatoria' para que su hash
                 # quede registrado y no se vuelva a pagar al modelo por lo mismo.
@@ -421,7 +425,8 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
                     "es_ayuda": False,
                     "indice": indice,
                 }
-            if extraccion.datos.get("destinatario") in relevancia.DESTINATARIOS_FUERA:
+            if (extraccion.datos.get("destinatario") in relevancia.DESTINATARIOS_FUERA
+                    and not es_estrategia):
                 # Para administraciones publicas o personas fisicas: no interesa.
                 # Se guarda oculta (su hash evita volver a pagar al modelo) y no
                 # hace falta clasificar su relevancia.
@@ -500,6 +505,7 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
             "motivo_revision": salida["extraccion"].motivo,
             "duplicado_de": publicacion.get("duplicado_de"),
             "destinatario": datos.get("destinatario", "no_consta"),
+            "es_estrategia": int(bool(datos.get("es_estrategia"))),
             "estado": ("nueva" if salida.get("es_ayuda", True)
                        else salida.get("estado", "no_convocatoria")),
             "json_modelo": relevancia.json_crudo(datos, clasificacion),
@@ -734,6 +740,7 @@ def analizar_apartada(apartada_id: int, usuario: str = "sistema") -> tuple[bool,
         "terminos": "", "contextos": "", "texto_incompleto": 0,
         "revision_manual": int(extraccion.revision_manual), "motivo_revision": extraccion.motivo,
         "duplicado_de": None, "destinatario": datos.get("destinatario", "no_consta"),
+        "es_estrategia": int(bool(datos.get("es_estrategia"))),
         "estado": "nueva", "json_modelo": relevancia.json_crudo(datos, clasificacion),
     }
     if repositorio.existe_hash(hash_contenido):
