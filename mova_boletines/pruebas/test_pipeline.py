@@ -1219,6 +1219,13 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("PLAN O ESTRATEGIA" in html_plan,
               "y en el correo se distingue de una ayuda con su etiqueta")
 
+    # Lo que cambia una convocatoria ya publicada tambien se envia, con su etiqueta.
+    fila_seg = dict(repositorio.publicaciones({}, limite=1)[0])
+    fila_seg["es_seguimiento"] = 1
+    html_seg = correo.componer([fila_seg], date.today(), {"consultados": [], "fallidos": []})
+    comprobar("SEGUIMIENTO DE CONVOCATORIA" in html_seg,
+              "una lista de reserva o una ampliacion de credito se marca como seguimiento")
+
     print("\n29) Los botones del CRM solo para quien puede usarlos")
     from negocio import crm as _crm
 

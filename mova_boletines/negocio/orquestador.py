@@ -409,10 +409,14 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
                              "justificacion": config.MARCADOR_PENDIENTE, "llamadas": 0}
         else:
             extraccion = relevancia.extraer(publicacion, modelo_extraccion, tokens_extraccion)
-            # Los planes estrategicos y las estrategias entran aunque no convoquen
-            # ayudas: anuncian por donde iran las de los proximos anos.
+            # Dos cosas entran aunque no abran plazo: los planes estrategicos
+            # (anuncian por donde iran las ayudas) y las resoluciones que cambian
+            # algo de una convocatoria ya publicada (listas de reserva, mas
+            # credito, correccion de bases), que afectan a quien la pidio.
             es_estrategia = bool(extraccion.datos.get("es_estrategia"))
-            if not extraccion.datos.get("es_convocatoria_ayuda", True) and not es_estrategia:
+            es_seguimiento = bool(extraccion.datos.get("es_seguimiento"))
+            if (not extraccion.datos.get("es_convocatoria_ayuda", True)
+                    and not es_estrategia and not es_seguimiento):
                 # No es una convocatoria (nombramiento, licitacion, correccion...).
                 # Se guarda igualmente con estado 'no_convocatoria' para que su hash
                 # quede registrado y no se vuelva a pagar al modelo por lo mismo.
@@ -506,6 +510,7 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
             "duplicado_de": publicacion.get("duplicado_de"),
             "destinatario": datos.get("destinatario", "no_consta"),
             "es_estrategia": int(bool(datos.get("es_estrategia"))),
+            "es_seguimiento": int(bool(datos.get("es_seguimiento"))),
             "estado": ("nueva" if salida.get("es_ayuda", True)
                        else salida.get("estado", "no_convocatoria")),
             "json_modelo": relevancia.json_crudo(datos, clasificacion),
@@ -741,6 +746,7 @@ def analizar_apartada(apartada_id: int, usuario: str = "sistema") -> tuple[bool,
         "revision_manual": int(extraccion.revision_manual), "motivo_revision": extraccion.motivo,
         "duplicado_de": None, "destinatario": datos.get("destinatario", "no_consta"),
         "es_estrategia": int(bool(datos.get("es_estrategia"))),
+        "es_seguimiento": int(bool(datos.get("es_seguimiento"))),
         "estado": "nueva", "json_modelo": relevancia.json_crudo(datos, clasificacion),
     }
     if repositorio.existe_hash(hash_contenido):

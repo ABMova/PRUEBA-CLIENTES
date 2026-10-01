@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS publicaciones (
     json_modelo        TEXT NOT NULL DEFAULT '',
     destinatario       TEXT NOT NULL DEFAULT '',
     es_estrategia      INTEGER NOT NULL DEFAULT 0,
+    es_seguimiento     INTEGER NOT NULL DEFAULT 0,
     creado_en          TEXT NOT NULL DEFAULT (datetime('now')),
     actualizado_en     TEXT NOT NULL DEFAULT (datetime('now'))
 );
