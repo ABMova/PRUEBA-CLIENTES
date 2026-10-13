@@ -1,9 +1,13 @@
 """Roles y control de acceso. El usuario se relee de la base en cada petición:
 desactivar a alguien lo deja fuera al instante."""
+import os
+import secrets
+import time
 from functools import wraps
 
 from flask import abort, g, redirect, request, session, url_for
 
+import config
 from models import db
 
 ROLES = {
@@ -23,11 +27,50 @@ PERMISOS = {
 
 def puede(permiso: str, usuario=None) -> bool:
     u = usuario if usuario is not None else g.get("usuario")
-    return bool(u) and u["rol"] in PERMISOS.get(permiso, set())
+    if not u or u["rol"] not in PERMISOS.get(permiso, set()):
+        return False
+    if config.ESCRITORIO and permiso == "administrar":
+        return configuracion_desbloqueada()
+    return True
+
+
+# ---------------------------------------------------------------- modo escritorio
+def configuracion_desbloqueada() -> bool:
+    return session.get("config_hasta", 0) > time.time()
+
+
+def desbloquear_configuracion() -> None:
+    session["config_hasta"] = time.time() + config.MINUTOS_DESBLOQUEO * 60
+
+
+def bloquear_configuracion() -> None:
+    session.pop("config_hasta", None)
+
+
+def usuario_del_equipo():
+    """El único usuario de la versión de escritorio: la cuenta de Windows que la abre."""
+    from auth import user
+    u = db.usuario_por_email(config.EMAIL_ESCRITORIO)
+    nombre = os.environ.get("USERNAME") or "Usuario del equipo"
+    if not u:
+        # Contraseña aleatoria que nadie conoce: este usuario no entra por /login
+        db.crear_usuario(config.EMAIL_ESCRITORIO, nombre, user.hash_clave(secrets.token_urlsafe(32)), "admin",
+                         cambiar_clave=0)
+        u = db.usuario_por_email(config.EMAIL_ESCRITORIO)
+    elif u["nombre"] != nombre or not u["activo"] or u["rol"] != "admin":
+        db.actualizar_usuario(u["id"], nombre=nombre, activo=1, rol="admin", cambiar_clave=0)
+        u = db.usuario_por_email(config.EMAIL_ESCRITORIO)
+    return u
 
 
 def cargar_usuario() -> None:
     g.usuario = None
+    if config.ESCRITORIO:
+        g.usuario = usuario_del_equipo()
+        session["uid"] = g.usuario["id"]
+        if configuracion_desbloqueada():  # el desbloqueo se alarga mientras se usa
+            desbloquear_configuracion()
+        return
     uid = session.get("uid")
     if not uid:
         return
@@ -49,6 +92,8 @@ def requiere(permiso: str = "ver"):
             if g.usuario["cambiar_clave"] and request.endpoint not in ("auth.cambiar_clave", "auth.logout"):
                 return redirect(url_for("auth.cambiar_clave"))
             if not puede(permiso):
+                if config.ESCRITORIO and permiso == "administrar" and not request.path.startswith("/api/"):
+                    return redirect(url_for("auth.desbloquear", next=request.path))
                 abort(403)
             return f(*a, **kw)
         return envoltura

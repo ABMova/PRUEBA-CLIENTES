@@ -4,6 +4,7 @@ python app.py  ->  aplica el esquema, hace copia de seguridad, levanta waitress
 en 127.0.0.1:5000 y abre el navegador.
 """
 import base64
+import os
 import logging
 import secrets
 import socket
@@ -40,7 +41,11 @@ def _data_uri(nombre: str) -> str:
 
 
 def _asegurar_admin() -> None:
-    if db.contar_usuarios() == 0:
+    if config.ESCRITORIO:
+        return  # en escritorio no hay inicio de sesión: el usuario es la cuenta de Windows
+    # El usuario del equipo (versión de escritorio) no cuenta: con la misma base en modo servidor
+    # hace falta igualmente alguien que pueda entrar por /login
+    if not any(u["email"] != config.EMAIL_ESCRITORIO for u in db.listar_usuarios()):
         db.crear_usuario(config.ADMIN_INICIAL_EMAIL, "Administrador", user.hash_clave(config.ADMIN_INICIAL_CLAVE),
                          "admin", cambiar_clave=1)
         log.info("Creado el usuario inicial %s (cambio de contraseña obligatorio)", config.ADMIN_INICIAL_EMAIL)
@@ -83,6 +88,14 @@ def crear_app() -> Flask:
 
     @app.before_request
     def antes():
+        if config.ESCRITORIO:
+            # Solo la ventana de la aplicación: trae el token que generó al arrancar y llama a 127.0.0.1.
+            # Así ni otro programa del equipo ni una web abierta en el navegador pueden usar el puerto.
+            enviado = request.headers.get("X-MOVA-Token", "")
+            if not config.TOKEN_ESCRITORIO or not secrets.compare_digest(enviado, config.TOKEN_ESCRITORIO):
+                abort(403)
+            if request.host != f"127.0.0.1:{config.PUERTO}":
+                abort(403)
         permissions.cargar_usuario()
         g.ip = ip_cliente()
         if "csrf" not in session:
@@ -108,7 +121,8 @@ def crear_app() -> Flask:
     def globales():
         return {"usuario": g.get("usuario"), "puede": permissions.puede, "iconos": iconos,
                 "version": config.VERSION, "csrf": session.get("csrf", ""), "ROLES": permissions.ROLES,
-                "ultima_consulta": session.get("ultima_consulta")}
+                "ultima_consulta": session.get("ultima_consulta"), "escritorio": config.ESCRITORIO,
+                "config_desbloqueada": permissions.configuracion_desbloqueada()}
 
     @app.template_filter("euros")
     def filtro_euros(x):
@@ -126,6 +140,11 @@ def crear_app() -> Flask:
             return datetime.fromisoformat(iso[:10]).strftime("%d/%m/%Y")
         except ValueError:
             return iso
+
+    @app.route("/salud")
+    def salud():
+        """La ventana de escritorio espera a que esto responda antes de mostrar la aplicación."""
+        return {"ok": True, "version": config.VERSION}
 
     def _error(codigo, titulo):
         def manejador(e):
@@ -167,10 +186,30 @@ def _puerto_ocupado(host, puerto) -> bool:
         return s.connect_ex((host, puerto)) == 0
 
 
+def _vigilar_padre(pid: int) -> None:
+    """En escritorio: si la ventana Electron muere sin cerrar el servidor, el servidor se cierra solo."""
+    import ctypes
+    SYNCHRONIZE = 0x00100000
+    k32 = ctypes.windll.kernel32
+    h = k32.OpenProcess(SYNCHRONIZE, False, pid)
+    if not h:
+        log.warning("No se encuentra el proceso de la ventana (%s): el servidor se cierra.", pid)
+        os._exit(0)
+    k32.WaitForSingleObject(h, 0xFFFFFFFF)  # espera a que termine, sin consumir nada
+    log.info("La ventana se cerró: el servidor se cierra.")
+    os._exit(0)
+
+
 def main() -> None:
     _configurar_registro()
     url = f"http://{config.HOST}:{config.PUERTO}"
-    if _puerto_ocupado(config.HOST, config.PUERTO):
+    if config.ESCRITORIO:
+        if not config.TOKEN_ESCRITORIO:
+            log.error("Modo escritorio sin MOVA_TOKEN: no se arranca.")
+            sys.exit(2)
+        if config.PID_PADRE and os.name == "nt":
+            threading.Thread(target=_vigilar_padre, args=(config.PID_PADRE,), daemon=True).start()
+    elif _puerto_ocupado(config.HOST, config.PUERTO):
         log.info("Ya hay una instancia en %s; se abre el navegador y se sale.", url)
         if config.ABRIR_NAVEGADOR:
             webbrowser.open(url)
@@ -186,7 +225,7 @@ def main() -> None:
     except Exception:
         log.exception("No se pudo hacer la copia de seguridad al arrancar")
     log.info("MOVA Minimis %s en %s · datos en %s", config.VERSION, url, config.DATOS)
-    if config.ABRIR_NAVEGADOR:
+    if config.ABRIR_NAVEGADOR and not config.ESCRITORIO:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     from waitress import serve
     kwargs = {"trusted_proxy": "127.0.0.1", "trusted_proxy_headers": {"x-forwarded-for", "x-forwarded-proto"}} \

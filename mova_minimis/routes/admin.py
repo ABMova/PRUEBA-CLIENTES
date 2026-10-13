@@ -27,6 +27,8 @@ def _auditar(accion, entidad, detalle=None):
 @bp.route("/usuarios", methods=["GET", "POST"])
 @requiere("administrar")
 def usuarios():
+    if config.ESCRITORIO:  # un solo usuario: la cuenta de Windows
+        return redirect(url_for("admin.configuracion"))
     clave_nueva = None
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -184,6 +186,8 @@ def _exigir_integridad(ruta: Path) -> None:
 @requiere("administrar")
 def apagar():
     """El .exe no tiene ventana: esta es la forma limpia de pararlo."""
+    if config.ESCRITORIO:  # en escritorio se cierra con la ventana
+        abort(404)
     import os
     import threading
     _auditar("apagado", "aplicacion")
@@ -236,6 +240,19 @@ def configuracion():
                     flash(f"Claude responde ({uso['modelo']}, {uso['entrada']}+{uso['salida']} tokens).", "ok")
                 except claude_api.ErrorClaude as e:
                     flash(str(e), "err")
+        elif accion == "cambiar_clave_config" and config.ESCRITORIO:
+            from routes.auth import CLAVE_CONFIG
+            nueva = request.form.get("nueva", "")
+            if not user.verificar_clave(request.form.get("actual", ""), db.leer_ajuste(CLAVE_CONFIG, "")):
+                flash("La contraseña actual no es correcta.", "err")
+            elif nueva != request.form.get("repetir", ""):
+                flash("Las dos contraseñas nuevas no coinciden.", "err")
+            elif problemas := user.problemas_clave(nueva):
+                flash("La contraseña nueva necesita " + ", ".join(problemas) + ".", "err")
+            else:
+                db.guardar_ajuste(CLAVE_CONFIG, user.hash_clave(nueva))
+                _auditar("clave_configuracion_cambiada", "configuracion")
+                flash("Contraseña de configuración cambiada.", "ok")
         elif accion == "vaciar_cache":
             n = db.vaciar_cache()
             _auditar("configuracion", "cache_bdns", {"borradas": n})

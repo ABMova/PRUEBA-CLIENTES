@@ -14,6 +14,15 @@ Flask + waitress + SQLite, empaquetado con PyInstaller (no Electron). Responder 
 - Entregar: copiar el .exe a `OneDrive\00_IA-AFBM\CLAUDE\EJECUTABLES` como `MOVAMinimis-X.Y.Z.exe`
   y comprobar el hash.
 
+## Versión de escritorio (desde 1.1.0)
+- Electron en `escritorio/` (main.js arranca el motor con `MOVA_MODO_ESCRITORIO=1`, `MOVA_TOKEN`, puerto libre,
+  datos en `%APPDATA%\MOVAMinimis\datos`, `MOVA_PID_PADRE` para que el motor muera con la ventana).
+- Compilar: `C:\build\venvs\mova_minimis\Scripts\python escritorio\construir.py` (motor con
+  `mova_minimis_servidor.spec` en carpeta + electron-builder desde `%LOCALAPPDATA%\Temp\mova-minimis-esc`).
+  Deja `escritorio\dist\MOVAMinimis-Setup-X.Y.Z.exe`. La versión va en `escritorio/package.json` y en `config.VERSION`.
+- Sin login: `permissions.usuario_del_equipo()`; la administración pide la contraseña de configuración
+  (ajuste `clave_configuracion`, ruta `/desbloquear`). Sin gestión de usuarios ni botón de apagado.
+
 ## Datos
 - Desarrollo: `%LOCALAPPDATA%\MOVA Minimis\data-dev`; ejecutable: `...\data`. Nunca en OneDrive.
 - `cipher.key` cifra la clave de Claude y los documentos subidos.

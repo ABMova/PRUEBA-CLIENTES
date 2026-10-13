@@ -5,7 +5,8 @@ from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 
-from auth import user
+import config
+from auth import permissions, user
 from auth.permissions import requiere
 from models import db
 
@@ -39,7 +40,7 @@ def _destino_seguro(nxt: str | None) -> str:
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    if g.get("usuario"):
+    if g.get("usuario") or config.ESCRITORIO:
         return redirect(url_for("dashboard.inicio"))
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -71,6 +72,9 @@ def login():
 
 @bp.route("/logout", methods=["POST"])
 def logout():
+    if config.ESCRITORIO:
+        permissions.bloquear_configuracion()
+        return redirect(url_for("dashboard.inicio"))
     if g.get("usuario"):
         db.auditar(g.usuario["id"], g.usuario["email"], "logout", "usuario", None, g.ip)
     session.clear()
@@ -80,6 +84,8 @@ def logout():
 @bp.route("/cambiar-clave", methods=["GET", "POST"])
 @requiere("ver")
 def cambiar_clave():
+    if config.ESCRITORIO:
+        return redirect(url_for("admin.configuracion") + "#clave-config")
     if request.method == "POST":
         actual = request.form.get("actual", "")
         nueva = request.form.get("nueva", "")
@@ -97,3 +103,50 @@ def cambiar_clave():
             flash("Contraseña actualizada.", "ok")
             return redirect(url_for("dashboard.inicio"))
     return render_template("cambiar_clave.html", obligatorio=bool(g.usuario["cambiar_clave"]))
+
+
+# ---------------------------------------------------------------- escritorio: candado de la configuración
+CLAVE_CONFIG = "clave_configuracion"
+
+
+@bp.route("/desbloquear", methods=["GET", "POST"])
+def desbloquear():
+    """Escritorio: la administración pide una contraseña propia. La primera vez se crea aquí."""
+    if not config.ESCRITORIO:
+        return redirect(url_for("admin.configuracion"))
+    siguiente = _destino_seguro(request.args.get("next") or url_for("admin.configuracion"))
+    guardada = db.leer_ajuste(CLAVE_CONFIG)
+    clave_fallos = (g.ip, "configuracion")
+    if request.method == "POST":
+        clave = request.form.get("clave", "")
+        if _bloqueado(clave_fallos):
+            flash("Demasiados intentos fallidos. Espera unos minutos.", "err")
+        elif not guardada:
+            if clave != request.form.get("repetir", ""):
+                flash("Las dos contraseñas no coinciden.", "err")
+            elif problemas := user.problemas_clave(clave):
+                flash("La contraseña necesita " + ", ".join(problemas) + ".", "err")
+            else:
+                db.guardar_ajuste(CLAVE_CONFIG, user.hash_clave(clave))
+                permissions.desbloquear_configuracion()
+                db.auditar(g.usuario["id"], g.usuario["email"], "clave_configuracion_creada", "configuracion", None, g.ip)
+                flash("Contraseña de configuración creada. Guárdala: sin ella no se puede entrar en la administración.", "ok")
+                return redirect(siguiente)
+        elif user.verificar_clave(clave, guardada):
+            _fallos.pop(clave_fallos, None)
+            permissions.desbloquear_configuracion()
+            db.auditar(g.usuario["id"], g.usuario["email"], "desbloqueo_configuracion", "configuracion", None, g.ip)
+            return redirect(siguiente)
+        else:
+            _fallos.setdefault(clave_fallos, deque()).append(time.time())
+            db.auditar(g.usuario["id"], g.usuario["email"], "desbloqueo_fallido", "configuracion", None, g.ip)
+            flash("Contraseña incorrecta.", "err")
+    return render_template("desbloquear.html", crear=not guardada, siguiente=siguiente,
+                           minutos=config.MINUTOS_DESBLOQUEO)
+
+
+@bp.route("/bloquear", methods=["POST"])
+def bloquear():
+    permissions.bloquear_configuracion()
+    flash("Administración bloqueada.", "ok")
+    return redirect(url_for("dashboard.inicio"))

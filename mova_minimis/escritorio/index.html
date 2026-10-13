@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
+<title>MOVA Minimis</title>
+<style>
+  html,body{margin:0;height:100%}
+  body{display:flex;align-items:center;justify-content:center;font-family:"Segoe UI",system-ui,sans-serif;color:#3b3d43;
+    background:radial-gradient(44% 34% at 88% 2%,rgba(217,180,91,.20),transparent 70%),
+               radial-gradient(38% 30% at 10% 96%,rgba(217,180,91,.12),transparent 72%),#f6f5f1}
+  .caja{text-align:center;max-width:560px;padding:2rem}
+  img{height:64px}
+  .nombre{font-family:"Century Gothic","Avenir Next","Trebuchet MS",sans-serif;letter-spacing:.14em;color:#b8892f;font-size:1rem;margin:.4rem 0 1.6rem}
+  .barra{height:6px;width:220px;margin:0 auto;border-radius:999px;background:#ebe8e0;overflow:hidden}
+  .barra i{display:block;height:100%;width:40%;border-radius:999px;background:linear-gradient(90deg,#f0d98c,#b8892f);animation:ir 1.4s ease-in-out infinite}
+  @keyframes ir{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+  .texto{margin-top:1rem;font-size:.9rem;color:#6c7078}
+  .error{display:none;background:#fdecec;color:#b91c1c;border:1px solid rgba(185,28,28,.25);border-radius:12px;padding:1rem;text-align:left;font-size:.9rem}
+  .error code{display:block;margin-top:.5rem;font-size:.78rem;color:#3b3d43;word-break:break-all}
+  body.fallo .barra,body.fallo .texto{display:none}
+  body.fallo .error{display:block}
+</style>
+</head>
+<body>
+  <div class="caja">
+    <img src="logo.png" alt="MOVA IA">
+    <div class="nombre">MINIMIS</div>
+    <div class="barra"><i></i></div>
+    <div class="texto">Arrancando…</div>
+    <div class="error"><b id="error"></b><br>Cierra la ventana y vuelve a abrir MOVA Minimis. Si se repite, el registro está en:<code id="registro"></code></div>
+  </div>
+  <script src="arranque.js"></script>
+</body>
+</html>

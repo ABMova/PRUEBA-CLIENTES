@@ -35,6 +35,23 @@ Lo que la aplicación **no** puede saber y por eso marca como `[PENDIENTE: ...]`
 
 ## Instalación
 
+### Versión de escritorio (recomendada para un solo equipo)
+`MOVAMinimis-Setup-X.Y.Z.exe` instala MOVA Minimis como cualquier programa de Windows: en tu
+cuenta, sin permisos de administrador, con accesos en el escritorio y en el menú Inicio, y se
+desinstala desde «Agregar o quitar programas».
+
+- **No pide contraseña al entrar.** El usuario es la cuenta de Windows que la abre.
+- **La administración sí:** Configuración, Copias de seguridad y Auditoría piden una contraseña
+  de configuración, que se crea la primera vez que se entra ahí. Queda abierta 30 minutos sin uso
+  o hasta que se bloquea desde el menú del usuario. No se puede recuperar desde la aplicación.
+- **Datos** en `%APPDATA%\MOVAMinimis\datos` (separados de la versión de servidor).
+- Por dentro es una ventana Electron que arranca el motor de MOVA Minimis en un puerto privado de
+  127.0.0.1; cada petición lleva un token aleatorio, así que nada más del equipo puede usarlo.
+- Al abrirlo por primera vez Windows avisa («Windows protegió su PC») porque no está firmado:
+  *Más información* → *Ejecutar de todas formas*.
+
+### Versión de servidor (varios usuarios con cuenta)
+
 ### Ejecutable (recomendado)
 1. Copie `MOVA Minimis.exe` donde quiera y ábralo. Se abre el navegador en
    http://127.0.0.1:5000.

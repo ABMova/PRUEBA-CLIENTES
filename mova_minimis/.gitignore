@@ -11,3 +11,5 @@ build/
 dist/
 *.spec.bak
 .venv/
+escritorio/node_modules/
+escritorio/dist/

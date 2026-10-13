@@ -32,9 +32,13 @@
       <a class="mv-item{{ ' on' if seccion == 'nueva' }}" href="{{ url_for('consultas.nueva') }}">{{ icono('buscar') }}<span>Nueva consulta</span></a>
       {% endif %}
       <a class="mv-item{{ ' on' if seccion == 'resultados' }}" href="{{ url_for('resultados.ver', cid=ultima_consulta) if ultima_consulta else url_for('dashboard.inicio') }}">{{ icono('resultados') }}<span>Resultados</span></a>
+      {% if escritorio and not puede('administrar') %}
+      <div class="mv-grupo">Administración</div>
+      <a class="mv-item{{ ' on' if seccion == 'config' }}" href="{{ url_for('auth.desbloquear') }}">{{ icono('ajustes') }}<span>🔒 Configuración</span></a>
+      {% endif %}
       {% if puede('administrar') %}
       <div class="mv-grupo">Administración</div>
-      <a class="mv-item{{ ' on' if seccion == 'usuarios' }}" href="{{ url_for('admin.usuarios') }}">{{ icono('usuarios') }}<span>Usuarios</span></a>
+      {% if not escritorio %}<a class="mv-item{{ ' on' if seccion == 'usuarios' }}" href="{{ url_for('admin.usuarios') }}">{{ icono('usuarios') }}<span>Usuarios</span></a>{% endif %}
       <a class="mv-item{{ ' on' if seccion == 'auditoria' }}" href="{{ url_for('admin.auditoria') }}">{{ icono('auditoria') }}<span>Auditoría</span></a>
       <a class="mv-item{{ ' on' if seccion == 'backups' }}" href="{{ url_for('admin.backups') }}">{{ icono('copias') }}<span>Copias de seguridad</span></a>
       <a class="mv-item{{ ' on' if seccion == 'config' }}" href="{{ url_for('admin.configuracion') }}">{{ icono('ajustes') }}<span>Configuración</span></a>
@@ -57,15 +61,21 @@
         <div class="mv-drop">
           <button type="button" class="mv-usuario" data-mv-drop>
             <img src="{{ iconos.cerebro }}" alt="">
-            <span class="mv-usuario-txt"><b>{{ usuario.nombre }}</b><span>{{ ROLES[usuario.rol] }}</span></span>
+            <span class="mv-usuario-txt"><b>{{ usuario.nombre }}</b><span>{% if escritorio %}{{ 'Administración abierta' if config_desbloqueada else 'Este equipo' }}{% else %}{{ ROLES[usuario.rol] }}{% endif %}</span></span>
           </button>
           <div class="mv-pop">
+            {% if escritorio %}
+            {% if config_desbloqueada %}
+            <form method="post" action="{{ url_for('auth.bloquear') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Bloquear la administración</button></form>
+            {% else %}<a href="{{ url_for('auth.desbloquear') }}">🔒 Abrir la administración</a>{% endif %}
+            {% else %}
             <a href="{{ url_for('auth.cambiar_clave') }}">Cambiar contraseña</a>
             {% if puede('administrar') %}
             <form method="post" action="{{ url_for('admin.apagar') }}"><input type="hidden" name="csrf" value="{{ csrf }}">
               <button type="submit" data-confirmar="¿Cerrar MOVA Minimis? Las consultas en curso se interrumpirán.">Cerrar la aplicación</button></form>
             {% endif %}
             <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Salir</button></form>
+            {% endif %}
           </div>
         </div>
       </div>

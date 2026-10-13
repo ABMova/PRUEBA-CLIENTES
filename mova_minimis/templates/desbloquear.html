@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% set seccion = 'config' %}
+{% block titulo %}Administración{% endblock %}
+{% block barra %}Administración{% endblock %}
+{% block ancho %}520px{% endblock %}
+{% block contenido %}
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Administración</div>
+  <div class="en-cabecera"><div><h1>🔒 Administración</h1>
+    <div class="en-sub">{% if crear %}Configuración, copias de seguridad y auditoría van protegidas. Crea la contraseña que las abrirá.
+      {% else %}Introduce la contraseña de configuración. Se mantiene abierta {{ minutos }} minutos sin uso.{% endif %}</div></div></div>
+</div>
+<section class="en-card">
+  <form method="post" class="en-campos" style="grid-template-columns:1fr">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="en-campo"><label for="clave">{{ 'Contraseña nueva' if crear else 'Contraseña de configuración' }}</label>
+      <input class="form-control" id="clave" name="clave" type="password" autocomplete="{{ 'new-password' if crear else 'current-password' }}" autofocus required></div>
+    {% if crear %}
+    <div class="en-campo"><label for="repetir">Repetir contraseña</label>
+      <input class="form-control" id="repetir" name="repetir" type="password" autocomplete="new-password" required>
+      <span class="en-ayuda">Al menos 10 caracteres, con letras y números. Guárdala bien: no hay forma de recuperarla desde la aplicación.</span></div>
+    {% endif %}
+    <div class="en-acciones"><a class="btn btn-light btn-sm" href="{{ url_for('dashboard.inicio') }}">Cancelar</a>
+      <button class="btn btn-primary btn-sm" type="submit">{{ 'Crear y entrar' if crear else 'Entrar' }}</button></div>
+  </form>
+</section>
+{% endblock %}

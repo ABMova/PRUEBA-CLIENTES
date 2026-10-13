@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "1.0.5"
+VERSION = "1.1.0"
 NOMBRE_APP = "MOVA Minimis"
 
 CONGELADO = getattr(sys, "frozen", False)
@@ -41,6 +41,15 @@ DIR_LOGS = DATOS / "logs"
 DIR_BACKUPS = DATOS / "backups"
 DIR_TEMPORAL = DATOS / "tmp"
 FICHERO_CLAVE_CIFRADO = DATOS / "cipher.key"
+
+# Modo escritorio: lo arranca la ventana Electron. Sin inicio de sesión (un solo usuario, el de Windows);
+# la administración se protege con una contraseña de configuración. Cada petición debe traer el
+# token que la ventana genera al arrancar, para que nada más del equipo pueda usar el puerto.
+ESCRITORIO = os.environ.get("MOVA_MODO_ESCRITORIO", "0") == "1"
+TOKEN_ESCRITORIO = os.environ.get("MOVA_TOKEN", "")
+PID_PADRE = int(os.environ.get("MOVA_PID_PADRE", "0") or 0)
+MINUTOS_DESBLOQUEO = 30
+EMAIL_ESCRITORIO = "equipo@local"
 
 HOST = os.environ.get("MOVA_HOST", "127.0.0.1")
 PUERTO = int(os.environ.get("MOVA_PUERTO", "5000"))

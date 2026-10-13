@@ -308,6 +308,91 @@ class DesgloseMovil(unittest.TestCase):
         self.assertEqual([(x["ano"], x["tramo"]) for x in c["desglose_por_ano"]], [(2023, ""), (2024, ""), (2025, "")])
 
 
+class Escritorio(unittest.TestCase):
+    """Versión de escritorio: sin inicio de sesión, token obligatorio y candado en la administración."""
+
+    TOKEN = "t" * 48
+
+    @classmethod
+    def setUpClass(cls):
+        import app as aplicacion
+        import config
+        cls.config = config
+        cls.antes = (config.ESCRITORIO, config.TOKEN_ESCRITORIO, config.PUERTO)
+        config.ESCRITORIO, config.TOKEN_ESCRITORIO, config.PUERTO = True, cls.TOKEN, 5099
+        cls.app = aplicacion.crear_app()
+        cls.app.testing = True
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.config.ESCRITORIO, cls.config.TOKEN_ESCRITORIO, cls.config.PUERTO = cls.antes
+
+    def _cliente(self, token=TOKEN, host="127.0.0.1:5099"):
+        """Cliente que se presenta como la ventana: token en cabecera y la dirección que usa Electron."""
+        c = self.app.test_client()
+        c.environ_base["HTTP_X_MOVA_TOKEN"] = token
+        original = c.open
+
+        def abrir(*a, **kw):
+            kw.setdefault("base_url", f"http://{host}")
+            return original(*a, **kw)
+        c.open = abrir
+        return c
+
+    def _csrf(self, c):
+        c.get("/")
+        with c.session_transaction(base_url="http://127.0.0.1:5099") as s:
+            return s["csrf"]
+
+    def test_sin_token_o_con_otro_host_no_entra(self):
+        self.assertEqual(self._cliente(token="malo").get("/").status_code, 403)
+        self.assertEqual(self._cliente(token="").get("/salud").status_code, 403)
+        self.assertEqual(self._cliente(host="localhost:5099").get("/").status_code, 403)
+
+    def test_entra_sin_contrasena(self):
+        c = self._cliente()
+        r = c.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Consultas de minimis", r.data)
+        self.assertEqual(c.get("/consultas/nueva").status_code, 200)
+        self.assertEqual(c.get("/login").status_code, 302)
+
+    def test_administracion_con_candado(self):
+        from models import db
+        from routes.auth import CLAVE_CONFIG
+        db.guardar_ajuste(CLAVE_CONFIG, None)
+        c = self._cliente()
+        csrf = self._csrf(c)
+        for ruta in ("/admin/configuracion", "/admin/backups", "/admin/auditoria"):
+            r = c.get(ruta)
+            self.assertEqual(r.status_code, 302, ruta)
+            self.assertIn("/desbloquear", r.headers["Location"])
+        # La primera vez se crea la contraseña
+        r = c.post("/desbloquear?next=/admin/backups",
+                   data={"csrf": csrf, "clave": "ConfigSegura123", "repetir": "ConfigSegura123"})
+        self.assertEqual(r.headers["Location"], "/admin/backups")
+        self.assertEqual(c.get("/admin/backups").status_code, 200)
+        self.assertEqual(c.get("/admin/usuarios").status_code, 302)  # sin gestión de usuarios
+        # Bloquear y volver a abrir: la contraseña mala no vale, la buena sí
+        c.post("/bloquear", data={"csrf": csrf})
+        self.assertEqual(c.get("/admin/configuracion").status_code, 302)
+        c.post("/desbloquear", data={"csrf": csrf, "clave": "Mala1234567"})
+        self.assertEqual(c.get("/admin/configuracion").status_code, 302)
+        c.post("/desbloquear", data={"csrf": csrf, "clave": "ConfigSegura123"})
+        self.assertEqual(c.get("/admin/configuracion").status_code, 200)
+
+    def test_otra_sesion_no_hereda_el_desbloqueo(self):
+        from models import db
+        from auth import user
+        from routes.auth import CLAVE_CONFIG
+        db.guardar_ajuste(CLAVE_CONFIG, user.hash_clave("ConfigSegura123"))
+        a = self._cliente()
+        csrf = self._csrf(a)
+        a.post("/desbloquear", data={"csrf": csrf, "clave": "ConfigSegura123"})
+        self.assertEqual(a.get("/admin/configuracion").status_code, 200)
+        self.assertEqual(self._cliente().get("/admin/configuracion").status_code, 302)
+
+
 class Documentos(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
