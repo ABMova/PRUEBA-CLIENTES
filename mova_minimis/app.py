@@ -151,6 +151,16 @@ def crear_app() -> Flask:
     return app
 
 
+def _vaciar_temporal() -> None:
+    """Restos de subidas o descargas cortadas por un cierre a destiempo."""
+    import shutil
+    for p in config.DIR_TEMPORAL.iterdir():
+        if p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            p.unlink(missing_ok=True)
+
+
 def _puerto_ocupado(host, puerto) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
@@ -166,6 +176,7 @@ def main() -> None:
             webbrowser.open(url)
         return
     app = crear_app()
+    _vaciar_temporal()
     n = db.marcar_interrumpidas()
     if n:
         log.warning("%d consulta(s) en curso marcadas como interrumpidas", n)

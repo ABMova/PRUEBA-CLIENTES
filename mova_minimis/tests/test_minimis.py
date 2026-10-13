@@ -201,6 +201,91 @@ class Regresiones(unittest.TestCase):
         self.assertEqual(e, [])
 
 
+class Regresiones102(unittest.TestCase):
+    """Segunda revisión (13/10/2026)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import app as aplicacion
+        from auth import user
+        from models import db
+        cls.app = aplicacion.crear_app()
+        cls.app.testing = True
+        if not db.usuario_por_email("admin2@prueba"):
+            db.crear_usuario("admin2@prueba", "Admin", user.hash_clave("ClaveAdmin123"), "admin", cambiar_clave=0)
+
+    def _admin(self):
+        c = self.app.test_client()
+        c.get("/login")
+        with c.session_transaction() as s:
+            csrf = s["csrf"]
+        c.post("/login", data={"email": "admin2@prueba", "clave": "ClaveAdmin123", "csrf": csrf})
+        return c, csrf
+
+    def test_zip_sin_base_no_da_500_y_no_deja_restos(self):
+        import io
+        import zipfile
+        import config
+        c, csrf = self._admin()
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("informe.pdf", b"%PDF")
+        buf.seek(0)
+        r = c.post("/admin/backups/restaurar", data={"csrf": csrf, "copia": (buf, "informes.zip")},
+                   content_type="multipart/form-data")
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(list(config.DIR_TEMPORAL.iterdir()), [])
+
+    def test_descarga_de_copia_no_deja_zip(self):
+        import config
+        c, _ = self._admin()
+        r = c.get("/admin/backups/descargar")
+        self.assertEqual(r.data[:2], b"PK")
+        r.close()
+        self.assertEqual(list(config.DIR_TEMPORAL.iterdir()), [])
+        self.assertEqual(list(config.DIR_BACKUPS.glob("*.zip")), [])
+
+    def test_klm_y_dni_corto_en_entrada_manual(self):
+        salida = parser.procesar_manual("K1234567L ; Cliente uno\n1234567L Cliente dos")
+        self.assertEqual(sorted(x["cif"] for x in salida["clientes"]), ["01234567L", "K1234567L"])
+        self.assertEqual(salida["errores"], [])
+
+    def test_sublimites_segun_fecha(self):
+        self.assertEqual(calculador.sublimite("agricola", date(2024, 12, 16))[0], 50_000)
+        self.assertEqual(calculador.sublimite("agricola", date(2024, 12, 15))[0], 25_000)
+        self.assertEqual(calculador.sublimite("agricola", date(2024, 6, 1))[0], 20_000)
+        self.assertEqual(calculador.sublimite("pesca", date(2024, 12, 2))[0], 40_000)
+        self.assertEqual(calculador.sublimite("pesca", date(2024, 12, 1))[0], 30_000)
+        per = calculador.periodo("movil", date(2024, 6, 1), None)
+        c, _ = calculador.calcular_cliente(res(ayuda("2024-01-10", 30_000, "REG (UE) 1408/2013 de minimis")), per)
+        self.assertEqual(c["sublimites"][0]["disponible"], -10_000)
+
+    def test_copias_antiguas_no_rompen_la_poda(self):
+        import config
+        from models import db
+        for p in config.DIR_BACKUPS.glob("*.db"):
+            p.unlink()
+        for i in range(12):
+            (config.DIR_BACKUPS / f"minimis_antes_de_restaurar_202601{i:02d}_000000.db").write_bytes(b"x")
+        nueva = db.copia_automatica()
+        self.assertTrue(nueva.exists())
+
+    def test_todas_las_pantallas_abren(self):
+        """Una ruta borrada rompe cualquier plantilla que la enlace (url_for): se abre cada pantalla."""
+        c, _ = self._admin()
+        for ruta in ("/", "/consultas/nueva", "/admin/configuracion", "/admin/usuarios", "/admin/auditoria",
+                     "/admin/backups", "/cambiar-clave"):
+            self.assertEqual(c.get(ruta).status_code, 200, ruta)
+        endpoints = {r.endpoint for r in self.app.url_map.iter_rules()}
+        self.assertIn("admin.apagar", endpoints)
+
+    def test_intentos_no_crean_entradas(self):
+        from routes import auth
+        auth._fallos.clear()
+        self.assertFalse(auth._bloqueado(("127.0.0.1", "nadie@x")))
+        self.assertEqual(auth._fallos, {})
+
+
 class Documentos(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())

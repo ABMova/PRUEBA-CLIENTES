@@ -9,8 +9,14 @@ Normativa aplicada (vigente a octubre de 2026):
 - Acumulación (art. 5 del 2023/2831): las de minimis agrícolas (1408/2013) y de
   pesca (717/2014) suman contra el mismo techo general; las SIEG (2023/2832)
   se acumulan con las generales hasta 750.000 €.
-- Sublímites propios: agrícola 50.000 € (Reg. 2024/3118), pesca 40.000 €
-  (Reg. 2023/2391), sobre el mismo periodo de tres años.
+- Sublímites propios, según la fecha de referencia:
+  · agrícola: 50.000 € en cualquier periodo de tres años desde el 16/12/2024
+    (Reg. 2024/3118, DO L 13/12/2024, vigor a los tres días); antes 25.000 € en
+    España desde el 02/12/2024 (RD 1139/2024) y 20.000 € hasta entonces.
+  · pesca: 40.000 € en España desde el 02/12/2024 (art. 3.2 bis del 717/2014,
+    añadido por el 2023/2391, activado por el RD 1139/2024); antes 30.000 €.
+    La pesca se sigue midiendo por ejercicios fiscales: el periodo móvil es una
+    aproximación para este sublímite.
 
 Dos modos:
 - 'movil' (recomendado): tres años hasta la fecha de referencia.
@@ -22,9 +28,20 @@ from datetime import date
 TECHO_GENERAL = 300_000.0
 TECHO_GENERAL_1407 = 200_000.0
 TECHO_SIEG_COMBINADO = 750_000.0
-SUBLIMITE = {"agricola": 50_000.0, "pesca": 40_000.0}
+# (desde, tope, norma), de la más reciente a la más antigua
+SUBLIMITES = {
+    "agricola": [(date(2024, 12, 16), 50_000.0, "Reg. (UE) 2024/3118"),
+                 (date(2024, 12, 2), 25_000.0, "Reg. (UE) 1408/2013 y RD 1139/2024"),
+                 (date.min, 20_000.0, "Reg. (UE) 1408/2013")],
+    "pesca": [(date(2024, 12, 2), 40_000.0, "Reg. (UE) 717/2014 mod. 2023/2391 y RD 1139/2024"),
+              (date.min, 30_000.0, "Reg. (UE) 717/2014")],
+}
 MARGEN_LIMITE = 5_000.0
 INICIO_2023_2831 = date(2024, 1, 1)
+
+
+def sublimite(clase: str, fecha_ref: date) -> tuple[float, str]:
+    return next((tope, norma) for desde, tope, norma in SUBLIMITES[clase] if fecha_ref >= desde)
 
 
 def sumar_anos(d: date, n: int) -> date:
@@ -156,11 +173,11 @@ def calcular_cliente(res: dict, per: dict) -> tuple[dict, list[dict]]:
     estado = _estado(saldo)
 
     sublimites = []
-    if techo == TECHO_GENERAL:
-        for clase, tope in SUBLIMITE.items():
-            if sumas[clase]:
-                sublimites.append({"clase": clase, "tope": tope, "computado": round(sumas[clase], 2),
-                                   "disponible": round(min(tope - sumas[clase], saldo), 2)})
+    for clase in SUBLIMITES:
+        if sumas[clase]:
+            tope, norma = sublimite(clase, per["hasta"])
+            sublimites.append({"clase": clase, "tope": tope, "norma": norma, "computado": round(sumas[clase], 2),
+                               "disponible": round(min(tope - sumas[clase], saldo), 2)})
     if sumas["sieg"]:
         notas.append("Incluye ayudas SIEG (Reg. 2023/2832): se aplica también el techo combinado de 750.000 €.")
 

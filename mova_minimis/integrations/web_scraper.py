@@ -26,8 +26,6 @@ import requests
 
 import config
 
-AVISO_REUTILIZACION = config.AVISO_BDNS
-
 _sesion = requests.Session()
 _sesion.headers.update({"Accept": "application/json", "User-Agent": f"MOVA-Minimis/{config.VERSION}"})
 

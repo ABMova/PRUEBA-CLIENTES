@@ -432,7 +432,8 @@ MAX_BYTES_RESTAURAR = 2 * 1024 ** 3
 
 
 def _podar(prefijo: str, conservar: int) -> None:
-    copias = sorted(config.DIR_BACKUPS.glob(f"{prefijo}*.db"))  # la marca de tiempo ordena por fecha
+    # solo nombres con marca de tiempo (que ordena por fecha); las 'minimis_antes_de_restaurar_*' de la 1.0.0 no entran
+    copias = sorted(config.DIR_BACKUPS.glob(f"{prefijo}[0-9]*.db"))
     for viejo in copias[:-conservar]:
         viejo.unlink(missing_ok=True)
 

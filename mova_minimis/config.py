@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 NOMBRE_APP = "MOVA Minimis"
 
 CONGELADO = getattr(sys, "frozen", False)
@@ -39,6 +39,7 @@ DIR_DOCUMENTOS = DATOS / "documentos"
 DIR_INFORMES = DATOS / "informes"
 DIR_LOGS = DATOS / "logs"
 DIR_BACKUPS = DATOS / "backups"
+DIR_TEMPORAL = DATOS / "tmp"
 FICHERO_CLAVE_CIFRADO = DATOS / "cipher.key"
 
 HOST = os.environ.get("MOVA_HOST", "127.0.0.1")
@@ -75,5 +76,5 @@ AVISO_BDNS = (
 
 
 def preparar_carpetas() -> None:
-    for d in (DATOS, DIR_DOCUMENTOS, DIR_INFORMES, DIR_LOGS, DIR_BACKUPS):
+    for d in (DATOS, DIR_DOCUMENTOS, DIR_INFORMES, DIR_LOGS, DIR_BACKUPS, DIR_TEMPORAL):
         d.mkdir(parents=True, exist_ok=True)

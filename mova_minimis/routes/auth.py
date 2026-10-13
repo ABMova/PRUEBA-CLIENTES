@@ -1,6 +1,6 @@
 """Acceso: entrar, salir y cambiar la contraseña."""
 import time
-from collections import defaultdict, deque
+from collections import deque
 from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
@@ -11,15 +11,20 @@ from models import db
 
 bp = Blueprint("auth", __name__)
 
-_fallos: dict[tuple[str, str], deque] = defaultdict(deque)
+_fallos: dict[tuple[str, str], deque] = {}
 MAX_FALLOS, VENTANA_S = 8, 15 * 60
 
 
 def _bloqueado(clave: tuple[str, str]) -> bool:
     """Por IP y correo: en el equipo todos entran desde 127.0.0.1 y no deben bloquearse entre sí."""
-    q = _fallos[clave]
+    q = _fallos.get(clave)
+    if q is None:
+        return False
     while q and time.time() - q[0] > VENTANA_S:
         q.popleft()
+    if not q:
+        del _fallos[clave]  # que el diccionario no crezca con cada correo tecleado
+        return False
     return len(q) >= MAX_FALLOS
 
 
@@ -54,7 +59,10 @@ def login():
             if u["cambiar_clave"]:
                 return redirect(url_for("auth.cambiar_clave"))
             return redirect(_destino_seguro(request.args.get("next")))
-        _fallos[clave_fallos].append(time.time())
+        _fallos.setdefault(clave_fallos, deque()).append(time.time())
+        if len(_fallos) > 1000:  # barrido de lo caducado para que no crezca sin fin
+            for k in [k for k, q in _fallos.items() if time.time() - q[-1] > VENTANA_S]:
+                del _fallos[k]
         db.auditar(u["id"] if u else None, email or None, "login_fallido", "usuario",
                    {"motivo": "usuario desactivado" if u and not u["activo"] else "credenciales"}, g.ip)
         flash("Correo o contraseña incorrectos.", "err")

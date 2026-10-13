@@ -22,7 +22,8 @@ _PATRON_ID = re.compile(
     r"(?<![A-Z0-9])(?:ES[\s\-]?)?("
     r"[ABCDEFGHJNPQRSUVW]" + _SEP + r"\d{2}" + _SEP + r"\d{3}" + _SEP + r"\d{2}" + _SEP + r"[0-9A-J]"
     r"|\d{8}" + _SEP + r"[A-Z]"
-    r"|[XYZ]" + _SEP + r"\d{7}" + _SEP + r"[A-Z]"
+    r"|[XYZKLM]" + _SEP + r"\d{7}" + _SEP + r"[A-Z]"
+    r"|\d{7}" + _SEP + r"[A-Z]"  # DNI escrito sin el cero inicial
     r")(?![A-Z0-9])"
 )
 _ETIQUETAS = re.compile(r"\b(C\.?I\.?F\.?|N\.?I\.?F\.?|N\.?I\.?E\.?|CIF/NIF|RAZ[OÓ]N SOCIAL|EMPRESA|CLIENTE|"
@@ -43,7 +44,7 @@ def validar_identificador(texto: str) -> tuple[str, str, bool, str]:
     s = re.sub(r"[\s.\-]", "", (texto or "").upper())
     if s.startswith("ES") and len(s) == 11:
         s = s[2:]
-    if re.fullmatch(r"\d{6,7}[A-Z]", s):  # DNI copiado sin ceros a la izquierda
+    if re.fullmatch(r"\d{7}[A-Z]", s):  # DNI copiado sin el cero inicial
         s = s.zfill(9)
     if re.fullmatch(r"[KLM]\d{7}[A-Z]", s):  # NIF especiales: letra como el DNI
         ok = LETRAS_NIF[int(s[1:8]) % 23] == s[8]

@@ -48,8 +48,7 @@ def subir_documentos():
     if not ficheros:
         return jsonify({"error": "No se recibió ningún fichero."}), 400
     salidas, docs, avisos_claude = [], [], []
-    tmp_dir = config.DATOS / "tmp"
-    tmp_dir.mkdir(exist_ok=True)
+    tmp_dir = config.DIR_TEMPORAL
     llamar = orquestador.llamador_claude(aviso=avisos_claude.append)
     for f in ficheros:
         nombre = Path(f.filename or "documento").name

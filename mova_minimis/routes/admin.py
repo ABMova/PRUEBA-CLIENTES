@@ -1,12 +1,12 @@
 """Administración: usuarios, auditoría, copias de seguridad y configuración."""
-import io
 import secrets
+import shutil
 import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, send_file, url_for
 
 import config
 from auth import user
@@ -106,12 +106,25 @@ def copia_ahora():
 @bp.route("/backups/descargar")
 @requiere("administrar")
 def descargar_backup():
+    """Se envía por trozos desde un temporal en disco (no en memoria) y la carpeta se borra al acabar.
+    No vale send_file + call_on_close: send_file entrega el fichero directo y las funciones de cierre no corren."""
     nombre = f"mova_minimis_copia_{datetime.now():%Y%m%d_%H%M%S}.zip"
-    with tempfile.TemporaryDirectory(dir=config.DATOS) as tmp:  # no se queda ningún .zip en el disco
-        ruta = db.crear_zip_copia(Path(tmp) / nombre)
-        contenido = io.BytesIO(ruta.read_bytes())
-    _auditar("descarga_copia", "base_datos", {"fichero": nombre, "bytes": contenido.getbuffer().nbytes})
-    return send_file(contenido, as_attachment=True, download_name=nombre, mimetype="application/zip")
+    tmp = Path(tempfile.mkdtemp(dir=config.DIR_TEMPORAL))
+    try:
+        ruta = db.crear_zip_copia(tmp / nombre)
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    _auditar("descarga_copia", "base_datos", {"fichero": nombre, "bytes": ruta.stat().st_size})
+    def trozos():
+        try:
+            with open(ruta, "rb") as fi:
+                while bloque := fi.read(1024 * 1024):
+                    yield bloque
+        finally:  # también si el navegador corta la descarga
+            shutil.rmtree(tmp, ignore_errors=True)
+    return Response(trozos(), mimetype="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="{nombre}"', "Content-Length": str(ruta.stat().st_size)})
 
 
 @bp.route("/backups/restaurar", methods=["POST"])
@@ -121,43 +134,50 @@ def restaurar():
     if not f or not f.filename:
         flash("Elija un fichero .zip o .db.", "err")
         return redirect(url_for("admin.backups"))
-    with tempfile.TemporaryDirectory(dir=config.DATOS) as tmp:
-        tmp = Path(tmp)
-        subido = tmp / Path(f.filename).name
+    with tempfile.TemporaryDirectory(dir=config.DIR_TEMPORAL) as tmp:
+        subido = Path(tmp) / ("subida" + Path(f.filename).suffix.lower())
         f.save(subido)
-        zf = None
-        if subido.suffix.lower() == ".zip":
-            try:
-                zf = zipfile.ZipFile(subido)
-                if "minimis.db" not in zf.namelist():
-                    raise zipfile.BadZipFile
-                with zf.open("minimis.db") as src, open(tmp / "minimis.db", "wb") as dst:
-                    dst.write(src.read())
-                db_origen = tmp / "minimis.db"
-            except zipfile.BadZipFile:
-                flash("El .zip no es una copia de MOVA Minimis (falta minimis.db).", "err")
-                return redirect(url_for("admin.backups"))
-        else:
-            db_origen = subido
-        ok, motivo = db.comprobar_integridad(db_origen)
-        if not ok:
-            flash(motivo, "err")
-            if zf:
-                zf.close()
-            return redirect(url_for("admin.backups"))
         try:
-            previa = db.restaurar(db_origen, zf)
+            previa = _restaurar_desde(subido, Path(tmp))
         except ValueError as e:
             flash(str(e), "err")
             return redirect(url_for("admin.backups"))
-        finally:
-            if zf:
-                zf.close()
     # La auditoría restaurada no tiene este evento: se anota en la base ya restaurada
     _auditar("restauracion", "base_datos", {"origen": f.filename, "copia_previa": previa.name})
     flash(f"Copia restaurada. El estado anterior quedó guardado en {previa.name}. "
           "Si su usuario no existía en la copia, vuelva a entrar.", "ok")
     return redirect(url_for("admin.backups"))
+
+
+def _restaurar_desde(subido: Path, tmp: Path) -> Path:
+    """Valida la copia y la restaura. Cualquier problema se devuelve como ValueError con el motivo.
+    El .zip se cierra siempre: en Windows un fichero abierto impide borrar la carpeta temporal."""
+    if subido.suffix != ".zip":
+        _exigir_integridad(subido)
+        return db.restaurar(subido)
+    try:
+        zf = zipfile.ZipFile(subido)
+    except zipfile.BadZipFile:
+        raise ValueError("El fichero no es un .zip válido.")
+    with zf:
+        try:
+            info = zf.getinfo("minimis.db")
+        except KeyError:
+            raise ValueError("El .zip no es una copia de MOVA Minimis (falta minimis.db).")
+        db.documentos_restaurables(zf)  # rechaza el .zip antes de descomprimir nada si es desmesurado
+        if info.file_size > db.MAX_BYTES_RESTAURAR:
+            raise ValueError("La base de datos del .zip es desmesurada: no parece una copia de MOVA Minimis.")
+        db_origen = tmp / "minimis.db"
+        with zf.open(info) as src, open(db_origen, "wb") as dst:
+            shutil.copyfileobj(src, dst)
+        _exigir_integridad(db_origen)
+        return db.restaurar(db_origen, zf)
+
+
+def _exigir_integridad(ruta: Path) -> None:
+    ok, motivo = db.comprobar_integridad(ruta)
+    if not ok:
+        raise ValueError(motivo)
 
 
 @bp.route("/apagar", methods=["POST"])

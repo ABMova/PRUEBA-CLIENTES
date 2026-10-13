@@ -197,7 +197,7 @@ def exportar_docx(informe: dict, destino: Path) -> Path:
             p.add_run("Vuelve a tener saldo a partir del: ").bold = True
             p.add_run(d["fecha_recupera_saldo"])
         for s in d["sublimites"]:
-            doc.add_paragraph(f"Sublímite {s['clase']}: computado {euros(s['computado'])} de {euros(s['tope'])}; "
+            doc.add_paragraph(f"Sublímite {s['clase']} ({s.get('norma', '')}): computado {euros(s['computado'])} de {euros(s['tope'])}; "
                               f"disponible {euros(s['disponible'])}.")
         if d["referencias_fuente"]:
             tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe", "Computa"],
@@ -342,7 +342,7 @@ def exportar_pdf(informe: dict, destino: Path) -> Path:
             bloque.append(P(f"Vuelve a tener saldo a partir del: {d['fecha_recupera_saldo']}"))
         h.append(KeepTogether(bloque))
         for s in d["sublimites"]:
-            h.append(P(f"Sublímite {s['clase']}: computado {euros(s['computado'])} de {euros(s['tope'])}; "
+            h.append(P(f"Sublímite {s['clase']} ({s.get('norma', '')}): computado {euros(s['computado'])} de {euros(s['tope'])}; "
                        f"disponible {euros(s['disponible'])}."))
         if d["referencias_fuente"]:
             h.append(Spacer(1, 4))

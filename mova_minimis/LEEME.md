@@ -16,8 +16,8 @@ Consulta el saldo disponible de ayudas de minimis de los clientes a partir de la
 |---|---|---|
 | (UE) 2023/2831, general (desde 01/01/2024) | 300.000 € por única empresa | cualquier periodo de 3 años (móvil) |
 | (UE) 1407/2013, general (hasta 31/12/2023) | 200.000 € | 3 ejercicios fiscales |
-| (UE) 1408/2013, agrícola (mod. 2024/3118) | sublímite 50.000 €, suma al techo general | 3 años |
-| (UE) 717/2014, pesca (mod. 2023/2391) | sublímite 40.000 €, suma al techo general | 3 años |
+| (UE) 1408/2013, agrícola | sublímite 50.000 € desde el 16/12/2024 (Reg. 2024/3118); 25.000 € desde el 02/12/2024 (RD 1139/2024); 20.000 € antes. Suma al techo general | 3 años |
+| (UE) 717/2014, pesca | sublímite 40.000 € en España desde el 02/12/2024 (Reg. 2023/2391 y RD 1139/2024); 30.000 € antes. Suma al techo general | 3 ejercicios (se aproxima con el periodo general) |
 | (UE) 2023/2832, SIEG | 750.000 € combinado con las generales | 3 años |
 
 Estados: **Saldo disponible** (más de 5.000 €), **En el límite** (entre 0 y 5.000 €),
