@@ -33,6 +33,14 @@ def nombre_base(informe: dict) -> str:
     return f"informe_minimis_{marca}_{informe['audit_trail']['consulta_id'][:8]}"
 
 
+# Word, PDF y Excel solo enseñan las ayudas que computan en el periodo, sin la lista de referencias de fuente
+_SIN_AYUDAS = "Sin ayudas de minimis que computen en el periodo."
+
+
+def _computan(d: dict) -> list[dict]:
+    return [x for x in d["referencias_fuente"] if x["computa"]]
+
+
 def _kpis(inf: dict) -> list[tuple[str, str]]:
     r = inf["resumen_ejecutivo"]
     return [
@@ -200,14 +208,14 @@ def exportar_docx(informe: dict, destino: Path) -> Path:
         for s in d["sublimites"]:
             doc.add_paragraph(f"Sublímite {s['clase']} ({s.get('norma', '')}): computado {euros(s['computado'])} de {euros(s['tope'])}; "
                               f"disponible {euros(s['disponible'])}.")
-        if d["referencias_fuente"]:
-            tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe", "Computa"],
-                  [(x["fecha_concesion"], x["programa"], x["convocante"], x["reglamento"],
-                    euros(x["importe"]), "Sí" if x["computa"] else "No")
-                   for x in d["referencias_fuente"]],
-                  anchos=[1.9, 5.0, 3.5, 2.9, 2.2, 1.7], tam=7.5)
+        computan = _computan(d)
+        if computan:
+            tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe"],
+                  [(x["fecha_concesion"], x["programa"], x["convocante"], x["reglamento"], euros(x["importe"]))
+                   for x in computan],
+                  anchos=[1.9, 6.4, 3.6, 2.9, 2.4], tam=7.5)
         else:
-            doc.add_paragraph("Sin concesiones de minimis registradas en la BDNS.")
+            doc.add_paragraph(_SIN_AYUDAS)
         for pend in d["pendientes"]:
             p = doc.add_paragraph()
             r = p.add_run(pend)
@@ -221,14 +229,6 @@ def exportar_docx(informe: dict, destino: Path) -> Path:
             r.italic = True
             r.font.size = Pt(8.5)
 
-    doc.add_heading("Referencias de fuente", level=1)
-    filas = [(d["cif"], x["programa"], x["ano"], euros(x["importe"]), x["fuente"], x["url"] or "")
-             for d in inf["detalle_clientes"] for x in d["referencias_fuente"]]
-    if filas:
-        tabla(["CIF", "Programa", "Año", "Importe", "Fuente", "URL"], filas,
-              anchos=[2.0, 5.0, 1.1, 2.2, 3.2, 3.8], tam=7)
-    else:
-        doc.add_paragraph("No hay referencias.")
 
     if inf.get("errores_entrada"):
         doc.add_heading("Entradas descartadas", level=1)
@@ -346,15 +346,15 @@ def exportar_pdf(informe: dict, destino: Path) -> Path:
         for s in d["sublimites"]:
             h.append(P(f"Sublímite {s['clase']} ({s.get('norma', '')}): computado {euros(s['computado'])} de {euros(s['tope'])}; "
                        f"disponible {euros(s['disponible'])}."))
-        if d["referencias_fuente"]:
+        computan = _computan(d)
+        if computan:
             h.append(Spacer(1, 4))
-            h.append(tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe", "Computa"],
-                           [(x["fecha_concesion"], x["programa"], x["convocante"], x["reglamento"],
-                             euros(x["importe"]), "Sí" if x["computa"] else "No")
-                            for x in d["referencias_fuente"]],
-                           [1.8, 4.9, 3.5, 2.9, 2.2, 1.7]))
+            h.append(tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe"],
+                           [(x["fecha_concesion"], x["programa"], x["convocante"], x["reglamento"], euros(x["importe"]))
+                            for x in computan],
+                           [1.8, 6.3, 3.6, 2.9, 2.4]))
         else:
-            h.append(P("Sin concesiones de minimis registradas en la BDNS."))
+            h.append(P(_SIN_AYUDAS))
         for pend in d["pendientes"]:
             h.append(P(pend, "pend"))
         if d["notas"]:
@@ -362,12 +362,6 @@ def exportar_pdf(informe: dict, destino: Path) -> Path:
         if d["notas_busqueda"]:
             h.append(P("Búsqueda: " + d["notas_busqueda"], "p"))
 
-    h.append(PageBreak())
-    h.append(Paragraph("Referencias de fuente", st["h1"]))
-    filas = [(d["cif"], x["programa"], x["ano"], euros(x["importe"]), x["fuente"], x["url"] or "")
-             for d in inf["detalle_clientes"] for x in d["referencias_fuente"]]
-    h.append(tabla(["CIF", "Programa", "Año", "Importe", "Fuente", "URL"], filas, [2.0, 5.0, 1.1, 2.2, 3.0, 3.7])
-             if filas else P("No hay referencias."))
     if inf.get("errores_entrada"):
         h.append(Paragraph("Entradas descartadas", st["h1"]))
         h.append(tabla(["Entrada", "Motivo"], [(e["entrada"], e["error"]) for e in inf["errores_entrada"]], [8, 9]))
@@ -473,29 +467,23 @@ def exportar_xlsx(informe: dict, destino: Path) -> Path:
                                                              fill=PatternFill("solid", fgColor=color)))
     wd.auto_filter.ref = f"A1:J{max(n, 1) + 1}"
 
-    # Hoja 3 · Referencias
-    wr = wb.create_sheet("Referencias")
+    # Hoja 3 · Ayudas computadas (como en Word y PDF: sin referencias de fuente ni ayudas que no computan)
+    wr = wb.create_sheet("Ayudas computadas")
     cabecera(wr, 1, ["CIF", "Razón social", "Programa / convocatoria", "Nº convocatoria BDNS", "Código concesión",
-                     "Concedente", "Reglamento", "Instrumento", "Año", "Fecha concesión", "Importe",
-                     "Computa en el periodo", "Origen", "Fuente", "URL"],
-             [12, 32, 50, 14, 16, 40, 30, 18, 7, 13, 15, 12, 12, 26, 50])
+                     "Concedente", "Reglamento", "Instrumento", "Año", "Fecha concesión", "Importe"],
+             [12, 32, 50, 14, 16, 40, 30, 18, 7, 13, 15])
     fila = 2
     for d in inf["detalle_clientes"]:
-        for x in d["referencias_fuente"]:
+        for x in _computan(d):
             valores = [d["cif"], d["razon_social"], x["programa"], x["numero_convocatoria"], x["codigo_concesion"],
-                       x["convocante"], x["reglamento"], x["instrumento"], x["ano"], x["fecha_concesion"],
-                       x["importe"], "Sí" if x["computa"] else "No",
-                       "BDNS" if x["origen"] == "bdns" else "Declarada", x["fuente"], x["url"]]
+                       x["convocante"], x["reglamento"], x["instrumento"], x["ano"], x["fecha_concesion"], x["importe"]]
             for j, v in enumerate(valores, start=1):
                 c = wr.cell(row=fila, column=j, value=v)
                 c.border = borde
                 if j == 11:
                     c.number_format = moneda
-                if j == 15 and v:
-                    c.hyperlink = v
-                    c.font = Font(color="1D4ED8", underline="single")
             fila += 1
-    wr.auto_filter.ref = f"A1:O{max(fila - 1, 1)}"
+    wr.auto_filter.ref = f"A1:K{max(fila - 1, 1)}"
 
     wb.properties.creator = "MOVA IA · MOVA Minimis"
     destino.parent.mkdir(parents=True, exist_ok=True)
