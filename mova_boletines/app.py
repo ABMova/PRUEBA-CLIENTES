@@ -96,6 +96,13 @@ def _tarea_tarde() -> None:
     registro.info("Comprobacion de la tarde: %s", mensaje)
 
 
+def _tarea_seguimiento() -> None:
+    if repositorio.ajuste("seguimiento_activo", "1") != "1":
+        return
+    exito, detalle = orquestador.enviar_seguimiento()
+    registro.info("Correo de seguimiento: %s", detalle)
+
+
 def _tarea_semanal() -> None:
     if repositorio.ajuste("semanal_activo", "1") != "1":
         return
@@ -162,6 +169,13 @@ def configurar_planificador(aplicacion: Flask) -> BackgroundScheduler:
                 _disparo(repositorio.ajuste("hora_tarde", "20:00"), dias, zona, (20, 0)),
                 id="vigilancia_tarde", name="Comprobacion de la tarde", **comunes)
 
+        if repositorio.ajuste("seguimiento_activo", "1") == "1":
+            planificador.add_job(
+                _tarea_seguimiento,
+                _disparo(repositorio.ajuste("hora_seguimiento", "08:15"),
+                         repositorio.ajuste("dias_seguimiento", "mon,wed,fri"), zona, (8, 15)),
+                id="correo_seguimiento", name="Correo de seguimiento", **comunes)
+
         if repositorio.ajuste("semanal_activo", "1") == "1":
             planificador.add_job(
                 _tarea_semanal,
@@ -208,7 +222,7 @@ class SesionSegunConexion(SecureCookieSessionInterface):
 
 # Lo unico que se sirve a quien llega desde la direccion publica: los botones
 # del correo (documentos con clave y descartes), sus estaticos y /salud.
-RUTAS_PUBLICAS = ("/d/", "/descartar/", "/estaticos/", "/salud", "/api/crm/",
+RUTAS_PUBLICAS = ("/d/", "/s/", "/descartar/", "/estaticos/", "/salud", "/api/crm/",
                   "/crm/estado/")
 HOSTS_LOCALES = ("127.0.0.1", "localhost", "::1", "")
 

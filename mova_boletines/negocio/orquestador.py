@@ -760,6 +760,40 @@ def analizar_apartada(apartada_id: int, usuario: str = "sistema") -> tuple[bool,
 
 
 # --------------------------------------------------------------- resumen semanal --
+def enviar_seguimiento(usuario: str = "planificador", enviar: bool = True) -> tuple[bool, str]:
+    """Correo con la lista de seguimiento del equipo (lunes, miercoles y viernes).
+
+    Lleva lo que alguien marco con el boton Seguimiento y sigue con el plazo
+    abierto; lo vencido sale solo de la lista. Si no hay nada marcado no se
+    manda nada: un correo vacio cada dos dias seria ruido.
+    """
+    filas = [dict(f) for f in repositorio.en_seguimiento()]
+    destinatarios = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
+    if not filas:
+        return True, "No hay nada en seguimiento: no se envia correo"
+    if not destinatarios:
+        return False, "No hay destinatarios activos"
+
+    hoy = date.today()
+    dias_token = repositorio.ajuste_int("dias_token_descarte", 90)
+    tokens = {f["id"]: repositorio.crear_token_descarte(f["id"], destinatarios[0], dias_token)
+              for f in filas}
+
+    def hacer_html(con_crm: bool) -> str:
+        return correo.componer(filas, hoy, {"consultados": [], "fallidos": []}, tokens,
+                               modo="seguimiento", con_crm=con_crm)
+
+    asunto = correo.asunto_seguimiento(len(filas))
+    exito, detalle, rutas = _enviar_correo(destinatarios, hacer_html, asunto, None,
+                                           f"seguimiento-{hoy:%Y%m%d}{{sufijo}}.html",
+                                           len(filas), enviar)
+    repositorio.registrar_auditoria(usuario, "correo_seguimiento", str(len(filas)), detalle,
+                                    resultado="ok" if exito or not enviar else "error")
+    if not enviar:
+        return True, f"Seguimiento generado sin enviar: {rutas[0].name if rutas else ''}"
+    return exito, detalle
+
+
 def enviar_resumen_semanal(hoy: date | None = None, usuario: str = "planificador",
                            enviar: bool = True) -> tuple[bool, str]:
     """Lo publicado la semana anterior (lunes a domingo) y los plazos que vencen."""

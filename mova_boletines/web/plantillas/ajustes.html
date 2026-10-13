@@ -214,6 +214,25 @@
       <input type="number" id="cambio_usd_eur" name="cambio_usd_eur" value="{{ ajustes.cambio_usd_eur }}" min="0" step="0.01">
       <span class="apoyo">Solo para mostrar el gasto en euros. Anthropic factura en dolares.</span></div>
   </div>
+
+  <div class="card">
+    <h2>Correo de seguimiento</h2>
+    <p class="apoyo">Lo que el equipo marca con el boton <strong>Seguimiento</strong> de los correos.
+    Sale solo de la lista cuando vence el plazo o cuando alguien lo quita. Si no hay nada marcado,
+    no se envia.</p>
+    <div class="campo-linea">
+      <div class="campo"><label for="seguimiento_activo">Estado</label>
+        <select id="seguimiento_activo" name="seguimiento_activo">
+          <option value="1" {% if ajustes.seguimiento_activo == '1' %}selected{% endif %}>Activado</option>
+          <option value="0" {% if ajustes.seguimiento_activo != '1' %}selected{% endif %}>Desactivado</option>
+        </select></div>
+      <div class="campo"><label for="dias_seguimiento">Dias</label>
+        <input type="text" id="dias_seguimiento" name="dias_seguimiento" value="{{ ajustes.dias_seguimiento }}" placeholder="mon,wed,fri">
+        <span class="apoyo">mon, tue, wed, thu, fri, sat, sun.</span></div>
+      <div class="campo"><label for="hora_seguimiento">Hora</label>
+        <input type="time" id="hora_seguimiento" name="hora_seguimiento" value="{{ ajustes.hora_seguimiento }}"></div>
+    </div>
+  </div>
 </div>
 
 <div class="fila">

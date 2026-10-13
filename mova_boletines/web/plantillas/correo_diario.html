@@ -179,6 +179,27 @@
                       </td>
                       {% endfor %}
                       {% endif %}
+                      {# Lista de seguimiento del equipo: en el correo de seguimiento
+                         el boton sirve para quitarla, y en los demas para marcarla. #}
+                      {% if p.url_seguir %}
+                      <td style="padding:0 6px 6px 0;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                          {% if modo == 'seguimiento' %}
+                          <td bgcolor="#ffffff" style="background-color:#ffffff; border-radius:6px; border:1px solid #a1a1aa;">
+                            <a href="{{ p.url_no_seguir }}" style="display:inline-block; padding:6px 13px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:#52525b; text-decoration:none;">Quitar del seguimiento</a>
+                          </td>
+                          {% elif p.en_seguimiento %}
+                          <td bgcolor="#dff5e4" style="background-color:#dff5e4; border-radius:6px; border:1px solid #228b4e;">
+                            <a href="{{ p.url_no_seguir }}" style="display:inline-block; padding:6px 13px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:#166539; text-decoration:none;">En seguimiento</a>
+                          </td>
+                          {% else %}
+                          <td bgcolor="#52525b" style="background-color:#52525b; border-radius:6px;">
+                            <a href="{{ p.url_seguir }}" style="display:inline-block; padding:7px 14px; font-family:Segoe UI,Arial,sans-serif; font-size:12px; font-weight:600; color:#ffffff; text-decoration:none;">Seguimiento</a>
+                          </td>
+                          {% endif %}
+                        </tr></table>
+                      </td>
+                      {% endif %}
                     </tr>
                   </table>
                   {% if p.url_crm %}

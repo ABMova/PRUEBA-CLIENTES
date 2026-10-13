@@ -451,6 +451,57 @@ def _publicacion_por_clave(token: str, tipo: str, contar: bool = True):
     return fila, None
 
 
+@web.route("/s/<token>/<accion>")
+def seguimiento_por_token(token: str, accion: str):
+    """Botones Seguimiento y Quitar del seguimiento de los correos.
+
+    Van sin contrasena, como los demas botones del correo: el token identifica
+    la publicacion. La lista es del equipo y da igual quien pulse, asi que no se
+    guarda el autor.
+    """
+    if accion not in ("marcar", "quitar"):
+        return _pagina_seguimiento("Enlace no valido", "error",
+                                   "Este enlace no sirve para nada.", 404)
+    ip = auth.ip_peticion()
+    repositorio.registrar_intento_ip(ip, "seguimiento")
+    if repositorio.intentos_recientes(ip, VENTANA_INTENTOS, "seguimiento") > INTENTOS_MAX_IP:
+        return _pagina_seguimiento("Demasiadas peticiones", "error",
+                                   "Espera unos minutos y vuelve a intentarlo.", 429)
+
+    clave = repositorio.token_documento(token)
+    fila = repositorio.publicacion(clave["publicacion_id"]) if clave else None
+    if fila is None:
+        return _pagina_seguimiento("Enlace no valido", "error",
+                                   "Este enlace no es valido o ha caducado.", 404)
+
+    titulo = fila["titulo_resumido"] or fila["titulo"][:120]
+    if accion == "marcar":
+        repositorio.marcar_seguimiento(fila["id"], "")
+        repositorio.registrar_auditoria("correo", "seguimiento", str(fila["id"]),
+                                        "Marcada para seguimiento", ip)
+        return _pagina_seguimiento(
+            "Guardada en seguimiento", "ok",
+            "La recibiras en el correo de seguimiento de los lunes, miercoles y viernes "
+            "hasta que venza su plazo o la quites.", publicacion=titulo)
+
+    quitada = repositorio.quitar_seguimiento(fila["id"], "")
+    repositorio.registrar_auditoria("correo", "seguimiento", str(fila["id"]),
+                                    "Quitada del seguimiento" if quitada else "No estaba en la lista",
+                                    ip)
+    return _pagina_seguimiento(
+        "Fuera del seguimiento" if quitada else "No estaba en la lista", "ok",
+        "Ya no saldra en el correo de seguimiento." if quitada
+        else "Esta publicacion no estaba en la lista de seguimiento.", publicacion=titulo)
+
+
+def _pagina_seguimiento(titulo: str, clase: str, mensaje: str, codigo: int = 200,
+                        publicacion: str = ""):
+    pagina = render_template("descarte_ok.html", titulo_pagina="Seguimiento",
+                             titulo_resultado=titulo, clase=clase, mensaje=mensaje,
+                             publicacion=publicacion)
+    return (pagina, codigo) if codigo != 200 else pagina
+
+
 @web.route("/crm/estado/<token>.png")
 def marca_crm(token: str):
     """La marca verde del correo: dice si esa ayuda ya se llevo al CRM y quien.
@@ -842,6 +893,7 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "copias_max", "max_candidatas_ejecucion", "terminos_refuerzo",
                   "tarde_activa", "hora_tarde", "alerta_activa", "dias_alerta",
                   "semanal_activo", "dia_semanal", "hora_semanal", "dias_vencimiento_semanal",
+                  "seguimiento_activo", "dias_seguimiento", "hora_seguimiento",
                   "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur",
                   "modelo_documentos", "max_tokens_documentos",
                   "crm_activo", "crm_url", "crm_correos")

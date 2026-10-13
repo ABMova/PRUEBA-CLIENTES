@@ -13,7 +13,7 @@ import os
 import secrets
 import sqlite3
 import threading
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -902,6 +902,58 @@ def token_documento(token: str) -> sqlite3.Row | None:
 def usar_token_documento(token: str, ip: str) -> None:
     _escribir("UPDATE tokens_documento SET usos=usos+1, ultimo_uso=datetime('now'), ultima_ip=?, "
               "actualizado_en=datetime('now') WHERE token=?", (ip, token))
+
+
+# ------------------------------------------- lista de seguimiento del equipo --
+def marcar_seguimiento(publicacion_id: int, usuario: str, nota: str = "") -> bool:
+    """Pone una publicacion en la lista comun. Si ya estaba quitada, vuelve a entrar."""
+    if publicacion(publicacion_id) is None:
+        return False
+    _escribir(
+        "INSERT INTO seguimiento (publicacion_id, usuario, nota) VALUES (?,?,?) "
+        "ON CONFLICT(publicacion_id) DO UPDATE SET quitado_en=NULL, quitado_por='', "
+        "usuario=excluded.usuario, nota=excluded.nota, actualizado_en=datetime('now')",
+        (publicacion_id, usuario.strip().lower(), nota[:300]))
+    return True
+
+
+def quitar_seguimiento(publicacion_id: int, usuario: str) -> bool:
+    return _escribir(
+        "UPDATE seguimiento SET quitado_en=datetime('now'), quitado_por=?, "
+        "actualizado_en=datetime('now') WHERE publicacion_id=? AND quitado_en IS NULL",
+        (usuario.strip().lower(), publicacion_id)) > 0
+
+
+def esta_en_seguimiento(publicacion_id: int) -> sqlite3.Row | None:
+    return _uno("SELECT * FROM seguimiento WHERE publicacion_id=? AND quitado_en IS NULL",
+                (publicacion_id,))
+
+
+def seguimiento_de(ids: list[int]) -> dict[int, sqlite3.Row]:
+    """Lo que esta en seguimiento de entre varias publicaciones (para el correo)."""
+    if not ids:
+        return {}
+    marcas = ",".join("?" for _ in ids)
+    filas = _consulta(f"SELECT * FROM seguimiento WHERE quitado_en IS NULL "
+                      f"AND publicacion_id IN ({marcas})", tuple(ids))
+    return {fila["publicacion_id"]: fila for fila in filas}
+
+
+def en_seguimiento(incluir_vencidas: bool = False, hoy: str = "") -> list[sqlite3.Row]:
+    """Publicaciones vivas de la lista, de plazo mas proximo a mas lejano.
+
+    Las que ya pasaron su fin de plazo no se envian (se consideran cerradas),
+    salvo que se pidan expresamente para verlas en el panel.
+    """
+    sql = ("SELECT p.*, s.usuario AS seguido_por, s.creado_en AS seguido_en, s.nota "
+           "FROM seguimiento s JOIN publicaciones p ON p.id = s.publicacion_id "
+           "WHERE s.quitado_en IS NULL")
+    parametros: list = []
+    if not incluir_vencidas:
+        sql += " AND (p.plazo_fin IS NULL OR p.plazo_fin >= ?)"
+        parametros.append(hoy or date.today().isoformat())
+    sql += " ORDER BY (p.plazo_fin IS NULL), p.plazo_fin, p.id"
+    return _consulta(sql, tuple(parametros))
 
 
 # ------------------------------------------------ lo hecho con el CRM de MOVA --

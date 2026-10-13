@@ -263,6 +263,20 @@ CREATE TABLE IF NOT EXISTS crm_ejecuciones (
 CREATE UNIQUE INDEX IF NOT EXISTS ix_crm_unica ON crm_ejecuciones(publicacion_id, accion, usuario);
 CREATE INDEX IF NOT EXISTS ix_crm_pub ON crm_ejecuciones(publicacion_id);
 
+-- Lista de vigilancia del equipo: lo que alguien marca con el boton Seguimiento
+-- del correo. Es comun (marca uno, lo ven todos) y sale sola cuando vence el
+-- plazo o cuando alguien la quita.
+CREATE TABLE IF NOT EXISTS seguimiento (
+    publicacion_id INTEGER PRIMARY KEY REFERENCES publicaciones(id) ON DELETE CASCADE,
+    usuario        TEXT NOT NULL DEFAULT '',
+    nota           TEXT NOT NULL DEFAULT '',
+    quitado_en     TEXT,
+    quitado_por    TEXT NOT NULL DEFAULT '',
+    creado_en      TEXT NOT NULL DEFAULT (datetime('now')),
+    actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_seguimiento_vivo ON seguimiento(quitado_en);
+
 CREATE TABLE IF NOT EXISTS destinatarios (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     correo         TEXT NOT NULL UNIQUE,
@@ -395,6 +409,9 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('dias_token_documento',  '90',      'Caducidad de los botones de documentos del correo (dias)'),
  ('recuperacion_activa',   '1',       'Si el equipo estaba apagado a la hora, hacer lo pendiente al encenderlo'),
  ('dias_recuperacion',     '7',       'Dias hacia atras que se recuperan como mucho'),
+ ('seguimiento_activo',    '1',       'Correo con la lista de seguimiento del equipo'),
+ ('dias_seguimiento',      'mon,wed,fri', 'Dias del correo de seguimiento (formato APScheduler)'),
+ ('hora_seguimiento',      '08:15',   'Hora del correo de seguimiento (HH:MM)'),
  ('crm_activo',            '0',       'Botones del correo para dar de alta la ayuda en el CRM de MOVA'),
  ('crm_url',               'https://crm.movaia.es', 'Direccion del CRM que recibe las ayudas'),
  ('crm_correos',           '',        'Correos que ven los botones del CRM, separados por comas (vacio = todos)');

@@ -1286,6 +1286,46 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(_crm.reparto(["antonio@mova.es"]) == ([], ["antonio@mova.es"]),
               "con el CRM desactivado vuelve a salir un unico correo para todos")
 
+    print("\n31) Lista de seguimiento del equipo")
+    sigo = dict(repositorio.publicaciones({}, limite=2)[0])
+    otra = dict(repositorio.publicaciones({}, limite=2)[1])
+
+    comprobar(repositorio.marcar_seguimiento(sigo["id"], ""),
+              "el boton del correo mete la ayuda en la lista")
+    comprobar(bool(repositorio.esta_en_seguimiento(sigo["id"]))
+              and not repositorio.esta_en_seguimiento(otra["id"]),
+              "y solo esa queda marcada")
+
+    html_dia = correo.componer([sigo, otra], date.today(), {"consultados": [], "fallidos": []})
+    comprobar(html_dia.count("Seguimiento") >= 1 and "En seguimiento" in html_dia,
+              "en el correo diario una sale como En seguimiento y la otra con el boton")
+
+    en_lista = repositorio.en_seguimiento()
+    comprobar([f["id"] for f in en_lista] == [sigo["id"]], "la lista trae solo lo marcado")
+    html_seg = correo.componer([dict(f) for f in en_lista], date.today(),
+                               {"consultados": [], "fallidos": []}, modo="seguimiento")
+    comprobar("Quitar del seguimiento" in html_seg and "Lista de seguimiento del equipo" in html_seg,
+              "el correo de seguimiento lleva el boton para quitarla")
+
+    # Lo que ya vencio sale solo de la lista.
+    repositorio.guardar_ajuste("_prueba", "1")
+    con = repositorio.conexion()
+    con.execute("UPDATE publicaciones SET plazo_fin='2020-01-01' WHERE id=?", (sigo["id"],))
+    con.commit()
+    comprobar(repositorio.en_seguimiento() == [],
+              "una ayuda con el plazo vencido deja de salir sin tocar nada")
+    comprobar(len(repositorio.en_seguimiento(incluir_vencidas=True)) == 1,
+              "pero sigue en la lista para verla en el panel")
+
+    comprobar(repositorio.quitar_seguimiento(sigo["id"], ""),
+              "y el boton de quitar la saca del todo")
+    comprobar(repositorio.en_seguimiento(incluir_vencidas=True) == [],
+              "despues de quitarla, la lista queda vacia")
+
+    aceptado, detalle = orquestador.enviar_seguimiento(enviar=False)
+    comprobar(aceptado and "No hay nada en seguimiento" in detalle,
+              "con la lista vacia no se manda ningun correo")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)

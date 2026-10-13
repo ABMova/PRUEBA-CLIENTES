@@ -24,6 +24,8 @@ SIN_NOVEDADES = "No se han encontrado nuevas ayudas o subvenciones en los boleti
 # Cabecera del correo segun para que se envia.
 MODOS = {
     "diario": "",
+    "seguimiento": ("Lista de seguimiento del equipo: lo que alguien marco con el boton "
+                    "Seguimiento y sigue con el plazo abierto. No es lo publicado hoy."),
     "tarde": ("Comprobacion de la tarde: publicaciones aparecidas despues del correo de la "
               "manana (boletines extraordinarios o publicados tarde)."),
     "alerta": ("Alerta: convocatorias de alta relevancia cuyo plazo de solicitud termina "
@@ -96,6 +98,13 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
     fila["crm_hecho"] = (crm_mova.resumen_hecho(repositorio.crm_de_publicacion(identificador))
                          if (fila["url_crm"] and identificador) else "")
     fila["url_crm_marca"] = f"{url_publica()}/crm/estado/{token}.png" if fila["url_crm"] else ""
+    # Lista de seguimiento: el boton marca, y en el correo de seguimiento quita.
+    fila["url_seguir"] = f"{url_publica()}/s/{token}/marcar" if token else ""
+    fila["url_no_seguir"] = f"{url_publica()}/s/{token}/quitar" if token else ""
+    if identificador and fila["url_seguir"]:
+        fila["en_seguimiento"] = bool(repositorio.esta_en_seguimiento(identificador))
+    else:
+        fila["en_seguimiento"] = False
     return fila
 
 
@@ -139,6 +148,10 @@ def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
         marcador_revision=config.MARCADOR_REVISION,
         generado=datetime.now().strftime("%d/%m/%Y %H:%M"),
     )
+
+
+def asunto_seguimiento(total: int) -> str:
+    return f"[MOVA Boletines] Seguimiento: {total} convocatoria(s) en la lista del equipo"
 
 
 def asunto(fecha: date, total: int, altas: int, modo: str = "diario",
