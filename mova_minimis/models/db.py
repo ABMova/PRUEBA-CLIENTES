@@ -5,6 +5,7 @@ sqlite3 no comparte conexiones entre hilos). WAL permite leer el progreso
 mientras el hilo de la consulta escribe.
 """
 import json
+import re
 import shutil
 import sqlite3
 import zipfile
@@ -150,6 +151,8 @@ def contar_admins_activos() -> int:
 # ---------------------------------------------------------------- auditoría
 def auditar(usuario_id, usuario_email, accion, entidad=None, detalle=None, ip=None) -> None:
     with conexion() as c:
+        if usuario_id is not None and not c.execute("SELECT 1 FROM usuarios WHERE id=?", (usuario_id,)).fetchone():
+            usuario_id = None  # p. ej. tras restaurar una copia sin ese usuario: el correo queda anotado
         c.execute(
             "INSERT INTO auditoria(usuario_id, usuario_email, accion, entidad, detalle_json, ip_origen) "
             "VALUES(?,?,?,?,?,?)",
@@ -399,6 +402,12 @@ def guardar_cache(clave, datos) -> None:
                   "fecha_actualizacion=?", (clave, json.dumps(datos, ensure_ascii=False), ahora_iso()))
 
 
+def borrar_cache_cifs(cifs) -> None:
+    """Para repetir una consulta con datos frescos de la BDNS."""
+    with conexion() as c:
+        c.executemany("DELETE FROM cache_bdns WHERE clave=?", [(f"minimis:{x}",) for x in cifs])
+
+
 def vaciar_cache() -> int:
     with conexion() as c:
         return c.execute("DELETE FROM cache_bdns").rowcount
@@ -416,38 +425,60 @@ def copia_db(destino: Path) -> None:
         src.close()
 
 
-def copia_automatica() -> Path:
-    marca = datetime.now().strftime("%Y%m%d_%H%M%S")
-    destino = config.DIR_BACKUPS / f"minimis_{marca}.db"
-    copia_db(destino)
-    copias = sorted(config.DIR_BACKUPS.glob("minimis_*.db"))
-    for viejo in copias[:-config.COPIAS_A_CONSERVAR]:
+PREFIJO_AUTO = "minimis_"              # copias del arranque y manuales: se conservan las 10 últimas
+PREFIJO_PREVIA = "previa_restaurar_"   # estado justo antes de restaurar: se conservan las 5 últimas
+_DOC_VALIDO = re.compile(r"^[0-9a-f]{64}\.[a-z0-9]{2,5}\.enc$")
+MAX_BYTES_RESTAURAR = 2 * 1024 ** 3
+
+
+def _podar(prefijo: str, conservar: int) -> None:
+    copias = sorted(config.DIR_BACKUPS.glob(f"{prefijo}*.db"))  # la marca de tiempo ordena por fecha
+    for viejo in copias[:-conservar]:
         viejo.unlink(missing_ok=True)
+
+
+def copia_automatica() -> Path:
+    destino = config.DIR_BACKUPS / f"{PREFIJO_AUTO}{datetime.now():%Y%m%d_%H%M%S}.db"
+    copia_db(destino)
+    _podar(PREFIJO_AUTO, config.COPIAS_A_CONSERVAR)
     return destino
 
 
 def listar_copias():
     return [{"nombre": p.name, "tamano": p.stat().st_size,
              "fecha": datetime.fromtimestamp(p.stat().st_mtime).strftime("%d/%m/%Y %H:%M")}
-            for p in sorted(config.DIR_BACKUPS.glob("*.db"), reverse=True)]
+            for p in sorted(config.DIR_BACKUPS.glob("*.db"), key=lambda p: p.stat().st_mtime, reverse=True)]
 
 
 def crear_zip_copia(destino: Path) -> Path:
+    """El .zip va a una ruta temporal que borra quien lo envía: no se acumula en backups."""
     tmp = destino.with_suffix(".db.tmp")
     copia_db(tmp)
-    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
-        z.write(tmp, "minimis.db")
-        for f in config.DIR_DOCUMENTOS.glob("*"):
-            if f.is_file():
-                z.write(f, f"documentos/{f.name}")
-    tmp.unlink(missing_ok=True)
+    try:
+        with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
+            z.write(tmp, "minimis.db")
+            for f in config.DIR_DOCUMENTOS.glob("*"):
+                if f.is_file():
+                    z.write(f, f"documentos/{f.name}")
+    finally:
+        tmp.unlink(missing_ok=True)
     return destino
+
+
+def documentos_restaurables(zf: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
+    """Solo los documentos cifrados con nombre de huella; rechaza el .zip si descomprime a un tamaño absurdo."""
+    if sum(i.file_size for i in zf.infolist()) > MAX_BYTES_RESTAURAR:
+        raise ValueError("El .zip descomprimido supera 2 GB: no parece una copia de MOVA Minimis.")
+    return [i for i in zf.infolist()
+            if i.filename.startswith("documentos/") and _DOC_VALIDO.match(i.filename[len("documentos/"):])]
 
 
 def restaurar(origen_db: Path, documentos_zip: zipfile.ZipFile | None = None) -> Path:
     """Guarda copia del estado actual y vuelca la copia elegida sobre la base activa."""
-    previa = config.DIR_BACKUPS / f"minimis_antes_de_restaurar_{datetime.now():%Y%m%d_%H%M%S}.db"
+    docs = documentos_restaurables(documentos_zip) if documentos_zip is not None else []
+    previa = config.DIR_BACKUPS / f"{PREFIJO_PREVIA}{datetime.now():%Y%m%d_%H%M%S}.db"
     copia_db(previa)
+    _podar(PREFIJO_PREVIA, 5)
     src = sqlite3.connect(origen_db)
     dst = _conectar()
     try:
@@ -455,12 +486,8 @@ def restaurar(origen_db: Path, documentos_zip: zipfile.ZipFile | None = None) ->
     finally:
         dst.close()
         src.close()
-    if documentos_zip is not None:
-        for n in documentos_zip.namelist():
-            if n.startswith("documentos/") and not n.endswith("/"):
-                nombre = Path(n).name
-                if nombre and ".." not in nombre:
-                    with documentos_zip.open(n) as fi, open(config.DIR_DOCUMENTOS / nombre, "wb") as fo:
-                        shutil.copyfileobj(fi, fo)
+    for info in docs:
+        with documentos_zip.open(info) as fi, open(config.DIR_DOCUMENTOS / Path(info.filename).name, "wb") as fo:
+            shutil.copyfileobj(fi, fo)
     inicializar()
     return previa

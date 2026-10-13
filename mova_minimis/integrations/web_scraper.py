@@ -26,11 +26,7 @@ import requests
 
 import config
 
-AVISO_REUTILIZACION = (
-    "Datos del Sistema Nacional de Publicidad de Subvenciones y Ayudas Públicas (BDNS). "
-    "Su reutilización está sujeta al aviso legal de infosubvenciones.es y la información es dinámica: "
-    "puede corregirse o completarse después de la consulta."
-)
+AVISO_REUTILIZACION = config.AVISO_BDNS
 
 _sesion = requests.Session()
 _sesion.headers.update({"Accept": "application/json", "User-Agent": f"MOVA-Minimis/{config.VERSION}"})

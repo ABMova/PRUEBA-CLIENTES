@@ -7,7 +7,7 @@ ejecuciones con los mismos datos.
 """
 from datetime import date, datetime, timezone
 
-from integrations.web_scraper import AVISO_REUTILIZACION
+from config import AVISO_BDNS
 from logic.calculador import euros
 
 ORDEN_ESTADO = {"SALDO_DISPONIBLE": 0, "LIMITE_ALCANZADO": 1, "LIMITE_SUPERADO": 2, "PENDIENTE": 3}
@@ -81,7 +81,7 @@ def generar(consulta: dict, periodo: dict, resultados: list[dict], usuario: str,
     pendientes = [x for x in detalle if x["estado"] == "PENDIENTE" or x["pendientes"]]
 
     notas = [
-        "Datos extraídos de fuentes públicas: " + AVISO_REUTILIZACION + " Requiere validación oficial.",
+        "Datos extraídos de fuentes públicas: " + AVISO_BDNS + " Requiere validación oficial.",
         f"Cálculo conforme al {periodo['reglamento']}: techo de {euros(periodo['techo'])} por única "
         f"empresa en el periodo {periodo['etiqueta']}.",
         "[PENDIENTE: única empresa] El techo se aplica al grupo de empresas vinculadas (art. 2.2 del "

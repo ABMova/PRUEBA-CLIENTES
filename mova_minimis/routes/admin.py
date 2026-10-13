@@ -1,4 +1,5 @@
 """Administración: usuarios, auditoría, copias de seguridad y configuración."""
+import io
 import secrets
 import tempfile
 import zipfile
@@ -106,9 +107,11 @@ def copia_ahora():
 @requiere("administrar")
 def descargar_backup():
     nombre = f"mova_minimis_copia_{datetime.now():%Y%m%d_%H%M%S}.zip"
-    ruta = db.crear_zip_copia(config.DIR_BACKUPS / nombre)
-    _auditar("descarga_copia", "base_datos", {"fichero": nombre, "bytes": ruta.stat().st_size})
-    return send_file(ruta, as_attachment=True, download_name=nombre, mimetype="application/zip")
+    with tempfile.TemporaryDirectory(dir=config.DATOS) as tmp:  # no se queda ningún .zip en el disco
+        ruta = db.crear_zip_copia(Path(tmp) / nombre)
+        contenido = io.BytesIO(ruta.read_bytes())
+    _auditar("descarga_copia", "base_datos", {"fichero": nombre, "bytes": contenido.getbuffer().nbytes})
+    return send_file(contenido, as_attachment=True, download_name=nombre, mimetype="application/zip")
 
 
 @bp.route("/backups/restaurar", methods=["POST"])
@@ -142,9 +145,14 @@ def restaurar():
             if zf:
                 zf.close()
             return redirect(url_for("admin.backups"))
-        previa = db.restaurar(db_origen, zf)
-        if zf:
-            zf.close()
+        try:
+            previa = db.restaurar(db_origen, zf)
+        except ValueError as e:
+            flash(str(e), "err")
+            return redirect(url_for("admin.backups"))
+        finally:
+            if zf:
+                zf.close()
     # La auditoría restaurada no tiene este evento: se anota en la base ya restaurada
     _auditar("restauracion", "base_datos", {"origen": f.filename, "copia_previa": previa.name})
     flash(f"Copia restaurada. El estado anterior quedó guardado en {previa.name}. "

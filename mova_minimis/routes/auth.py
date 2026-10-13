@@ -1,6 +1,7 @@
 """Acceso: entrar, salir y cambiar la contraseña."""
 import time
 from collections import defaultdict, deque
+from urllib.parse import urlsplit
 
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 
@@ -10,19 +11,25 @@ from models import db
 
 bp = Blueprint("auth", __name__)
 
-_fallos: dict[str, deque] = defaultdict(deque)
+_fallos: dict[tuple[str, str], deque] = defaultdict(deque)
 MAX_FALLOS, VENTANA_S = 8, 15 * 60
 
 
-def _bloqueado(ip: str) -> bool:
-    q = _fallos[ip]
+def _bloqueado(clave: tuple[str, str]) -> bool:
+    """Por IP y correo: en el equipo todos entran desde 127.0.0.1 y no deben bloquearse entre sí."""
+    q = _fallos[clave]
     while q and time.time() - q[0] > VENTANA_S:
         q.popleft()
     return len(q) >= MAX_FALLOS
 
 
 def _destino_seguro(nxt: str | None) -> str:
-    return nxt if nxt and nxt.startswith("/") and not nxt.startswith("//") else url_for("dashboard.inicio")
+    """Solo rutas internas. Los navegadores leen la barra invertida como "/", así que "/" + "\\" + "dominio"
+    acabaría en otro sitio: se rechaza cualquier barra invertida."""
+    if not nxt or "\\" in nxt or not nxt.startswith("/") or nxt.startswith("//"):
+        return url_for("dashboard.inicio")
+    partes = urlsplit(nxt)
+    return nxt if not partes.scheme and not partes.netloc else url_for("dashboard.inicio")
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -30,10 +37,11 @@ def login():
     if g.get("usuario"):
         return redirect(url_for("dashboard.inicio"))
     if request.method == "POST":
-        if _bloqueado(g.ip):
+        email = request.form.get("email", "").strip().lower()
+        clave_fallos = (g.ip, email)
+        if _bloqueado(clave_fallos):
             flash("Demasiados intentos fallidos. Espere unos minutos.", "err")
             return render_template("login.html"), 429
-        email = request.form.get("email", "").strip().lower()
         u = db.usuario_por_email(email) if email else None
         if u and u["activo"] and user.verificar_clave(request.form.get("clave", ""), u["contrasena_hash"]):
             csrf = session.get("csrf")
@@ -42,11 +50,11 @@ def login():
             session.update(uid=u["id"], ver=u["contrasena_hash"][-12:], csrf=csrf)
             db.actualizar_usuario(u["id"], ultimo_acceso=db.ahora_iso())
             db.auditar(u["id"], u["email"], "login", "usuario", None, g.ip)
-            _fallos.pop(g.ip, None)
+            _fallos.pop(clave_fallos, None)
             if u["cambiar_clave"]:
                 return redirect(url_for("auth.cambiar_clave"))
             return redirect(_destino_seguro(request.args.get("next")))
-        _fallos[g.ip].append(time.time())
+        _fallos[clave_fallos].append(time.time())
         db.auditar(u["id"] if u else None, email or None, "login_fallido", "usuario",
                    {"motivo": "usuario desactivado" if u and not u["activo"] else "credenciales"}, g.ip)
         flash("Correo o contraseña incorrectos.", "err")

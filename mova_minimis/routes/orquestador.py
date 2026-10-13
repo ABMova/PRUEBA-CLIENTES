@@ -15,7 +15,6 @@ from logic import calculador, consultor, exportador, generador
 from models import db
 
 log = logging.getLogger(__name__)
-_hilos: dict[str, threading.Thread] = {}
 
 
 class Cancelada(Exception):
@@ -103,7 +102,6 @@ def recalcular_resultado(rid: int) -> None:
 # ---------------------------------------------------------------- la cadena en un hilo
 def lanzar(cid: str) -> None:
     h = threading.Thread(target=_ejecutar, args=(cid,), name=f"consulta-{cid[:8]}", daemon=True)
-    _hilos[cid] = h
     h.start()
 
 
@@ -159,5 +157,3 @@ def _ejecutar(cid: str) -> None:
         log.exception("Fallo en la consulta %s", cid)
         db.actualizar_consulta(cid, estado="error", mensaje_error=str(e)[:500])
         db.progreso(cid, "Error", 100, f"Error: {e}")
-    finally:
-        _hilos.pop(cid, None)

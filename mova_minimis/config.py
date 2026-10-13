@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 NOMBRE_APP = "MOVA Minimis"
 
 CONGELADO = getattr(sys, "frozen", False)
@@ -67,6 +67,11 @@ MODELO_POR_DEFECTO = "claude-opus-5-5"
 BDNS_API = os.environ.get("BDNS_API", "https://www.infosubvenciones.es/bdnstrans/api")
 BDNS_WEB = "https://www.infosubvenciones.es/bdnstrans/GE/es"
 BDNS_TIMEOUT_S = 20
+AVISO_BDNS = (
+    "Datos del Sistema Nacional de Publicidad de Subvenciones y Ayudas Públicas (BDNS). "
+    "Su reutilización está sujeta al aviso legal de infosubvenciones.es y la información es dinámica: "
+    "puede corregirse o completarse después de la consulta."
+)
 
 
 def preparar_carpetas() -> None:

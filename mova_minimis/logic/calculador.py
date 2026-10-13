@@ -30,7 +30,9 @@ INICIO_2023_2831 = date(2024, 1, 1)
 def sumar_anos(d: date, n: int) -> date:
     try:
         return d.replace(year=d.year + n)
-    except ValueError:  # 29 de febrero
+    except ValueError:  # 29 de febrero en año no bisiesto
+        if n > 0:  # la ayuda sigue computando el 28: sale del periodo el 1 de marzo
+            return date(d.year + n, 3, 1)
         return d.replace(year=d.year + n, day=28)
 
 
@@ -179,14 +181,15 @@ def calcular_cliente(res: dict, per: dict) -> tuple[dict, list[dict]]:
             g["saldo_tras_liberar"] = l["saldo_tras_liberar"]
         liberaciones = list(agrupadas.values())
     else:
-        anos = per["anos"]
-        acumulado = dict(sumas)
-        for ano in anos:
-            imp_ano = por_ano.get(ano, 0.0)
-            # se aproxima liberando por año completo, sin distinguir reglamento
-            acumulado["general"] -= imp_ano
-            liberaciones.append({"fecha": date(ano + 3, 1, 1).isoformat(), "importe": round(imp_ano, 2),
-                                 "saldo_tras_liberar": _saldo(acumulado, techo)})
+        # por ejercicios: cada 1 de enero sale del cálculo el año más antiguo, con cada ayuda en su bolsa
+        restante = dict(sumas)
+        for ano in per["anos"]:
+            del_ano = [(imp, clase) for f, imp, clase in computables if f.year == ano]
+            for imp, clase in del_ano:
+                restante[clase] -= imp
+            liberaciones.append({"fecha": date(ano + 3, 1, 1).isoformat(),
+                                 "importe": round(sum(imp for imp, _ in del_ano), 2),
+                                 "saldo_tras_liberar": _saldo(restante, techo)})
 
     proxima = next((l["fecha"] for l in liberaciones if l["importe"] > 0), None)
     recupera = None

@@ -43,6 +43,11 @@ def validar_identificador(texto: str) -> tuple[str, str, bool, str]:
     s = re.sub(r"[\s.\-]", "", (texto or "").upper())
     if s.startswith("ES") and len(s) == 11:
         s = s[2:]
+    if re.fullmatch(r"\d{6,7}[A-Z]", s):  # DNI copiado sin ceros a la izquierda
+        s = s.zfill(9)
+    if re.fullmatch(r"[KLM]\d{7}[A-Z]", s):  # NIF especiales: letra como el DNI
+        ok = LETRAS_NIF[int(s[1:8]) % 23] == s[8]
+        return s, "NIF", ok, "" if ok else "letra de control del NIF incorrecta"
     if re.fullmatch(r"\d{8}[A-Z]", s):
         ok = LETRAS_NIF[int(s[:8]) % 23] == s[8]
         return s, "NIF", ok, "" if ok else "letra de control del NIF incorrecta"
@@ -119,7 +124,7 @@ def extraer_de_texto(texto: str, origen: str, destino: dict, errores: list, conf
     return n
 
 
-_PATRON_DUDOSO = re.compile(r"(?<![A-Z0-9])[ABCDEFGHJNPQRSUVWXYZ0-9][\s.\-]?[0-9OIL|/S]{7}[0-9A-Z](?![A-Z0-9])")
+_PATRON_DUDOSO = re.compile(r"(?<![A-Z0-9])[ABCDEFGHJNPQRSUVWXYZ][\s.\-]?[0-9OIL|/S]{7}[0-9A-Z](?![A-Z0-9])")
 
 
 # ---------------------------------------------------------------- tablas (Excel, CSV)

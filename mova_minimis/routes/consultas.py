@@ -20,6 +20,13 @@ bp = Blueprint("consultas", __name__)
 log = logging.getLogger(__name__)
 
 
+def _numero(valor, defecto: float) -> float:
+    try:
+        return min(max(float(valor), 0.0), 1.0)
+    except (TypeError, ValueError):
+        return defecto
+
+
 def _anos_por_defecto() -> list[int]:
     hoy = date.today()
     return [hoy.year - 3, hoy.year - 2, hoy.year - 1]  # últimos tres ejercicios completos
@@ -109,6 +116,8 @@ def _validar_periodo(datos) -> tuple[str, str, list[int]]:
         anos = anos or _anos_por_defecto()
         if len(anos) > 3 or any(a < 2010 or a > date.today().year + 1 for a in anos):
             abort(400, "Elija como máximo tres años entre 2010 y el próximo ejercicio.")
+        if anos[-1] - anos[0] != len(anos) - 1:
+            abort(400, "Los ejercicios deben ser consecutivos.")
     return modo, fecha_ref.isoformat(), anos
 
 
@@ -129,7 +138,7 @@ def crear():
         vistos.add(cif)
         clientes.append({"cif": cif, "razon_social": (str(c.get("razon_social") or "").strip()[:160] or None),
                          "anos_solicitados": anos, "origen": str(c.get("origen") or "manual")[:200],
-                         "confianza": float(c.get("confianza") or 1), "notas": str(c.get("notas") or "")[:500]})
+                         "confianza": _numero(c.get("confianza"), 1.0), "notas": str(c.get("notas") or "")[:500]})
     if not clientes:
         return jsonify({"error": "No hay ningún cliente con identificador válido."}), 400
     cid = str(uuid.uuid4())
@@ -174,6 +183,7 @@ def cancelar(cid):
 def reintentar(cid):
     q = db.consulta(cid) or abort(404)
     entrada = json.loads(q["clientes_buscados"])
+    db.borrar_cache_cifs(c["cif"] for c in entrada["clientes"])  # «datos actuales»: nada de la caché
     nuevo = str(uuid.uuid4())
     db.crear_consulta(nuevo, g.usuario["id"], q["modo_periodo"],
                       date.today().isoformat() if q["modo_periodo"] == "movil" and request.form.get("hoy")

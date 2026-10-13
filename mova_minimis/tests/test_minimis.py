@@ -66,7 +66,7 @@ class Calculo(unittest.TestCase):
     def test_liberacion_y_recuperacion(self):
         c, _ = calculador.calcular_cliente(res(ayuda("2024-02-29", 250_000), ayuda("2025-01-10", 60_000)), self.per)
         self.assertEqual(c["estado"], "LIMITE_SUPERADO")
-        self.assertEqual(c["fecha_recupera_saldo"], "2027-02-28")  # 29/02 + 3 años
+        self.assertEqual(c["fecha_recupera_saldo"], "2027-03-01")  # el 28/02/2027 aún computa
 
     def test_busqueda_incompleta_es_pendiente(self):
         c, _ = calculador.calcular_cliente(res(completa=False), self.per)
@@ -105,6 +105,100 @@ class Identificadores(unittest.TestCase):
         d, e = {}, []
         parser.extraer_de_tabla([["Razón social", "NIF"], ["MERCADONA SA", "A46103834"]], "x", d, e)
         self.assertEqual(d["A46103834"]["razon_social"], "MERCADONA SA")
+
+
+class Regresiones(unittest.TestCase):
+    """Fallos encontrados en la revisión del 13/10/2026."""
+
+    @classmethod
+    def setUpClass(cls):
+        import app as aplicacion
+        cls.app = aplicacion.crear_app()
+
+    def test_numeros_de_norma_no_son_cif_ilegibles(self):
+        d, e = {}, []
+        parser.extraer_de_texto("Reglamento (UE) 2023/2831 y 1407/2013, expediente 2025/12345", "x", d, e)
+        self.assertEqual(e, [])
+        parser.extraer_de_texto("CIF: B636/9153", "x", d, e)
+        self.assertEqual(len(e), 1)
+
+    def test_redireccion_abierta(self):
+        from routes.auth import _destino_seguro
+        with self.app.test_request_context():
+            for malo in ("/\\evil.com", "//evil.com", "https://evil.com", "/\\/evil.com"):
+                self.assertEqual(_destino_seguro(malo), "/", malo)
+            self.assertEqual(_destino_seguro("/consultas/nueva"), "/consultas/nueva")
+
+    def test_auditar_usuario_inexistente(self):
+        from models import db
+        db.auditar(987654, "borrado@x", "restauracion")
+        self.assertIsNone(db.listar_auditoria(1)[0]["usuario_id"])
+
+    def test_poda_de_copias(self):
+        import config
+        from models import db
+        for p in config.DIR_BACKUPS.glob("*.db"):
+            p.unlink()
+        for i in range(7):
+            (config.DIR_BACKUPS / f"previa_restaurar_2026010{i}_000000.db").write_bytes(b"x")
+        for i in range(12):
+            (config.DIR_BACKUPS / f"minimis_202601{i:02d}_000000.db").write_bytes(b"x")
+        db._podar(db.PREFIJO_PREVIA, 5)
+        db.copia_automatica()
+        self.assertEqual(len(list(config.DIR_BACKUPS.glob("minimis_*.db"))), 10)
+        self.assertEqual(len(list(config.DIR_BACKUPS.glob("previa_restaurar_*.db"))), 5)
+
+    def test_zip_restaurable_filtra_nombres(self):
+        import io
+        import zipfile
+        from models import db
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("minimis.db", b"")
+            z.writestr("documentos/" + "a" * 64 + ".pdf.enc", b"x")
+            z.writestr("documentos/../../malo.exe", b"x")
+            z.writestr("documentos/app.py", b"x")
+        nombres = [i.filename for i in db.documentos_restaurables(zipfile.ZipFile(buf))]
+        self.assertEqual(nombres, ["documentos/" + "a" * 64 + ".pdf.enc"])
+
+    def test_ejercicios_libera_cada_reglamento(self):
+        per = calculador.periodo("ejercicios", date(2026, 1, 1), [2023, 2024, 2025])
+        c, _ = calculador.calcular_cliente(res(ayuda("2023-05-05", 100_000),
+                                               ayuda("2023-06-06", 600_000, "REG (UE) 2023/2832 de minimis, SIEG"),
+                                               ayuda("2025-01-01", 150_000)), per)
+        self.assertEqual(c["saldo_disponible"], -100_000)  # 750.000 - 850.000
+        self.assertEqual(c["liberaciones"][0]["saldo_tras_liberar"], 150_000)  # sale todo 2023
+
+
+    def test_29_febrero_computa_hasta_el_28(self):
+        per = calculador.periodo("movil", date(2027, 2, 28), None)
+        _, ay = calculador.calcular_cliente(res(ayuda("2024-02-29", 1000)), per)
+        self.assertTrue(ay[0]["computa"])
+        per = calculador.periodo("movil", date(2027, 3, 1), None)
+        _, ay = calculador.calcular_cliente(res(ayuda("2024-02-29", 1000)), per)
+        self.assertFalse(ay[0]["computa"])
+
+    def test_importes(self):
+        from routes.resultados import _importe
+        casos = {"150.000": 150000, "1.500": 1500, "1.234,56": 1234.56, "1234,5": 1234.5, "1234.56": 1234.56,
+                 "12 500 €": 12500}
+        for texto, valor in casos.items():
+            self.assertEqual(_importe(texto), valor, texto)
+        for malo in ("1.23.4", "1,234,5", "abc", "0", "-5"):
+            with self.assertRaises(ValueError, msg=malo):
+                _importe(malo)
+
+    def test_reglamentos_modificados(self):
+        from logic.consultor import clase_reglamento
+        self.assertEqual(clase_reglamento("Reglamento (UE) 2024/3118"), "agricola")
+        self.assertEqual(clase_reglamento("Reglamento (UE) 2023/2391"), "pesca")
+
+    def test_nif_sin_ceros_y_klm(self):
+        self.assertEqual(parser.validar_identificador("1234567L")[:3], ("01234567L", "NIF", True))
+        self.assertTrue(parser.validar_identificador("K1234567L")[2])
+        d, e = {}, []
+        parser.extraer_de_texto("Fecha de concesión 1/02/2024", "x", d, e)
+        self.assertEqual(e, [])
 
 
 class Documentos(unittest.TestCase):

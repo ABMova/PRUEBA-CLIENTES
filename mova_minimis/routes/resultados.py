@@ -1,5 +1,6 @@
 """Resultados de una consulta, ayudas declaradas por el cliente y exportación."""
 import io
+import re
 import json
 import zipfile
 from datetime import date
@@ -20,17 +21,23 @@ FORMATOS = {"docx": "Word", "pdf": "PDF", "xlsx": "Excel", "json": "JSON"}
 REGLAMENTOS_MANUALES = {
     "REG (UE) 2023/2831 de minimis, General": "General (2023/2831)",
     "REG (UE) 1407/2013 de minimis": "General anterior (1407/2013)",
-    "REG (UE) 1408/2013 de minimis": "Agrícola (1408/2013)",
-    "REG (UE) 717/2014 de minimis": "Pesca (717/2014)",
+    "REG (UE) 1408/2013 de minimis": "Agrícola (1408/2013, mod. 2024/3118)",
+    "REG (UE) 717/2014 de minimis": "Pesca (717/2014, mod. 2023/2391)",
     "REG (UE) 2023/2832 de minimis, SIEG": "SIEG (2023/2832)",
 }
 
 
 def _importe(texto: str) -> float:
-    """Admite 1.234,56 · 1234,56 · 1234.56"""
+    """Admite 1.234,56 · 1234,56 · 150.000 · 1234.56. Lo que sea ambiguo se rechaza."""
     t = texto.strip().replace(" ", "").replace("€", "")
     if "," in t:
+        if not re.fullmatch(r"\d{1,3}(\.\d{3})*,\d{1,2}|\d+,\d{1,2}", t):
+            raise ValueError
         t = t.replace(".", "").replace(",", ".")
+    elif re.fullmatch(r"\d{1,3}(\.\d{3})+", t):  # puntos de miles: 150.000
+        t = t.replace(".", "")
+    elif not re.fullmatch(r"\d+(\.\d{1,2})?", t):
+        raise ValueError
     valor = float(t)
     if valor <= 0:
         raise ValueError

@@ -21,9 +21,9 @@ def clase_reglamento(texto: str | None) -> str:
     t = (texto or "").upper()
     if "2023/2831" in t or "1407/2013" in t:
         return "general"
-    if "1408/2013" in t:
+    if "1408/2013" in t or "2024/3118" in t:
         return "agricola"
-    if "717/2014" in t:
+    if "717/2014" in t or "2023/2391" in t:
         return "pesca"
     if "2023/2832" in t or "360/2012" in t:
         return "sieg"
