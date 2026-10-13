@@ -109,7 +109,7 @@ logic/              los cinco agentes, sin SQL ni HTTP
 models/             db.py (único módulo con SQL) y schema.sql idempotente
 auth/               contraseñas PBKDF2, cifrado Fernet, roles
 integrations/       web_scraper.py (API de la BDNS) y claude_api.py
-templates/, static/ interfaz MOVA IA (tema oscuro y dorado, sin CDN)
+templates/, static/ interfaz con el aspecto del CRM de MOVA (claro, cristal y dorado; mova-crm.css + minimis.css, sin CDN)
 tests/              pruebas sin red: python -m unittest discover -s tests
 ```
 

@@ -1,0 +1,89 @@
+/* MOVA Minimis · piezas propias sobre la hoja del CRM (mova-crm.css).
+   Solo variables --mv-*: si el CRM cambia de color, esto le sigue. */
+
+/* Marca: logotipo MOVA IA + nombre de la herramienta.
+   La hoja del CRM fija .mv-marca img a 34x26 (su icono): aquí el logotipo manda su proporción. */
+.mv-marca{flex-direction:column;align-items:flex-start;gap:.35rem}
+.mv-marca img.mv-mova{height:28px;width:auto}
+.mv-logo{align-items:center;gap:.5rem}
+.mv-logo em{font-size:.7rem}
+
+/* Avisos tras cada acción */
+.avisos{display:grid;gap:.5rem}
+.aviso{padding:.7rem 1rem;border-radius:12px;font-size:.86rem;border:1px solid transparent}
+.aviso.ok{background:var(--mv-ok-l);color:var(--mv-ok);border-color:rgba(21,128,61,.18)}
+.aviso.warn{background:var(--mv-warn-l);color:var(--mv-warn);border-color:rgba(161,98,7,.2)}
+.aviso.err{background:var(--mv-err-l);color:var(--mv-err);border-color:rgba(185,28,28,.22)}
+.aviso.info{background:var(--mv-info-l);color:var(--mv-info)}
+.pend{background:var(--mv-warn-l);color:var(--mv-warn);border-radius:9px;padding:.5rem .8rem;font-size:.84rem;font-weight:600;margin:.5rem 0}
+.clave-unica{font-family:Consolas,Menlo,monospace;font-size:1rem;background:#fff;border:1px solid var(--mv-oro-d);border-radius:6px;padding:.15rem .5rem;color:var(--mv-pri)}
+
+/* Indicadores: la cifra roja cuando es un problema */
+.en-kpi b.en-rojo{color:var(--mv-err)!important}
+.en-kpi .ic svg{display:block}
+
+/* Saldo y detalle por cliente */
+.saldo{font-family:var(--mv-geo);font-weight:300;font-size:1.7rem;color:var(--mv-pri);letter-spacing:.02em;line-height:1.1;text-align:right}
+.saldo.neg{color:var(--mv-err)}
+.pildoras{display:flex;gap:.4rem;flex-wrap:wrap;margin:.55rem 0;align-items:center}
+.pildora{font-size:.76rem;padding:.16rem .6rem;border-radius:999px;background:var(--mv-soft);border:1px solid var(--mv-line);color:var(--mv-text-2)}
+.pildora b{color:var(--mv-text);font-weight:650}
+.cliente{border-top:1px solid var(--mv-line);padding-top:1.1rem;margin-top:1.1rem;scroll-margin-top:90px}
+.cliente:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.cliente-cab{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap}
+.cliente-cab h3{font-family:var(--mv-geo);font-weight:400;font-size:1.15rem;letter-spacing:.02em;margin:0}
+tr.nocomputa td{color:var(--mv-muted-2)}
+.mini{font-size:.76rem;color:var(--mv-muted)}
+.en-tabla td.num,.en-tabla th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+details > summary{cursor:pointer;color:var(--mv-muted);font-size:.85rem;margin:.6rem 0}
+details[open] > summary{color:var(--mv-text)}
+.en-tabla td form{margin:0}
+.btn-rojo{background:transparent;border:1px solid rgba(185,28,28,.35);color:var(--mv-err)}
+.btn-rojo:hover{background:var(--mv-err-l);color:var(--mv-err)}
+button.enlace-rojo{background:none;border:none;color:var(--mv-err);font:inherit;font-size:.84rem;font-weight:600;cursor:pointer;padding:0}
+
+/* Progreso y registro en vivo */
+.en-progreso{height:10px}
+.en-progreso i{background:linear-gradient(90deg,var(--mv-oro-2),var(--mv-oro-d));transition:width .3s}
+.registro{background:var(--mv-soft);border:1px solid var(--mv-line);border-radius:9px;padding:.7rem .9rem;font:12px Consolas,Menlo,monospace;
+  color:var(--mv-text-2);max-height:300px;min-height:80px;overflow:auto;white-space:pre-wrap}
+.registro .aviso,.registro .error{padding:0;border:0;background:none;border-radius:0;font-size:inherit}
+.registro .aviso{color:var(--mv-warn)}
+.registro .error{color:var(--mv-err)}
+
+/* Nueva consulta */
+.dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.1rem}
+@media(max-width:900px){.dos{grid-template-columns:1fr}}
+.opcion{display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--mv-line);border-radius:12px;padding:.75rem .9rem;cursor:pointer;
+  background:rgba(255,255,255,.6);margin:0}
+.opcion:has(input:checked){border-color:var(--mv-oro-d);background:var(--mv-pri-l)}
+.opcion input{accent-color:var(--mv-pri);margin-top:.2rem}
+.opcion b{display:block;color:var(--mv-text);font-size:.9rem}
+.opcion span{font-size:.8rem;color:var(--mv-muted)}
+.en-subida input[type=file]{margin-top:.5rem;font-size:.8rem}
+.en-campo textarea.form-control{height:auto;min-height:120px;font-family:inherit}
+.chips{display:flex;gap:.4rem;flex-wrap:wrap}
+.chips label{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--mv-line-2);border-radius:999px;padding:.25rem .7rem;
+  font-size:.82rem;color:var(--mv-text-2);background:#fff;cursor:pointer;margin:0}
+.chips label:has(input:checked){border-color:var(--mv-oro-d);background:var(--mv-pri-l);color:var(--mv-pri)}
+.chips input{accent-color:var(--mv-pri)}
+.oculto{display:none!important}
+.rejilla-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.8rem;align-items:end}
+
+/* Aviso flotante */
+.toast{position:fixed;right:1.2rem;bottom:1.2rem;background:rgba(255,255,255,.97);border:1px solid var(--mv-line);border-radius:12px;
+  padding:.65rem .9rem;font-size:.86rem;display:none;max-width:440px;z-index:60;box-shadow:var(--mv-sh-h);color:var(--mv-text-2)}
+.toast.show{display:block}
+.toast .en-tag{margin-right:.4rem}
+
+/* Acceso: dos mitades, formulario a la izquierda y marca a la derecha */
+.acceso{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh}
+.acceso-form{display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem}
+.acceso-form form{width:100%;max-width:420px;display:grid;gap:.9rem}
+.acceso-form .form-control{height:46px}
+.acceso .mv-login-panel{display:flex}
+.mv-login-marca img.mv-mova{height:80px;width:auto}
+@media(max-width:900px){.acceso{grid-template-columns:1fr}.acceso .mv-login-panel{order:-1;min-height:180px}.mv-login-marca img.mv-mova{height:52px}}
+
+/* Pantallas sueltas (cambio de contraseña obligatorio, error) */
+.centrada{max-width:460px;margin:2.5rem auto}

@@ -1,29 +1,37 @@
 {% extends "base.html" %}
-{% set paso = 'config' %}{% set pestana = 'backups' %}
+{% set seccion = 'backups' %}
 {% block titulo %}Copias de seguridad{% endblock %}
+{% block barra %}Copias de seguridad{% endblock %}
 {% block contenido %}
-{% include "admin/_pestanas.html" %}
-<section class="card">
-  <h2>Copias de seguridad</h2>
-  <p class="hint">Se hace una copia de la base de datos en cada arranque y se conservan las 10 últimas en <code>{{ datos }}\backups</code>.
-    La descarga es un .zip con la base de datos y los documentos subidos (cifrados). La llave <code>cipher.key</code> no va en el .zip:
-    guárdela aparte para poder leer los documentos y la clave de Claude en otro equipo.</p>
-  <div class="row">
-    <a class="btn btn-primary" href="{{ url_for('admin.descargar_backup') }}">Descargar copia (.zip)</a>
-    <form method="post" action="{{ url_for('admin.copia_ahora') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Hacer copia ahora</button></form>
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Administración / Copias de seguridad</div>
+  <div class="en-cabecera">
+    <div><h1>Copias de seguridad</h1>
+      <div class="en-sub">Copia automática en cada arranque; se conservan las 10 últimas en <code>{{ datos }}\backups</code>.</div></div>
+    <div class="en-acciones">
+      <form method="post" action="{{ url_for('admin.copia_ahora') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-light btn-sm" type="submit">Hacer copia ahora</button></form>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('admin.descargar_backup') }}">Descargar copia (.zip)</a>
+    </div>
   </div>
-  <div class="tabla" style="margin-top:.8rem"><table>
-    <thead><tr><th>Fichero</th><th>Fecha</th><th class="cifra">Tamaño</th></tr></thead>
-    <tbody>{% for c in copias %}<tr><td>{{ c.nombre }}</td><td>{{ c.fecha }}</td><td class="cifra">{{ (c.tamano / 1024)|round(0)|int }} KB</td></tr>{% else %}<tr><td colspan="3" class="muted">Sin copias.</td></tr>{% endfor %}</tbody>
+</div>
+<div class="aviso info">La descarga es un .zip con la base de datos y los documentos subidos (cifrados). La llave <code>cipher.key</code> no va en el .zip:
+  guárdala aparte para poder leer los documentos y la clave de Claude en otro equipo.</div>
+<section class="en-card">
+  <div class="en-card-cab"><h2>Copias en el equipo</h2><span class="en-tenue">{{ copias|length }} copia(s)</span></div>
+  {% if copias %}
+  <div class="en-tabla"><table>
+    <thead><tr><th>Fichero</th><th>Fecha</th><th class="num">Tamaño</th></tr></thead>
+    <tbody>{% for c in copias %}<tr><td>{{ c.nombre }}</td><td class="en-tenue-td">{{ c.fecha }}</td><td class="num">{{ (c.tamano / 1024)|round(0)|int }} KB</td></tr>{% endfor %}</tbody>
   </table></div>
+  {% else %}<div class="en-vacio">Todavía no hay copias. Se hará una en el próximo arranque, o pulsa «Hacer copia ahora».</div>{% endif %}
 </section>
-<section class="card">
-  <h2>Restaurar</h2>
-  <div class="banner warn">Restaurar sustituye todos los datos actuales por los de la copia. Antes se guarda automáticamente una copia del estado actual.</div>
-  <form method="post" action="{{ url_for('admin.restaurar') }}" enctype="multipart/form-data" class="row" style="margin-top:.7rem">
+<section class="en-card">
+  <div class="en-card-cab"><h2>Restaurar</h2></div>
+  <div class="pend">Restaurar sustituye todos los datos actuales por los de la copia. Antes se guarda automáticamente una copia del estado actual.</div>
+  <form method="post" action="{{ url_for('admin.restaurar') }}" enctype="multipart/form-data" class="en-filtros" style="margin:.6rem 0 0">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="file" name="copia" accept=".zip,.db" required style="max-width:420px">
-    <button class="btn btn-danger" type="submit" data-confirmar="¿Restaurar la copia? Los datos actuales se sustituirán (queda copia previa).">Restaurar copia</button>
+    <input class="form-control" type="file" name="copia" accept=".zip,.db" required style="max-width:420px">
+    <button class="btn btn-rojo btn-sm" type="submit" data-confirmar="¿Restaurar la copia? Los datos actuales se sustituirán (queda copia previa).">Restaurar copia</button>
   </form>
 </section>
 {% endblock %}

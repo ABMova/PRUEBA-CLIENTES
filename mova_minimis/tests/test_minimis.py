@@ -101,6 +101,12 @@ class Identificadores(unittest.TestCase):
         self.assertEqual(d["B66894452"]["razon_social"], "CAL PETITO DE TORA SL")
         self.assertEqual(len(e), 1)
 
+    def test_etiquetas_solo_con_dos_puntos(self):
+        salida = parser.procesar_manual("K1234567L ; Cliente Uno SL\nRazón social: Talleres Ruiz SL - CIF: A46103834")
+        nombres = {c["cif"]: c["razon_social"] for c in salida["clientes"]}
+        self.assertEqual(nombres["K1234567L"], "Cliente Uno SL")
+        self.assertEqual(nombres["A46103834"], "Talleres Ruiz SL")
+
     def test_tabla_con_cabecera(self):
         d, e = {}, []
         parser.extraer_de_tabla([["Razón social", "NIF"], ["MERCADONA SA", "A46103834"]], "x", d, e)

@@ -27,6 +27,11 @@ Flask + waitress + SQLite, empaquetado con PyInstaller (no Electron). Responder 
 - La BDNS filtra en silencio si el parámetro no es exactamente el del portal (`beneficiario=<id>` sale
   de `/terceros?ambito=M&busqueda=<CIF>`); fechas en dd/mm/aaaa.
 
+## Aspecto
+Desde la 1.0.4 la aplicación viste como el CRM de MOVA (skill mova-crm-claro): `static/mova-crm.css` es copia literal
+de la hoja de la skill y no se edita; lo propio va en `static/minimis.css`. Logotipo MOVA IA negro en el menú y en el
+acceso. Los informes (Word, PDF, Excel) NO siguen este aspecto: el usuario pidió dejarlos como salían.
+
 ## Arquitectura
 `logic/` no importa Flask ni `models`: la red, la caché y el progreso se inyectan desde
 `routes/orquestador.py`. Todo el SQL vive en `models/db.py`. Columnas nuevas: añadir a

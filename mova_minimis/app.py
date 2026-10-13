@@ -79,7 +79,7 @@ def crear_app() -> Flask:
     for bp in (rutas_auth.bp, dashboard.bp, consultas.bp, resultados.bp, admin.bp):
         app.register_blueprint(bp)
 
-    iconos = {"cerebro": _data_uri("icono-cerebro.png"), "logo": _data_uri("mova-ia-blanco.png")}
+    iconos = {"cerebro": _data_uri("icono-cerebro.png"), "logo": _data_uri("mova-ia-negro.png")}  # tema claro del CRM
 
     @app.before_request
     def antes():

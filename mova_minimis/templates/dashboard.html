@@ -1,42 +1,55 @@
 {% extends "base.html" %}
-{% set paso = 'historial' %}
-{% block titulo %}Inicio{% endblock %}
+{% from "_iconos.html" import icono %}
+{% set seccion = 'inicio' %}
+{% set ESTADO = {'completada': ('ok', 'Completada'), 'en_proceso': ('info', 'En proceso'), 'error': ('err', 'Error'),
+                 'interrumpida': ('err', 'Interrumpida'), 'cancelada': ('off', 'Cancelada')} %}
+{% block titulo %}Escritorio{% endblock %}
+{% block barra %}Escritorio{% endblock %}
 {% block contenido %}
-<section class="card">
-  <div class="row space">
-    <h2 style="margin:0">Consultas de minimis</h2>
-    {% if puede('consultar') %}<a class="btn btn-primary" href="{{ url_for('consultas.nueva') }}">Nueva consulta</a>{% endif %}
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Historial</div>
+  <div class="en-cabecera">
+    <div><h1>Consultas de minimis</h1>
+      <div class="en-sub">Saldo disponible de ayudas de minimis por cliente, con los datos de la Base de Datos Nacional de Subvenciones.</div></div>
+    <div class="en-acciones">{% if puede('consultar') %}<a class="btn btn-primary btn-sm" href="{{ url_for('consultas.nueva') }}">+ Nueva consulta</a>{% endif %}</div>
   </div>
-  <div class="kpis" style="margin-top:.9rem">
-    <div class="kpi"><b>{{ estados.get('completada', 0) }}</b><span>Consultas completadas</span></div>
-    <div class="kpi"><b>{{ estados.get('en_proceso', 0) }}</b><span>En proceso</span></div>
-    <div class="kpi"><b>{{ estados.get('error', 0) + estados.get('interrumpida', 0) }}</b><span>Con error o interrumpidas</span></div>
-  </div>
-  <form method="get" class="row" style="margin-bottom:.6rem">
-    <input type="search" name="q" value="{{ texto }}" placeholder="Buscar en el historial por razón social o CIF" style="flex:1;min-width:240px">
-    <button class="btn" type="submit">Buscar</button>
-    {% if texto %}<a class="btn" href="{{ url_for('dashboard.inicio') }}">Quitar filtro</a>{% endif %}
+</div>
+
+<div class="en-kpis">
+  <div class="en-kpi"><span class="ic c-ok">{{ icono('resultados', 20) }}</span><div><b>{{ estados.get('completada', 0) }}</b><span>Consultas completadas</span></div></div>
+  <div class="en-kpi"><span class="ic c-info">{{ icono('buscar', 20) }}</span><div><b>{{ estados.get('en_proceso', 0) }}</b><span>En proceso</span></div></div>
+  {% set fallidas = estados.get('error', 0) + estados.get('interrumpida', 0) %}
+  <div class="en-kpi"><span class="ic c-warn">{{ icono('alerta', 20) }}</span><div><b{% if fallidas %} class="en-rojo"{% endif %}>{{ fallidas }}</b><span>Con error o interrumpidas · se pueden reintentar</span></div></div>
+</div>
+
+<section class="en-card">
+  <form class="en-filtros" method="get">
+    <input type="search" name="q" value="{{ texto }}" placeholder="Buscar por razón social o CIF…" aria-label="Buscar en el historial">
+    <button class="btn btn-light btn-sm" type="submit">Buscar</button>
+    <span class="en-hueco"></span>
+    {% if texto %}<a class="en-limpiar" href="{{ url_for('dashboard.inicio') }}">Quitar filtro</a>{% endif %}
   </form>
   {% if consultas %}
-  <div class="tabla">
-    <table>
-      <thead><tr><th>Fecha</th><th>Clientes</th><th>Periodo</th><th>Usuario</th><th>Estado</th><th></th></tr></thead>
-      <tbody>
-      {% for c in consultas %}
-        <tr>
-          <td>{{ c.fecha_consulta|fecha }}</td>
-          <td><b>{{ c.n_clientes }}</b> · <span class="muted">{{ (c.nombres or '')[:140] }}{% if (c.nombres or '')|length > 140 %}…{% endif %}</span></td>
-          <td>{% if c.modo_periodo == 'movil' %}3 años hasta {{ c.fecha_referencia|fecha }}{% else %}Ejercicios {{ c.anos_solicitados|replace('[','')|replace(']','') }}{% endif %}</td>
-          <td>{{ c.usuario_nombre }}</td>
-          <td><span class="badge {{ c.estado }}">{{ c.estado|replace('_',' ')|upper }}</span></td>
-          <td><a class="btn btn-sm" href="{{ url_for('resultados.ver', cid=c.id) }}">Abrir</a></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <div class="en-tabla"><table>
+    <thead><tr><th>Fecha</th><th>Clientes</th><th>Periodo</th><th>Usuario</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for c in consultas %}
+      {% set e = ESTADO.get(c.estado, ('off', c.estado)) %}
+      <tr class="clic">
+        <td class="en-tenue-td" style="white-space:nowrap">{{ c.fecha_consulta|fecha }}</td>
+        <td><div class="en-celda"><span class="en-ini c-pri">{{ c.n_clientes }}</span>
+          <div class="txt"><a class="fuerte" href="{{ url_for('resultados.ver', cid=c.id) }}">{{ (c.nombres or 'Sin resultados')[:110] }}{% if (c.nombres or '')|length > 110 %}…{% endif %}</a>
+          <small>{{ c.n_clientes }} cliente(s)</small></div></div></td>
+        <td class="en-tenue-td">{% if c.modo_periodo == 'movil' %}3 años hasta {{ c.fecha_referencia|fecha }}{% else %}Ejercicios {{ c.anos_solicitados|replace('[','')|replace(']','') }}{% endif %}</td>
+        <td class="en-tenue-td">{{ c.usuario_nombre }}</td>
+        <td><span class="en-tag {{ e[0] }}"><i></i>{{ e[1] }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
   {% else %}
-  <p class="hint">{% if texto %}Ninguna consulta contiene «{{ texto }}».{% else %}Todavía no hay consultas.{% endif %}</p>
+  <div class="en-vacio">{% if texto %}Ninguna consulta contiene «{{ texto }}».{% else %}Todavía no hay consultas.
+    {% if puede('consultar') %}<a href="{{ url_for('consultas.nueva') }}">Haz la primera</a>.{% endif %}{% endif %}</div>
   {% endif %}
 </section>
 {% endblock %}

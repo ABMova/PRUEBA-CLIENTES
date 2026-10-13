@@ -1,17 +1,41 @@
-{% extends "base.html" %}
-{% block titulo %}Entrar{% endblock %}
-{% block ancho %}{% endblock %}
-{% block contenido %}
-<section class="card centro">
-  <h2>Acceso</h2>
-  <form method="post">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label for="email">Correo</label>
-    <input id="email" name="email" type="text" autocomplete="username" autofocus required>
-    <label for="clave">Contraseña</label>
-    <input id="clave" name="clave" type="password" autocomplete="current-password" required>
-    <div class="row" style="margin-top:1rem"><button class="btn btn-primary" type="submit">Entrar</button></div>
-  </form>
-  <p class="hint" style="margin-top:1rem">La sesión caduca a las 8 horas. Cada acceso queda registrado.</p>
-</section>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="es" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf" content="{{ csrf }}">
+<title>Entrar · MOVA Minimis</title>
+<link rel="icon" href="{{ iconos.cerebro }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='mova-crm.css') }}?v={{ version }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='minimis.css') }}?v={{ version }}">
+</head>
+<body class="mv-body mv-login">
+<div class="acceso">
+  <div class="acceso-form">
+    <form method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div style="text-align:center;margin-bottom:.6rem">
+        <h1 class="mv-login-titulo">Entrar</h1>
+        <div class="mv-login-sub">MOVA Minimis · accede con tu correo y contraseña</div>
+      </div>
+      {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in mensajes %}<div class="aviso {{ cat }}">{{ m }}</div>{% endfor %}
+      {% endwith %}
+      <input class="form-control" id="email" name="email" type="text" placeholder="Correo" autocomplete="username" autofocus required aria-label="Correo">
+      <input class="form-control" id="clave" name="clave" type="password" placeholder="Contraseña" autocomplete="current-password" required aria-label="Contraseña">
+      <span class="mv-login-ayuda" style="text-align:right">¿Has olvidado la contraseña? Pídesela a un administrador.</span>
+      <button class="btn btn-primary" type="submit">Entrar</button>
+      <span class="mv-login-ayuda" style="text-align:center">La sesión caduca a las 8 horas. Cada acceso queda registrado.</span>
+    </form>
+  </div>
+  <div class="mv-login-panel">
+    <svg class="mv-login-ondas" id="mvLoginOndas" viewBox="0 0 640 240" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="mv-login-marca">
+      <span class="mv-logo"><img class="mv-mova" src="{{ iconos.logo }}" alt="MOVA IA"><em>MINIMIS</em></span>
+      <span class="mv-login-lema">Saldo de ayudas de minimis por cliente, con los datos de la BDNS</span>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}?v={{ version }}"></script>
+</body>
+</html>

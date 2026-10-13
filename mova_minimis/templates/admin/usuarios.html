@@ -1,47 +1,54 @@
 {% extends "base.html" %}
-{% set paso = 'config' %}{% set pestana = 'usuarios' %}
+{% set seccion = 'usuarios' %}
 {% block titulo %}Usuarios{% endblock %}
+{% block barra %}Usuarios{% endblock %}
+{% from "_iconos.html" import iniciales %}
 {% block contenido %}
-{% include "admin/_pestanas.html" %}
-{% if clave_nueva %}<div class="banner ok">Contraseña provisional: <span class="clave-unica">{{ clave_nueva }}</span> · se pedirá cambiarla en el primer acceso.</div>{% endif %}
-<section class="card">
-  <h2>Usuarios</h2>
-  <div class="tabla"><table>
-    <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Administración / Usuarios</div>
+  <div class="en-cabecera"><div><h1>Usuarios</h1>
+    <div class="en-sub">Administrador: todo. Consultor: consultas, documentos e informes. Solo lectura: ver consultas anteriores.</div></div></div>
+</div>
+{% if clave_nueva %}<div class="aviso ok">Contraseña provisional: <span class="clave-unica">{{ clave_nueva }}</span> · se pedirá cambiarla en el primer acceso.</div>{% endif %}
+
+<section class="en-card">
+  <div class="en-tabla"><table>
+    <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
     <tbody>
     {% for u in usuarios %}
       <tr>
-        <td>{{ u.nombre }}{% if u.cambiar_clave %} <span class="badge warn">CLAVE PROVISIONAL</span>{% endif %}</td>
-        <td>{{ u.email }}</td>
+        <td><div class="en-celda"><span class="en-ini c-pri">{{ iniciales(u.nombre) }}</span>
+          <div class="txt"><b style="color:var(--mv-text)">{{ u.nombre }}</b><small>{{ u.email }}</small></div></div></td>
         <td>
-          <form method="post" action="{{ url_for('admin.editar_usuario', uid=u.id) }}" class="row">
+          <form method="post" action="{{ url_for('admin.editar_usuario', uid=u.id) }}" style="display:flex;gap:.4rem;align-items:center">
             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="rol">
-            <select name="rol" style="width:auto">{% for k, v in ROLES.items() %}<option value="{{ k }}" {{ 'selected' if k == u.rol }}>{{ v }}</option>{% endfor %}</select>
-            <button class="btn btn-sm" type="submit">Cambiar</button>
+            <select class="form-select" name="rol" style="width:auto;padding:.35rem .6rem">{% for k, v in ROLES.items() %}<option value="{{ k }}" {{ 'selected' if k == u.rol }}>{{ v }}</option>{% endfor %}</select>
+            <button class="btn btn-light btn-sm" type="submit">Cambiar</button>
           </form>
         </td>
-        <td>{% if u.activo %}<span class="badge ok">ACTIVO</span>{% else %}<span class="badge pendiente">DESACTIVADO</span>{% endif %}</td>
-        <td>{{ u.ultimo_acceso|fecha }}</td>
-        <td><div class="row">
-          <form method="post" action="{{ url_for('admin.editar_usuario', uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="activar">
-            <button class="btn btn-sm {{ 'btn-danger' if u.activo }}" type="submit">{{ 'Desactivar' if u.activo else 'Activar' }}</button></form>
+        <td>{% if u.activo %}<span class="en-tag ok"><i></i>Activo</span>{% else %}<span class="en-tag off"><i></i>Desactivado</span>{% endif %}
+          {% if u.cambiar_clave %}<span class="en-tag warn"><i></i>Clave provisional</span>{% endif %}</td>
+        <td class="en-tenue-td">{{ u.ultimo_acceso|fecha }}</td>
+        <td><div class="en-acciones">
           <form method="post" action="{{ url_for('admin.editar_usuario', uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="restablecer">
-            <button class="btn btn-sm" type="submit" data-confirmar="¿Generar una contraseña provisional nueva para {{ u.email }}?">Restablecer contraseña</button></form>
+            <button class="btn btn-light btn-sm" type="submit" data-confirmar="¿Generar una contraseña provisional nueva para {{ u.email }}?">Restablecer contraseña</button></form>
+          <form method="post" action="{{ url_for('admin.editar_usuario', uid=u.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="activar">
+            <button class="btn btn-sm {{ 'btn-rojo' if u.activo else 'btn-light' }}" type="submit">{{ 'Desactivar' if u.activo else 'Activar' }}</button></form>
         </div></td>
       </tr>
     {% endfor %}
     </tbody>
   </table></div>
 </section>
-<section class="card">
-  <h2>Nuevo usuario</h2>
-  <form method="post" class="gridform">
+
+<section class="en-card">
+  <div class="en-card-cab"><h2>Nuevo usuario</h2></div>
+  <form method="post" class="rejilla-form">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div><label>Nombre</label><input type="text" name="nombre" required></div>
-    <div><label>Correo</label><input type="email" name="email" required></div>
-    <div><label>Rol</label><select name="rol">{% for k, v in ROLES.items() %}<option value="{{ k }}" {{ 'selected' if k == 'consultor' }}>{{ v }}</option>{% endfor %}</select></div>
-    <div><button class="btn btn-primary" type="submit">Crear usuario</button></div>
+    <div class="en-campo"><label>Nombre</label><input class="form-control" type="text" name="nombre" required></div>
+    <div class="en-campo"><label>Correo</label><input class="form-control" type="email" name="email" required></div>
+    <div class="en-campo"><label>Rol</label><select class="form-select" name="rol">{% for k, v in ROLES.items() %}<option value="{{ k }}" {{ 'selected' if k == 'consultor' }}>{{ v }}</option>{% endfor %}</select></div>
+    <div><button class="btn btn-primary btn-sm" type="submit">Crear usuario</button></div>
   </form>
-  <p class="hint" style="margin-top:.6rem">Administrador: usuarios, auditoría, copias y configuración. Consultor: consultas, documentos e informes. Solo lectura: ver consultas anteriores.</p>
 </section>
 {% endblock %}

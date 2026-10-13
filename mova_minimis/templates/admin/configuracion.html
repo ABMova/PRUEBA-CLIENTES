@@ -1,53 +1,58 @@
 {% extends "base.html" %}
-{% set paso = 'config' %}{% set pestana = 'config' %}
+{% set seccion = 'config' %}
 {% block titulo %}Configuración{% endblock %}
+{% block barra %}Configuración{% endblock %}
 {% block contenido %}
-{% include "admin/_pestanas.html" %}
-<section class="card">
-  <h2>Configuración</h2>
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Administración / Configuración</div>
+  <div class="en-cabecera"><div><h1>Configuración</h1>
+    <div class="en-sub">Lectura de documentos con Claude, periodo por defecto y comprobaciones del entorno.</div></div></div>
+</div>
+<section class="en-card">
   <form method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="accion" value="guardar">
-    <div class="grid two">
-      <div>
-        <label for="modelo">Modelo de Claude para leer documentos</label>
-        <select id="modelo" name="modelo">{% for k, v in modelos.items() %}<option value="{{ k }}" {{ 'selected' if k == modelo }}>{{ v }} · {{ k }}</option>{% endfor %}</select>
-        <label for="modo_periodo">Periodo por defecto en las consultas nuevas</label>
-        <select id="modo_periodo" name="modo_periodo">
-          <option value="movil" {{ 'selected' if modo == 'movil' }}>Tres años móviles (Reglamento 2023/2831)</option>
+    <div class="en-campos">
+      <div class="en-campo ancho-2"><label for="modelo">Modelo de Claude para leer documentos</label>
+        <select class="form-select" id="modelo" name="modelo">{% for k, v in modelos.items() %}<option value="{{ k }}" {{ 'selected' if k == modelo }}>{{ v }} · {{ k }}</option>{% endfor %}</select></div>
+      <div class="en-campo ancho-2"><label for="modo_periodo">Periodo por defecto en las consultas nuevas</label>
+        <select class="form-select" id="modo_periodo" name="modo_periodo">
+          <option value="movil" {{ 'selected' if modo == 'movil' }}>Tres años hacia atrás desde la fecha del informe (Reglamento 2023/2831)</option>
           <option value="ejercicios" {{ 'selected' if modo == 'ejercicios' }}>Últimos tres ejercicios completos</option>
-        </select>
-      </div>
-      <div>
-        <label for="api_key">Clave de la API de Anthropic</label>
-        <input id="api_key" name="api_key" type="password" autocomplete="off" placeholder="{{ ('Guardada: ' ~ clave_mascara) if clave_mascara else 'sk-ant-...' }}">
-        <p class="hint">{% if origen_clave %}En uso: {{ clave_mascara }} · origen: {{ origen_clave }}.{% else %}Sin clave: los documentos se leen sin IA (texto directo y OCR).{% endif %}
-          Se guarda cifrada (Fernet); la llave de cifrado está en <code>cipher.key</code>, fuera de la base de datos.</p>
-      </div>
+        </select></div>
+      <div class="en-campo ancho-4"><label for="api_key">Clave de la API de Anthropic</label>
+        <input class="form-control" id="api_key" name="api_key" type="password" autocomplete="off" placeholder="{{ ('Guardada: ' ~ clave_mascara) if clave_mascara else 'sk-ant-...' }}">
+        <span class="en-ayuda">{% if origen_clave %}En uso: {{ clave_mascara }} · origen: {{ origen_clave }}.{% else %}Sin clave: los documentos se leen sin IA (texto directo y OCR).{% endif %}
+          Se guarda cifrada (Fernet); la llave de cifrado está en <code>cipher.key</code>, fuera de la base de datos.</span></div>
     </div>
-    <div class="row" style="margin-top:.8rem"><button class="btn btn-primary" type="submit">Guardar configuración</button></div>
+    <div class="en-acciones" style="margin-top:1rem"><button class="btn btn-primary btn-sm" type="submit">Guardar configuración</button></div>
   </form>
-  <div class="sep"></div>
-  <div class="row">
+</section>
+<section class="en-card">
+  <div class="en-card-cab"><h2>Comprobaciones</h2></div>
+  <div class="en-acciones" style="justify-content:flex-start;flex-wrap:wrap">
     <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="probar_bdns">
-      <button class="btn btn-sm" type="submit">Comprobar la BDNS</button></form>
+      <button class="btn btn-light btn-sm" type="submit">Comprobar la BDNS</button></form>
     <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="probar_claude">
-      <button class="btn btn-sm" type="submit">Comprobar Claude</button></form>
+      <button class="btn btn-light btn-sm" type="submit">Comprobar Claude</button></form>
     <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="vaciar_cache">
-      <button class="btn btn-sm" type="submit">Vaciar caché de la BDNS</button></form>
+      <button class="btn btn-light btn-sm" type="submit">Vaciar caché de la BDNS</button></form>
     <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="borrar_clave">
-      <button class="btn btn-sm btn-danger" type="submit" data-confirmar="¿Borrar la clave de Claude guardada?">Borrar clave de Claude</button></form>
+      <button class="btn btn-rojo btn-sm" type="submit" data-confirmar="¿Borrar la clave de Claude guardada?">Borrar clave de Claude</button></form>
   </div>
 </section>
-<section class="card">
-  <h2>Entorno</h2>
-  <div class="tabla"><table><tbody>
-    <tr><td>Versión</td><td>{{ version }}</td></tr>
-    <tr><td>Carpeta de datos</td><td><code>{{ datos }}</code></td></tr>
-    <tr><td>API de la BDNS</td><td><code>{{ bdns }}</code></td></tr>
-    <tr><td>Servidor</td><td><form method="post" action="{{ url_for('admin.apagar') }}"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="btn btn-danger btn-sm" type="submit" data-confirmar="¿Cerrar MOVA Minimis? Las consultas en curso se interrumpirán.">Cerrar la aplicación</button></form></td></tr>
-    <tr><td>OCR (Tesseract)</td><td>{% if tesseract %}<span class="badge ok">DISPONIBLE</span> <code>{{ tesseract }}</code>{% else %}<span class="badge warn">NO INSTALADO</span> Instálelo desde github.com/UB-Mannheim/tesseract/wiki (con el idioma español) y reinicie la aplicación.{% endif %}</td></tr>
-  </tbody></table></div>
+<section class="en-card">
+  <div class="en-card-cab"><h2>Entorno</h2></div>
+  <div class="en-datos">
+    <div class="en-dato"><span>Versión</span><b>{{ version }}</b></div>
+    <div class="en-dato"><span>Carpeta de datos</span><b><code>{{ datos }}</code></b></div>
+    <div class="en-dato"><span>API de la BDNS</span><b><code>{{ bdns }}</code></b></div>
+    <div class="en-dato"><span>OCR (Tesseract)</span><b>{% if tesseract %}<span class="en-tag ok"><i></i>Disponible</span>{% else %}<span class="en-tag warn"><i></i>No instalado</span>{% endif %}</b></div>
+  </div>
+  {% if not tesseract %}<p class="mini">Instálalo desde github.com/UB-Mannheim/tesseract/wiki (con el idioma español) y reinicia la aplicación.</p>{% endif %}
+  <div class="en-acciones" style="justify-content:flex-start;margin-top:.8rem">
+    <form method="post" action="{{ url_for('admin.apagar') }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-rojo btn-sm" type="submit" data-confirmar="¿Cerrar MOVA Minimis? Las consultas en curso se interrumpirán.">Cerrar la aplicación</button></form>
+  </div>
 </section>
 {% endblock %}

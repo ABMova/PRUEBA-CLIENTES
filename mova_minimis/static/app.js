@@ -24,9 +24,9 @@ async function api(url, opciones) {
 function toast(html, tipo) {
   const x = $("toast");
   if (!x) return;
-  const etiqueta = {ok: "OK", error: "ERROR", warn: "AVISO"}[tipo] || "INFO";
-  const clase = {ok: "ok", error: "error", warn: "warn"}[tipo] || "procesando";
-  x.innerHTML = '<span class="badge ' + clase + '">' + etiqueta + "</span> " + html;
+  const etiqueta = {ok: "Hecho", error: "Error", warn: "Aviso"}[tipo] || "Info";
+  const clase = {ok: "ok", error: "err", warn: "warn"}[tipo] || "info";
+  x.innerHTML = '<span class="en-tag ' + clase + '"><i></i>' + etiqueta + "</span>" + html;
   x.className = "toast show";
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { x.className = "toast"; }, 6000);
@@ -41,6 +41,38 @@ function hora(iso) {
   const d = iso ? new Date(iso) : new Date();
   return isNaN(d) ? "" : d.toLocaleTimeString("es-ES");
 }
+
+/* Menú lateral en móvil y desplegables (usuario), como en el CRM */
+(function armazon() {
+  const app = $("app"), btn = $("btnMenu"), velo = $("velo");
+  if (btn && app) btn.addEventListener("click", () => app.classList.toggle("menu-abierto"));
+  if (velo && app) velo.addEventListener("click", () => app.classList.remove("menu-abierto"));
+  document.addEventListener("click", e => {
+    const boton = e.target.closest("[data-mv-drop]");
+    document.querySelectorAll(".mv-drop.abierto").forEach(d => {
+      if (!boton || d !== boton.parentElement) d.classList.remove("abierto");
+    });
+    if (boton) boton.parentElement.classList.toggle("abierto");
+  });
+})();
+
+/* Haz de líneas doradas del panel de acceso (igual que el CRM) */
+(function ondas() {
+  const svg = $("mvLoginOndas");
+  if (!svg) return;
+  let s = '<defs><linearGradient id="lgOro" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b8892f" stop-opacity="0"/>' +
+          '<stop offset=".45" stop-color="#d9b45b"/><stop offset="1" stop-color="#f0d98c"/></linearGradient></defs>';
+  for (let i = 0, N = 30; i < N; i++) {
+    const f = i / (N - 1), amp = 26 + 30 * Math.sin(f * Math.PI), d = 118 + (f - .5) * 110, p = [];
+    for (let x = 0; x <= 640; x += 20) {
+      const t = x / 640;
+      p.push(x + " " + (d + amp * Math.sin(t * 3.05 + f * 1.5) * (0.35 + 0.65 * t)).toFixed(1));
+    }
+    s += '<path d="M' + p[0] + " " + p.slice(1).map(q => "L" + q).join(" ") + '" fill="none" stroke="url(#lgOro)" stroke-width=".9" opacity="' +
+         (0.16 + 0.5 * Math.sin(f * Math.PI)).toFixed(2) + '"/>';
+  }
+  svg.innerHTML = s;
+})();
 
 /* Confirmación para botones marcados con data-confirmar */
 document.addEventListener("submit", e => {
@@ -57,7 +89,7 @@ document.addEventListener("submit", e => {
   function pintar() {
     const tb = $("tbClientes");
     if (!lista.size) {
-      tb.innerHTML = '<tr><td colspan="6" class="muted">Añada clientes desde documentos o a mano.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="6"><div class="en-vacio">Añade clientes desde documentos o a mano.</div></td></tr>';
     } else {
       tb.innerHTML = [...lista.values()].map(c => {
         const conf = Math.round((c.confianza || 0) * 100);
@@ -66,17 +98,17 @@ document.addEventListener("submit", e => {
           ? esc(c.razon_social)
           : "";
         return "<tr><td><b>" + esc(c.cif) + "</b></td>" +
-          '<td><input type="text" data-cif="' + esc(c.cif) + '" value="' + nombre + '" placeholder="[PENDIENTE: la pondrá la BDNS]"></td>' +
-          '<td class="mini">' + esc(c.origen) + "</td>" +
-          '<td><span class="badge ' + claseConf + '">' + conf + " %</span></td>" +
-          '<td class="mini">' + (c.notas ? '<span class="pendiente-txt">' + esc(c.notas) + "</span>" : "") + "</td>" +
-          '<td><button class="btn btn-sm btn-danger" type="button" data-quitar="' + esc(c.cif) + '">Quitar</button></td></tr>';
+          '<td><input class="form-control" type="text" data-cif="' + esc(c.cif) + '" value="' + nombre + '" placeholder="[PENDIENTE: la pondrá la BDNS]"></td>' +
+          '<td class="en-tenue-td">' + esc(c.origen) + "</td>" +
+          '<td><span class="en-tag ' + claseConf + '"><i></i>' + conf + " %</span></td>" +
+          '<td class="mini">' + (c.notas ? '<span style="color:var(--mv-warn);font-weight:600">' + esc(c.notas) + "</span>" : "") + "</td>" +
+          '<td><button class="enlace-rojo" type="button" data-quitar="' + esc(c.cif) + '">Quitar</button></td></tr>';
       }).join("");
     }
-    const avisosHtml = avisos.map(a => '<div class="banner warn" style="margin-top:.4rem">' + esc(a) + "</div>").join("");
+    const avisosHtml = avisos.map(a => '<div class="pend">' + esc(a) + "</div>").join("");
     const erroresHtml = errores.length
-      ? '<div class="banner warn" style="margin-top:.4rem"><b>Entradas no válidas (no se consultarán):</b><ul class="mini">' +
-        errores.map(e => '<li><span class="pendiente-txt">[PENDIENTE: confirmación manual]</span> ' +
+      ? '<div class="pend"><b>Entradas no válidas (no se consultarán):</b><ul class="lista-errores" style="margin:.3rem 0 0;padding-left:1.1rem;font-weight:400">' +
+        errores.map(e => '<li>[PENDIENTE: confirmación manual] ' +
           esc(e.entrada) + " — " + esc(e.error) + "</li>").join("") + "</ul></div>"
       : "";
     $("errores").innerHTML = avisosHtml + erroresHtml;
@@ -108,29 +140,30 @@ document.addEventListener("submit", e => {
     if (!ficheros.length) return;
     const fd = new FormData();
     ficheros.forEach(f => fd.append("ficheros", f));
-    const linea = document.createElement("div");
-    linea.className = "file";
-    linea.innerHTML = "<span>" + ficheros.map(f => esc(f.name)).join(", ") + '</span><span></span><span></span><span class="badge procesando">LEYENDO</span>';
+    const linea = document.createElement("tr");
+    linea.innerHTML = "<td>" + ficheros.map(f => esc(f.name)).join(", ") + '</td><td class="en-tenue-td"></td>' +
+                      '<td class="num"><span class="en-tag info"><i></i>Leyendo…</span></td>';
     $("listaDocs").appendChild(linea);
+    const estado = linea.lastChild.firstChild;
     try {
       const res = await api("/api/documentos", {method: "POST", body: fd});
       documentos = documentos.concat((res.documentos || []).map(d => d.id));
-      linea.lastChild.className = "badge ok";
-      linea.lastChild.textContent = (res.clientes || []).length + " CLIENTE(S)";
-      linea.children[1].innerHTML = '<span class="hint">' +
-        (res.documentos || []).map(d => esc(d.metodo || "")).join(", ") + "</span>";
+      const n = (res.clientes || []).length;
+      estado.className = "en-tag " + (n ? "ok" : "warn");
+      estado.innerHTML = "<i></i>" + n + (n === 1 ? " cliente" : " clientes");
+      linea.children[1].textContent = (res.documentos || []).map(d => d.metodo || "").join(", ");
       incorporar(res);
       toast((res.clientes || []).length + " cliente(s) leído(s) de los documentos", "ok");
     } catch (err) {
-      linea.lastChild.className = "badge error";
-      linea.lastChild.textContent = "ERROR";
+      estado.className = "en-tag err";
+      estado.innerHTML = "<i></i>Error";
       toast(esc(err.message), "error");
     }
   }
 
   const dz = $("drop"), input = $("fileInput");
-  ["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
+  ["dragenter", "dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("encima"); }));
+  ["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("encima"); }));
   dz.addEventListener("drop", e => subir([...e.dataTransfer.files]));
   input.addEventListener("change", () => { subir([...input.files]); input.value = ""; });
 

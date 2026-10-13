@@ -1,145 +1,150 @@
 {% extends "base.html" %}
-{% set paso = 'resultados' %}
+{% from "_iconos.html" import icono %}
+{% set seccion = 'resultados' %}
+{% set ESTADO_Q = {'completada': ('ok', 'Completada'), 'en_proceso': ('info', 'En proceso'), 'error': ('err', 'Error'),
+                   'interrumpida': ('err', 'Interrumpida'), 'cancelada': ('off', 'Cancelada')} %}
+{% set TAG = {'SALDO_DISPONIBLE': 'ok', 'LIMITE_ALCANZADO': 'warn', 'LIMITE_SUPERADO': 'err', 'PENDIENTE': 'off'} %}
+{% set INI = {'SALDO_DISPONIBLE': 'c-ok', 'LIMITE_ALCANZADO': 'c-warn', 'LIMITE_SUPERADO': 'c-warn', 'PENDIENTE': 'c-info'} %}
+{% from "_iconos.html" import iniciales %}
 {% block titulo %}Resultados{% endblock %}
+{% block barra %}Resultados{% endblock %}
 {% block contenido %}
 <div id="pagResultados" data-cid="{{ q.id }}" data-estado="{{ q.estado }}"></div>
-
-<section class="card">
-  <div class="row space">
-    <h2 style="margin:0">Consulta del {{ q.fecha_consulta|fecha }}</h2>
-    <span class="badge {{ q.estado }}" id="estadoConsulta">{{ q.estado|replace('_',' ')|upper }}</span>
+{% set eq = ESTADO_Q.get(q.estado, ('off', q.estado)) %}
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Resultados</div>
+  <div class="en-cabecera">
+    <div><h1>Consulta del {{ q.fecha_consulta|fecha }} <span class="en-tag {{ eq[0] }}" id="estadoConsulta" style="vertical-align:middle"><i></i>{{ eq[1] }}</span></h1>
+      <div class="en-sub">{{ entrada.clientes|length }} cliente(s) ·
+        {% if informe %}{{ 'tres años hacia atrás desde el ' ~ (q.fecha_referencia|fecha) ~ ' (' ~ informe.periodo_consulta ~ ')' if q.modo_periodo == 'movil' else 'ejercicios ' ~ informe.periodo_consulta }}
+        {% else %}{% if q.modo_periodo == 'movil' %}tres años hacia atrás desde el {{ q.fecha_referencia|fecha }}{% else %}ejercicios {{ q.anos_solicitados|replace('[','')|replace(']','') }}{% endif %}{% endif %}
+        · por {{ q.usuario_nombre }} · <span class="mini">ID {{ q.id }}</span></div></div>
+    <div class="en-acciones">
+      {% if puede('consultar') and q.estado != 'en_proceso' %}
+      <form method="post" action="{{ url_for('consultas.reintentar', cid=q.id) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% if q.modo_periodo == 'movil' %}<input type="hidden" name="hoy" value="1">{% endif %}
+        <button class="btn btn-light btn-sm" type="submit">{% if q.estado in ('error','interrumpida','cancelada') %}Reintentar consulta{% else %}Repetir con datos actuales{% endif %}</button>
+      </form>
+      {% endif %}
+      {% if puede('exportar') and q.estado == 'completada' %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('resultados.exportar_todo', cid=q.id) }}">{{ icono('descarga', 16) }}Descargar Word, PDF y Excel</a>
+      {% endif %}
+    </div>
   </div>
-  <p class="hint" style="margin-top:.5rem">
-    {{ entrada.clientes|length }} cliente(s) ·
-    {% if q.modo_periodo == 'movil' %}tres años móviles hasta el {{ q.fecha_referencia|fecha }}{% else %}ejercicios {{ q.anos_solicitados|replace('[','')|replace(']','') }}{% endif %}
-    · por {{ q.usuario_nombre }} · <span class="mini">ID {{ q.id }}</span>
-  </p>
-  {% if q.mensaje_error %}<div class="banner err">{{ q.mensaje_error }}</div>{% endif %}
-  {% if puede('consultar') and q.estado != 'en_proceso' %}
-  <form method="post" action="{{ url_for('consultas.reintentar', cid=q.id) }}" class="row" style="margin-top:.6rem">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% if q.modo_periodo == 'movil' %}<input type="hidden" name="hoy" value="1">{% endif %}
-    <button class="btn btn-sm" type="submit">{% if q.estado in ('error','interrumpida','cancelada') %}Reintentar consulta{% else %}Repetir consulta con datos actuales{% endif %}</button>
-  </form>
-  {% endif %}
-</section>
+</div>
+{% if q.mensaje_error %}<div class="aviso err">{{ q.mensaje_error }}</div>{% endif %}
 
-<section class="card {{ '' if q.estado == 'en_proceso' else 'oculto' }}" id="panelProgreso">
-  <div class="row space">
-    <h2 style="margin:0">Progreso</h2>
-    {% if puede('consultar') %}<button id="btnCancelar" class="btn btn-danger btn-sm" type="button">Cancelar consulta</button>{% endif %}
-  </div>
-  <div class="progress"><div id="bar"></div></div>
-  <div class="hint" id="progresoTxt" style="margin-top:.4rem">En espera.</div>
-  <h3 style="margin-top:.9rem">Registro en vivo</h3>
-  <div id="logEl" class="log"></div>
+<section class="en-card {{ '' if q.estado == 'en_proceso' else 'oculto' }}" id="panelProgreso">
+  <div class="en-card-cab"><h2>Progreso</h2>
+    {% if puede('consultar') %}<button id="btnCancelar" class="btn btn-rojo btn-sm" type="button">Cancelar consulta</button>{% endif %}</div>
+  <div class="en-progreso"><i id="bar" style="width:0"></i></div>
+  <div class="en-tenue" id="progresoTxt">En espera.</div>
+  <h3 style="margin:.9rem 0 .4rem;font-size:.9rem">Registro en vivo</h3>
+  <div id="logEl" class="registro"></div>
 </section>
 
 {% if informe %}
 {% set r = informe.resumen_ejecutivo %}
-<section class="card">
-  <h2>Resumen · {{ informe.reglamento }} · techo {{ informe.umbral|euros }}</h2>
-  <div class="kpis">
-    <div class="kpi"><b>{{ r.clientes_consultados }}</b><span>Clientes consultados</span></div>
-    <div class="kpi"><b>{{ r.total_saldo_disponible_conjunto|euros }}</b><span>Saldo disponible conjunto</span></div>
-    <div class="kpi"><b>{{ r.clientes_en_limite + r.clientes_superado_limite }}</b><span>En el límite o superado</span></div>
-  </div>
-  {% for a in informe.avisos_entrada %}<div class="banner warn" style="margin-bottom:.4rem">{{ a }}</div>{% endfor %}
+<div class="en-kpis">
+  <div class="en-kpi"><span class="ic c-pri">{{ icono('usuarios', 20) }}</span><div><b>{{ r.clientes_consultados }}</b><span>Clientes consultados · {{ informe.reglamento }}</span></div></div>
+  <div class="en-kpi"><span class="ic c-ok">{{ icono('euro', 20) }}</span><div><b>{{ r.total_saldo_disponible_conjunto|euros }}</b><span>Saldo disponible conjunto · techo {{ informe.umbral|euros }} por cliente</span></div></div>
+  {% set en_limite = r.clientes_en_limite + r.clientes_superado_limite %}
+  <div class="en-kpi"><span class="ic c-warn">{{ icono('alerta', 20) }}</span><div><b{% if en_limite %} class="en-rojo"{% endif %}>{{ en_limite }}</b><span>En el límite o superado</span></div></div>
+</div>
+
+{% for a in informe.avisos_entrada %}<div class="aviso warn">{{ a }}</div>{% endfor %}
+
+<section class="en-card">
+  <div class="en-card-cab"><h2>Resumen por cliente</h2>
+    {% if informe.errores_entrada %}<span class="en-tenue">{{ informe.errores_entrada|length }} entrada(s) descartadas al leer los documentos</span>{% endif %}</div>
   {% if informe.errores_entrada %}
-  <details><summary>{{ informe.errores_entrada|length }} entrada(s) descartadas al leer los documentos</summary>
-    <ul class="mini">{% for e in informe.errores_entrada %}<li><span class="pendiente-txt">[PENDIENTE: confirmación manual]</span> {{ e.entrada }} — {{ e.error }}</li>{% endfor %}</ul>
+  <details><summary>Ver entradas descartadas</summary>
+    <ul class="mini">{% for e in informe.errores_entrada %}<li><span class="pendiente-txt" style="color:var(--mv-warn);font-weight:600">[PENDIENTE: confirmación manual]</span> {{ e.entrada }} — {{ e.error }}</li>{% endfor %}</ul>
   </details>
   {% endif %}
-  <div class="tabla">
-    <table>
-      <thead><tr><th>CIF</th><th>Razón social (BDNS)</th><th class="cifra">Saldo disponible</th><th>Estado</th><th class="cifra">Computado en el periodo</th><th>Vuelve a tener saldo</th></tr></thead>
+  <div class="en-tabla"><table>
+    <thead><tr><th>Cliente</th><th class="num">Saldo disponible</th><th>Estado</th><th class="num">Computado en el periodo</th><th>Vuelve a tener saldo</th></tr></thead>
+    <tbody>
+    {% for d in informe.detalle_clientes %}
+      <tr class="clic">
+        <td><div class="en-celda"><span class="en-ini {{ INI[d.estado] }}">{{ iniciales(d.razon_social) }}</span>
+          <div class="txt"><a class="fuerte" href="#cli-{{ d.resultado_id }}">{{ d.razon_social }}</a><small>{{ d.cif }}{% if d.pendientes %} · con pendientes{% endif %}</small></div></div></td>
+        <td class="num{{ ' en-rojo' if (d.saldo_disponible or 0) < 0 }}" {% if (d.saldo_disponible or 0) < 0 %}style="color:var(--mv-err)"{% endif %}>{{ d.saldo_disponible|euros }}</td>
+        <td><span class="en-tag {{ TAG[d.estado] }}"><i></i>{{ d.estado_texto }}</span></td>
+        <td class="num">{{ d.total_concedido|euros }}</td>
+        <td class="en-tenue-td">{{ d.fecha_recupera_saldo or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="en-card">
+  <div class="en-card-cab"><h2>Detalle por cliente</h2></div>
+  {% for d in informe.detalle_clientes %}
+  <div class="cliente" id="cli-{{ d.resultado_id }}">
+    <div class="cliente-cab">
+      <div><h3>{{ d.razon_social }} · {{ d.cif }}</h3>
+        {% if d.razon_social_entrada and d.razon_social_entrada != d.razon_social %}<div class="mini">En la entrada: {{ d.razon_social_entrada }}</div>{% endif %}</div>
+      <div><div class="saldo {{ 'neg' if (d.saldo_disponible or 0) < 0 }}">{{ d.saldo_disponible|euros }}</div>
+        <div style="text-align:right"><span class="en-tag {{ TAG[d.estado] }}"><i></i>{{ d.estado_texto }}</span></div></div>
+    </div>
+    {% for p in d.pendientes %}<div class="pend">{{ p }}</div>{% endfor %}
+    <p style="margin:.6rem 0 .2rem">{{ d.notas }}</p>
+    {% if d.notas_busqueda %}<p class="mini" style="margin:0">Búsqueda: {{ d.notas_busqueda }}</p>{% endif %}
+    <div class="pildoras">
+      {% for a in d.desglose_por_ano %}<span class="pildora">{{ a.ano }}{% if a.tramo %} ({{ a.tramo }}){% endif %}: <b>{{ a.importe_concedido|euros }}</b></span>{% endfor %}
+      {% if d.proxima_actualizacion_limite %}<span class="pildora">Próxima salida del periodo: <b>{{ d.proxima_actualizacion_limite }}</b></span>{% endif %}
+      {% for s in d.sublimites %}<span class="pildora" title="{{ s.norma }}">Sublímite {{ s.clase }}: <b>{{ s.computado|euros }}</b> de {{ s.tope|euros }} ({{ s.norma }})</span>{% endfor %}
+      {% if d.url_beneficiario %}<a class="pildora" href="{{ d.url_beneficiario }}" target="_blank" rel="noopener">Ver en la BDNS ↗</a>{% endif %}
+    </div>
+    {% if d.referencias_fuente %}
+    <div class="en-tabla"><table>
+      <thead><tr><th>Fecha</th><th>Convocatoria / programa</th><th>Concedente</th><th>Reglamento</th><th class="num">Importe</th><th>Computa</th><th></th></tr></thead>
       <tbody>
-      {% for d in informe.detalle_clientes %}
-        <tr>
-          <td><a href="#cli-{{ d.resultado_id }}">{{ d.cif }}</a></td>
-          <td>{{ d.razon_social }}{% if d.pendientes %} <span class="badge warn">PENDIENTE</span>{% endif %}</td>
-          <td class="cifra">{{ d.saldo_disponible|euros }}</td>
-          <td><span class="badge {{ d.estado }}">{{ d.estado_texto }}</span></td>
-          <td class="cifra">{{ d.total_concedido|euros }}</td>
-          <td>{{ d.fecha_recupera_saldo or '' }}</td>
+      {% for x in d.referencias_fuente %}
+        <tr class="{{ '' if x.computa else 'nocomputa' }}">
+          <td class="en-tenue-td" style="white-space:nowrap">{{ x.fecha_concesion }}</td>
+          <td>{% if x.url %}<a href="{{ x.url }}" target="_blank" rel="noopener">{{ x.programa }}</a>{% else %}{{ x.programa }}{% endif %}
+            <div class="mini">{{ x.fuente }}{% if x.codigo_concesion %} · {{ x.codigo_concesion }}{% endif %}{% if x.instrumento %} · {{ x.instrumento }}{% endif %}{% if x.notas %} · {{ x.notas }}{% endif %}</div></td>
+          <td class="mini">{{ x.convocante or '' }}</td>
+          <td class="mini">{{ x.clase }}<br>{{ x.reglamento or '' }}</td>
+          <td class="num">{{ x.importe|euros }}</td>
+          <td>{{ 'Sí' if x.computa else 'No' }}</td>
+          <td>{% if x.origen == 'manual' and x.ayuda_id and puede('editar_resultados') %}
+            <form method="post" action="{{ url_for('resultados.borrar_ayuda', rid=d.resultado_id, aid=x.ayuda_id) }}">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="enlace-rojo" type="submit" data-confirmar="¿Quitar esta ayuda declarada y recalcular?">Quitar</button>
+            </form>{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
-    </table>
-  </div>
-</section>
-
-<section class="card">
-  <h2>Detalle por cliente</h2>
-  {% for d in informe.detalle_clientes %}
-  <div class="cliente" id="cli-{{ d.resultado_id }}">
-    <div class="cab">
-      <div>
-        <h3>{{ d.razon_social }} · {{ d.cif }}</h3>
-        {% if d.razon_social_entrada and d.razon_social_entrada != d.razon_social %}<div class="mini muted">En la entrada: {{ d.razon_social_entrada }}</div>{% endif %}
-      </div>
-      <div style="text-align:right">
-        <div class="saldo {{ 'neg' if (d.saldo_disponible or 0) < 0 }}">{{ d.saldo_disponible|euros }}</div>
-        <span class="badge {{ d.estado }}">{{ d.estado_texto }}</span>
-      </div>
-    </div>
-    {% for p in d.pendientes %}<div class="banner warn" style="margin-top:.5rem"><span class="pendiente-txt">{{ p }}</span></div>{% endfor %}
-    <p style="margin:.6rem 0 .3rem">{{ d.notas }}</p>
-    {% if d.notas_busqueda %}<p class="hint">Búsqueda: {{ d.notas_busqueda }}</p>{% endif %}
-    <div class="row mini muted">
-      {% for a in d.desglose_por_ano %}<span class="pill">{{ a.ano }}{% if a.tramo %} ({{ a.tramo }}){% endif %}: {{ a.importe_concedido|euros }}</span>{% endfor %}
-      {% if d.proxima_actualizacion_limite %}<span class="pill">Próxima salida del periodo: {{ d.proxima_actualizacion_limite }}</span>{% endif %}
-      {% for s in d.sublimites %}<span class="pill" title="{{ s.norma }}">Sublímite {{ s.clase }}: {{ s.computado|euros }} de {{ s.tope|euros }} ({{ s.norma }})</span>{% endfor %}
-      {% if d.url_beneficiario %}<a href="{{ d.url_beneficiario }}" target="_blank" rel="noopener">Ver en la BDNS ↗</a>{% endif %}
-    </div>
-    {% if d.referencias_fuente %}
-    <div class="tabla" style="margin-top:.6rem">
-      <table>
-        <thead><tr><th>Fecha</th><th>Convocatoria / programa</th><th>Concedente</th><th>Reglamento</th><th class="cifra">Importe</th><th>Computa</th><th></th></tr></thead>
-        <tbody>
-        {% for x in d.referencias_fuente %}
-          <tr class="{{ '' if x.computa else 'nocomputa' }}">
-            <td>{{ x.fecha_concesion }}</td>
-            <td>{% if x.url %}<a href="{{ x.url }}" target="_blank" rel="noopener">{{ x.programa }}</a>{% else %}{{ x.programa }}{% endif %}
-              <div class="mini muted">{{ x.fuente }}{% if x.codigo_concesion %} · {{ x.codigo_concesion }}{% endif %}{% if x.instrumento %} · {{ x.instrumento }}{% endif %}{% if x.notas %} · {{ x.notas }}{% endif %}</div></td>
-            <td class="mini">{{ x.convocante or '' }}</td>
-            <td class="mini">{{ x.clase }}<br><span class="muted">{{ x.reglamento or '' }}</span></td>
-            <td class="cifra">{{ x.importe|euros }}</td>
-            <td>{{ 'Sí' if x.computa else 'No' }}</td>
-            <td>{% if x.origen == 'manual' and x.ayuda_id and puede('editar_resultados') %}
-              <form method="post" action="{{ url_for('resultados.borrar_ayuda', rid=d.resultado_id, aid=x.ayuda_id) }}">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <button class="btn btn-danger btn-sm" type="submit" data-confirmar="¿Quitar esta ayuda declarada y recalcular?">Quitar</button>
-              </form>{% endif %}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    </table></div>
     {% else %}
-    <p class="hint">Sin concesiones de minimis registradas en la BDNS.</p>
+    <div class="en-vacio">Sin concesiones de minimis registradas en la BDNS.</div>
     {% endif %}
     {% if d.liberaciones %}
     <details><summary>Calendario de salida de ayudas del periodo</summary>
-      <div class="tabla"><table>
-        <thead><tr><th>Fecha</th><th class="cifra">Importe que sale</th><th class="cifra">Saldo tras la salida</th></tr></thead>
-        <tbody>{% for l in d.liberaciones %}<tr><td>{{ l.fecha|fecha }}</td><td class="cifra">{{ l.importe|euros }}</td><td class="cifra">{{ l.saldo_tras_liberar|euros }}</td></tr>{% endfor %}</tbody>
+      <div class="en-tabla"><table>
+        <thead><tr><th>Fecha</th><th class="num">Importe que sale</th><th class="num">Saldo tras la salida</th></tr></thead>
+        <tbody>{% for l in d.liberaciones %}<tr><td>{{ l.fecha|fecha }}</td><td class="num">{{ l.importe|euros }}</td><td class="num">{{ l.saldo_tras_liberar|euros }}</td></tr>{% endfor %}</tbody>
       </table></div>
-      <p class="hint">Supone que no se conceden ni registran nuevas ayudas entretanto.</p>
+      <p class="mini">Supone que no se conceden ni registran nuevas ayudas entretanto.</p>
     </details>
     {% endif %}
     {% if puede('editar_resultados') and q.estado == 'completada' %}
     <details><summary>Ayudas declaradas por el cliente (no registradas en la BDNS)</summary>
-      <p class="hint">Se suman al cálculo y quedan marcadas como «Declarada por el cliente» en el informe.</p>
-      <form method="post" action="{{ url_for('resultados.anadir_ayuda', rid=d.resultado_id) }}" class="gridform">
+      <p class="mini">Se suman al cálculo y quedan marcadas como «Declarada por el cliente» en el informe.</p>
+      <form method="post" action="{{ url_for('resultados.anadir_ayuda', rid=d.resultado_id) }}" class="rejilla-form">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <div><label>Fecha de concesión</label><input type="date" name="fecha_concesion" max="{{ hoy }}" required></div>
-        <div><label>Importe (ayuda equivalente, €)</label><input type="text" name="importe" inputmode="decimal" placeholder="12.500,00" required></div>
-        <div><label>Reglamento</label><select name="reglamento">{% for k, v in reglamentos.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
-        <div><label>Programa</label><input type="text" name="programa" placeholder="Nombre de la ayuda"></div>
-        <div><label>Concedente</label><input type="text" name="convocante"></div>
-        <div><label>Notas</label><input type="text" name="notas" placeholder="Origen del dato"></div>
-        <div><button class="btn" type="submit">Añadir y recalcular</button></div>
+        <div class="en-campo"><label>Fecha de concesión</label><input class="form-control" type="date" name="fecha_concesion" max="{{ hoy }}" required></div>
+        <div class="en-campo"><label>Importe (ayuda equivalente, €)</label><input class="form-control" type="text" name="importe" inputmode="decimal" placeholder="12.500,00" required></div>
+        <div class="en-campo"><label>Reglamento</label><select class="form-select" name="reglamento">{% for k, v in reglamentos.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+        <div class="en-campo"><label>Programa</label><input class="form-control" type="text" name="programa" placeholder="Nombre de la ayuda"></div>
+        <div class="en-campo"><label>Concedente</label><input class="form-control" type="text" name="convocante"></div>
+        <div class="en-campo"><label>Notas</label><input class="form-control" type="text" name="notas" placeholder="Origen del dato"></div>
+        <div><button class="btn btn-light btn-sm" type="submit">Añadir y recalcular</button></div>
       </form>
     </details>
     {% endif %}
@@ -147,14 +152,13 @@
   {% endfor %}
 </section>
 
-<section class="card" id="exportar">
-  <h2>3 · Exportar</h2>
+<section class="en-card" id="exportar">
+  <div class="en-card-cab"><h2>Exportar</h2><span class="en-tenue">Datos de fuentes públicas. Requiere validación oficial.</span></div>
   {% if puede('exportar') and q.estado == 'completada' %}
-  <div class="row">
-    <a class="btn btn-primary" href="{{ url_for('resultados.exportar_todo', cid=q.id) }}">Descargar Word, PDF y Excel</a>
-    {% for f, nombre in formatos.items() %}<a class="btn" href="{{ url_for('resultados.exportar', cid=q.id, formato=f) }}">{{ nombre }}</a>{% endfor %}
+  <div class="en-acciones" style="justify-content:flex-start">
+    {% for f, nombre in formatos.items() %}<a class="btn btn-light btn-sm" href="{{ url_for('resultados.exportar', cid=q.id, formato=f) }}">{{ nombre }}</a>{% endfor %}
   </div>
-  {% else %}<p class="hint">La exportación está disponible para consultores y administradores con la consulta terminada.</p>{% endif %}
+  {% else %}<div class="en-vacio">La exportación está disponible para consultores y administradores con la consulta terminada.</div>{% endif %}
   {% if informes %}
   <details><summary>Informes generados ({{ informes|length }})</summary>
     <ul class="mini">{% for i in informes %}<li><a href="{{ url_for('resultados.descargar_informe', iid=i.id, consulta=q.id) }}">{{ i.ruta_fichero.replace('\\','/').split('/')[-1] }}</a> · {{ i.fecha_generacion|fecha }}</li>{% endfor %}</ul>
@@ -167,10 +171,10 @@
   {% endif %}
 </section>
 
-<section class="card">
-  <h2>Notas importantes</h2>
-  <ul class="mini">{% for n in informe.notas_importantes %}<li>{% if n.startswith('[PENDIENTE') %}<span class="pendiente-txt">{{ n }}</span>{% else %}{{ n }}{% endif %}</li>{% endfor %}</ul>
-  <details><summary>Registro de la consulta</summary><div id="registro" class="log"></div></details>
+<section class="en-card">
+  <div class="en-card-cab"><h2>Notas importantes</h2></div>
+  <ul class="mini" style="margin:0;padding-left:1.1rem">{% for n in informe.notas_importantes %}<li>{% if n.startswith('[PENDIENTE') %}<span style="color:var(--mv-warn);font-weight:600">{{ n }}</span>{% else %}{{ n }}{% endif %}</li>{% endfor %}</ul>
+  <details><summary>Registro de la consulta</summary><div id="registro" class="registro"></div></details>
 </section>
 {% endif %}
 {% endblock %}

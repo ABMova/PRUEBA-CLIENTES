@@ -26,8 +26,10 @@ _PATRON_ID = re.compile(
     r"|\d{7}" + _SEP + r"[A-Z]"  # DNI escrito sin el cero inicial
     r")(?![A-Z0-9])"
 )
-_ETIQUETAS = re.compile(r"\b(C\.?I\.?F\.?|N\.?I\.?F\.?|N\.?I\.?E\.?|CIF/NIF|RAZ[OÓ]N SOCIAL|EMPRESA|CLIENTE|"
-                        r"BENEFICIARIO|NOMBRE)\b\s*[:\-]?", re.I)
+# Las siglas se quitan siempre; las palabras comunes solo cuando hacen de etiqueta ("Cliente:"), para no
+# comerse nombres como "Cliente Uno SL" o "Empresa Municipal de Aguas"
+_ETIQUETAS = re.compile(r"\b(?:C\.?I\.?F\.?|N\.?I\.?F\.?|N\.?I\.?E\.?|CIF/NIF)(?![A-Z0-9])\s*[:\-]?"
+                        r"|\b(?:RAZ[OÓ]N SOCIAL|EMPRESA|CLIENTE|BENEFICIARIO|NOMBRE)\s*[:\-]", re.I)
 _FORMAS = re.compile(r"\b(S\.?\s?L\.?\s?U?\.?|S\.?\s?A\.?\s?U?\.?|S\.?\s?COOP\.?|S\.?\s?L\.?\s?L\.?|C\.?B\.?|"
                      r"S\.?\s?C\.?|FUNDACI[OÓ]N|ASOCIACI[OÓ]N)\b", re.I)
 

@@ -1,26 +1,34 @@
 {% extends "base.html" %}
-{% set paso = 'config' %}{% set pestana = 'auditoria' %}
+{% set seccion = 'auditoria' %}
 {% block titulo %}Auditoría{% endblock %}
+{% block barra %}Auditoría{% endblock %}
 {% block contenido %}
-{% include "admin/_pestanas.html" %}
-<section class="card">
-  <h2>Registro de auditoría</h2>
-  <form method="get" class="gridform" style="margin-bottom:.7rem">
-    <div><label>Usuario</label><select name="usuario"><option value="">Todos</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if filtros.usuario_id == u.id }}>{{ u.nombre }}</option>{% endfor %}</select></div>
-    <div><label>Acción</label><select name="accion"><option value="">Todas</option>{% for a in acciones %}<option {{ 'selected' if filtros.accion == a }}>{{ a }}</option>{% endfor %}</select></div>
-    <div><label>Texto</label><input type="search" name="q" value="{{ filtros.texto or '' }}" placeholder="CIF, consulta, correo..."></div>
-    <div><button class="btn" type="submit">Filtrar</button></div>
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Administración / Auditoría</div>
+  <div class="en-cabecera"><div><h1>Registro de auditoría</h1>
+    <div class="en-sub">Quién hizo qué, cuándo y desde dónde. Se muestran los 500 más recientes que cumplen el filtro.</div></div></div>
+</div>
+<section class="en-card">
+  <form class="en-filtros" method="get">
+    <select name="usuario" aria-label="Usuario"><option value="">Todos los usuarios</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if filtros.usuario_id == u.id }}>{{ u.nombre }}</option>{% endfor %}</select>
+    <select name="accion" aria-label="Acción"><option value="">Todas las acciones</option>{% for a in acciones %}<option {{ 'selected' if filtros.accion == a }}>{{ a }}</option>{% endfor %}</select>
+    <input type="search" name="q" value="{{ filtros.texto or '' }}" placeholder="CIF, consulta, correo…">
+    <button class="btn btn-light btn-sm" type="submit">Filtrar</button>
+    <span class="en-hueco"></span>
+    {% if filtros.usuario_id or filtros.accion or filtros.texto %}<a class="en-limpiar" href="{{ url_for('admin.auditoria') }}">Quitar filtros</a>{% endif %}
   </form>
-  <div class="tabla"><table>
+  {% if registros %}
+  <div class="en-tabla"><table>
     <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th></tr></thead>
     <tbody>
     {% for r in registros %}
-      <tr><td style="white-space:nowrap">{{ r.timestamp|fecha }}</td><td>{{ r.usuario_email or '' }}</td><td><span class="pill">{{ r.accion }}</span></td>
+      <tr><td class="en-tenue-td" style="white-space:nowrap">{{ r.timestamp|fecha }}</td><td>{{ r.usuario_email or '' }}</td>
+        <td><span class="en-tag pri">{{ r.accion }}</span></td>
         <td class="mini">{% if r.entidad and r.entidad.startswith('consulta:') %}<a href="{{ url_for('resultados.ver', cid=r.entidad[9:]) }}">{{ r.entidad[:17] }}…</a>{% else %}{{ r.entidad or '' }}{% endif %}</td>
         <td class="mini" style="max-width:420px;word-break:break-word">{{ r.detalle_json or '' }}</td><td class="mini">{{ r.ip_origen or '' }}</td></tr>
-    {% else %}<tr><td colspan="6" class="muted">Sin registros.</td></tr>{% endfor %}
+    {% endfor %}
     </tbody>
   </table></div>
-  <p class="hint">Se muestran los 500 más recientes que cumplen el filtro.</p>
+  {% else %}<div class="en-vacio">Sin registros con este filtro.</div>{% endif %}
 </section>
 {% endblock %}

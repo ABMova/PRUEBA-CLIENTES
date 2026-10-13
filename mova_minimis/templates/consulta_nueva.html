@@ -1,76 +1,63 @@
 {% extends "base.html" %}
-{% set paso = 'busqueda' %}
+{% set seccion = 'nueva' %}
 {% block titulo %}Nueva consulta{% endblock %}
+{% block barra %}Nueva consulta{% endblock %}
 {% block contenido %}
 <div id="pagNueva"></div>
+<div>
+  <div class="en-miga"><a href="{{ url_for('dashboard.inicio') }}">Escritorio</a> / Nueva consulta</div>
+  <div class="en-cabecera"><div><h1>Nueva consulta</h1>
+    <div class="en-sub">Sube documentos con los CIF o escríbelos a mano. Se valida el dígito de control; la razón social oficial la pone la BDNS.</div></div></div>
+</div>
 
-<section class="card">
-  <h2>1 · Clientes</h2>
-  <p class="hint">Suba documentos con los CIF de los clientes o escríbalos a mano. Se valida el dígito de control;
-     la razón social oficial la pone después la BDNS.</p>
-  <div class="grid two">
-    <div>
-      <label>Documentos ({{ extensiones }})</label>
-      <div id="drop" class="dropzone">
-        <b>Arrastre aquí PDF, imágenes, Excel, Word, CSV o TXT</b>
-        <small>o selecciónelos · máx. 25 MB por fichero</small>
-        <input type="file" id="fileInput" multiple style="margin-top:.6rem"
-               accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.xlsx,.xlsm,.csv,.txt,.docx">
-      </div>
-      <div class="hint" style="margin-top:.4rem">
-        OCR: {% if hay_ocr %}<span class="oktxt">Tesseract disponible</span>{% else %}<span class="warntxt">Tesseract no instalado</span>{% endif %}
-        · Lectura con Claude: {% if hay_claude %}<span class="oktxt">configurada</span>{% else %}<span class="warntxt">sin clave</span>{% endif %}
-        {% if not hay_ocr and not hay_claude %}<br>Los PDF escaneados y las imágenes no se podrán leer: introduzca esos datos a mano.{% endif %}
-      </div>
-      <div id="listaDocs"></div>
-    </div>
-    <div>
-      <label for="manual">Entrada manual · una línea por cliente: CIF y razón social</label>
-      <textarea id="manual" class="prosa" placeholder="B12345674 ; Ejemplo Industrial SL&#10;A46103834 Mercadona SA"></textarea>
-      <div class="row" style="margin-top:.5rem"><button id="btnManual" class="btn" type="button">Añadir a la lista</button></div>
-    </div>
+<div class="dos">
+  <section class="en-card">
+    <div class="en-card-cab"><h2>1 · Clientes desde documentos</h2>
+      <span>{% if hay_ocr %}<span class="en-tag ok"><i></i>OCR disponible</span>{% else %}<span class="en-tag warn"><i></i>Sin OCR</span>{% endif %}
+        {% if hay_claude %}<span class="en-tag ok"><i></i>Claude</span>{% else %}<span class="en-tag off"><i></i>Sin Claude</span>{% endif %}</span></div>
+    <label class="en-subida" id="drop">
+      <b>Arrastra aquí PDF, imágenes, Excel, Word, CSV o TXT</b>
+      <small>o pulsa para elegirlos · máx. 25 MB por fichero · {{ extensiones }}</small>
+      <input type="file" id="fileInput" multiple accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.xlsx,.xlsm,.csv,.txt,.docx">
+    </label>
+    {% if not hay_ocr and not hay_claude %}<div class="pend">Los PDF escaneados y las imágenes no se podrán leer: introduce esos datos a mano.</div>{% endif %}
+    <div class="en-tabla" style="margin-top:.6rem"><table><tbody id="listaDocs"></tbody></table></div>
+  </section>
+
+  <section class="en-card">
+    <div class="en-card-cab"><h2>Entrada manual</h2></div>
+    <div class="en-campo"><label for="manual">Una línea por cliente: CIF y razón social</label>
+      <textarea class="form-control" id="manual" rows="5" placeholder="B12345674 ; Ejemplo Industrial SL&#10;A46103834 Mercadona SA"></textarea></div>
+    <div class="en-acciones" style="margin-top:.7rem;justify-content:flex-start"><button id="btnManual" class="btn btn-light btn-sm" type="button">Añadir a la lista</button></div>
+  </section>
+</div>
+
+<section class="en-card">
+  <div class="en-card-cab"><h2>2 · Periodo de cálculo</h2></div>
+  <div class="dos">
+    <label class="opcion"><input type="radio" name="modo" value="movil" {{ 'checked' if modo_defecto == 'movil' }}>
+      <div><b>Tres años hacia atrás desde la fecha del informe</b><span>Reglamento (UE) 2023/2831, vigente. Techo general de 300.000 € por única empresa; las ayudas agrícolas y de pesca suman contra el mismo techo.</span></div></label>
+    <label class="opcion"><input type="radio" name="modo" value="ejercicios" {{ 'checked' if modo_defecto == 'ejercicios' }}>
+      <div><b>Ejercicios fiscales elegidos</b><span>Criterio del Reglamento 1407/2013 (200.000 € antes de 2024), para revisar periodos pasados.</span></div></label>
+  </div>
+  <div style="margin-top:.9rem">
+    <div id="bloqueMovil" class="en-campos"><div class="en-campo"><label for="fechaRef">Fecha de referencia</label>
+      <input class="form-control" type="date" id="fechaRef" value="{{ hoy }}">
+      <span class="en-ayuda">Fecha prevista de concesión de la nueva ayuda.</span></div></div>
+    <div id="bloqueEjercicios" class="oculto"><div class="en-campo"><label>Ejercicios (hasta tres consecutivos)</label>
+      <div class="chips" id="anos" data-defecto="{{ anos_defecto|join(',') }}"></div></div></div>
   </div>
 </section>
 
-<section class="card">
-  <h2>2 · Periodo de cálculo</h2>
-  <div class="grid two">
-    <div>
-      <label class="inline"><input type="radio" name="modo" value="movil" {{ 'checked' if modo_defecto == 'movil' }}>
-        <b>Tres años hacia atrás</b> desde la fecha del informe (Reglamento UE 2023/2831, vigente)</label>
-      <label class="inline"><input type="radio" name="modo" value="ejercicios" {{ 'checked' if modo_defecto == 'ejercicios' }}>
-        <b>Ejercicios fiscales</b> elegidos (criterio del Reglamento 1407/2013, para revisar periodos pasados)</label>
-      <p class="hint">El techo general es de 300.000 € por única empresa en cualquier periodo de tres años
-        (200.000 € antes de 2024). Las ayudas agrícolas y de pesca suman contra el mismo techo.</p>
-    </div>
-    <div>
-      <div id="bloqueMovil">
-        <label for="fechaRef">Fecha de referencia (fecha prevista de concesión de la nueva ayuda)</label>
-        <input type="date" id="fechaRef" value="{{ hoy }}">
-      </div>
-      <div id="bloqueEjercicios" class="oculto">
-        <label>Ejercicios (hasta tres consecutivos)</label>
-        <div class="chiprow" id="anos" data-defecto="{{ anos_defecto|join(',') }}"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="card">
-  <div class="row space">
-    <h2 style="margin:0">3 · Revisión de la lista</h2>
-    <span class="hint" id="cuenta" style="margin:0">Sin clientes</span>
-  </div>
+<section class="en-card">
+  <div class="en-card-cab"><h2>3 · Revisión de la lista</h2><span class="en-tenue" id="cuenta">Sin clientes</span></div>
   <div id="errores"></div>
-  <div class="tabla" style="margin-top:.6rem">
-    <table>
-      <thead><tr><th>CIF / NIF</th><th>Razón social (de la entrada)</th><th>Origen</th><th>Confianza</th><th>Notas</th><th></th></tr></thead>
-      <tbody id="tbClientes"><tr><td colspan="6" class="muted">Añada clientes desde documentos o a mano.</td></tr></tbody>
-    </table>
-  </div>
-  <div class="row" style="margin-top:.9rem">
-    <button id="btnConsultar" class="btn btn-primary" type="button" disabled>Consultar saldo en la BDNS</button>
-    <button id="btnVaciar" class="btn btn-danger" type="button">Vaciar lista</button>
-  </div>
+  <div class="en-tabla"><table>
+    <thead><tr><th>CIF / NIF</th><th>Razón social (de la entrada)</th><th>Origen</th><th>Confianza</th><th>Notas</th><th></th></tr></thead>
+    <tbody id="tbClientes"></tbody>
+  </table></div>
+  <div class="en-form-pie"><span class="en-tenue">Los identificadores no válidos no se consultan.</span>
+    <div class="en-acciones"><button id="btnVaciar" class="btn btn-light btn-sm" type="button">Vaciar lista</button>
+      <button id="btnConsultar" class="btn btn-primary btn-sm" type="button" disabled>Consultar saldo en la BDNS</button></div></div>
 </section>
 {% endblock %}
