@@ -87,7 +87,7 @@
     <p style="margin:.6rem 0 .3rem">{{ d.notas }}</p>
     {% if d.notas_busqueda %}<p class="hint">Búsqueda: {{ d.notas_busqueda }}</p>{% endif %}
     <div class="row mini muted">
-      {% for a in d.desglose_por_ano %}<span class="pill">{{ a.ano }}: {{ a.importe_concedido|euros }}</span>{% endfor %}
+      {% for a in d.desglose_por_ano %}<span class="pill">{{ a.ano }}{% if a.tramo %} ({{ a.tramo }}){% endif %}: {{ a.importe_concedido|euros }}</span>{% endfor %}
       {% if d.proxima_actualizacion_limite %}<span class="pill">Próxima salida del periodo: {{ d.proxima_actualizacion_limite }}</span>{% endif %}
       {% for s in d.sublimites %}<span class="pill" title="{{ s.norma }}">Sublímite {{ s.clase }}: {{ s.computado|euros }} de {{ s.tope|euros }} ({{ s.norma }})</span>{% endfor %}
       {% if d.url_beneficiario %}<a href="{{ d.url_beneficiario }}" target="_blank" rel="noopener">Ver en la BDNS ↗</a>{% endif %}

@@ -187,7 +187,8 @@ def exportar_docx(informe: dict, destino: Path) -> Path:
         if d["desglose_por_ano"]:
             p = doc.add_paragraph()
             p.add_run("Desglose por año: ").bold = True
-            p.add_run("; ".join(f"{x['ano']}: {euros(x['importe_concedido'])}" for x in d["desglose_por_ano"]))
+            p.add_run("; ".join(f"{x['ano']}{' (' + x['tramo'] + ')' if x.get('tramo') else ''}: {euros(x['importe_concedido'])}"
+            for x in d["desglose_por_ano"]))
         if d["proxima_actualizacion_limite"]:
             p = doc.add_paragraph()
             p.add_run("Próxima salida de una ayuda del periodo: ").bold = True
@@ -335,7 +336,8 @@ def exportar_pdf(informe: dict, destino: Path) -> Path:
                             f'{escape(euros(d["total_concedido"]))}', st["n"])]
         if d["desglose_por_ano"]:
             bloque.append(P("Desglose por año: " + "; ".join(
-                f"{x['ano']}: {euros(x['importe_concedido'])}" for x in d["desglose_por_ano"])))
+                f"{x['ano']}{' (' + x['tramo'] + ')' if x.get('tramo') else ''}: {euros(x['importe_concedido'])}"
+            for x in d["desglose_por_ano"])))
         if d["proxima_actualizacion_limite"]:
             bloque.append(P(f"Próxima salida de una ayuda del periodo: {d['proxima_actualizacion_limite']}"))
         if d["fecha_recupera_saldo"]:

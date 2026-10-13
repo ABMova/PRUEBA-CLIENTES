@@ -286,6 +286,22 @@ class Regresiones102(unittest.TestCase):
         self.assertEqual(auth._fallos, {})
 
 
+class DesgloseMovil(unittest.TestCase):
+    """Tres años hacia atrás desde la fecha del informe tocan cuatro años naturales; el primero y el último, en parte."""
+
+    def test_tramos(self):
+        per = calculador.periodo("movil", date(2026, 10, 13), None)
+        self.assertEqual(per["etiqueta"], "14/10/2023 – 13/10/2026")
+        c, _ = calculador.calcular_cliente(res(ayuda("2023-12-01", 1000), ayuda("2026-01-05", 2000)), per)
+        tramos = {x["ano"]: x["tramo"] for x in c["desglose_por_ano"]}
+        self.assertEqual(tramos, {2023: "desde el 14/10", 2024: "", 2025: "", 2026: "hasta el 13/10"})
+
+    def test_fin_de_ano_sin_tramo(self):
+        per = calculador.periodo("movil", date(2025, 12, 31), None)
+        c, _ = calculador.calcular_cliente(res(), per)
+        self.assertEqual([(x["ano"], x["tramo"]) for x in c["desglose_por_ano"]], [(2023, ""), (2024, ""), (2025, "")])
+
+
 class Documentos(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())

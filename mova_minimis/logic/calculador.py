@@ -23,7 +23,7 @@ Dos modos:
 - 'ejercicios': años naturales elegidos (criterio del antiguo 1407/2013), útil
   para revisar periodos pasados; con años >= 2024 es orientativo.
 """
-from datetime import date
+from datetime import date, timedelta
 
 TECHO_GENERAL = 300_000.0
 TECHO_GENERAL_1407 = 200_000.0
@@ -92,10 +92,24 @@ def periodo(modo: str, fecha_ref: date, anos: list[int] | None) -> dict:
     if techo == TECHO_GENERAL_1407:
         avisos.append("Fecha de referencia anterior a 2024: se aplica el techo de 200.000 € del Reglamento "
                       "1407/2013, que se medía por ejercicios fiscales; el periodo móvil es una aproximación.")
-    anos = list(range(desde.year, fecha_ref.year + 1))
+    anos = list(range((desde + timedelta(days=1)).year, fecha_ref.year + 1))  # años que tienen algún día dentro
     return {"modo": "movil", "desde": desde, "hasta": fecha_ref, "techo": techo, "anos": anos,
-            "etiqueta": f"{desde.strftime('%d/%m/%Y')} – {fecha_ref.strftime('%d/%m/%Y')}", "avisos": avisos,
+            "etiqueta": f"{(desde + timedelta(days=1)):%d/%m/%Y} – {fecha_ref:%d/%m/%Y}", "avisos": avisos,
             "reglamento": "Reglamento (UE) 2023/2831" if techo == TECHO_GENERAL else "Reglamento (UE) 1407/2013"}
+
+
+def _tramo(ano: int, per: dict) -> str:
+    """En el periodo móvil el primer y el último año entran solo en parte: se dice qué parte."""
+    if per["modo"] != "movil":
+        return ""
+    primero = date.fromisoformat(per["desde"]) if isinstance(per["desde"], str) else per["desde"]
+    primero += timedelta(days=1)
+    ultimo = date.fromisoformat(per["hasta"]) if isinstance(per["hasta"], str) else per["hasta"]
+    if ano == primero.year and primero != date(ano, 1, 1):
+        return f"desde el {primero:%d/%m}"
+    if ano == ultimo.year and ultimo != date(ano, 12, 31):
+        return f"hasta el {ultimo:%d/%m}"
+    return ""
 
 
 def _en_periodo(f: date, per: dict) -> bool:
@@ -231,8 +245,8 @@ def calcular_cliente(res: dict, per: dict) -> tuple[dict, list[dict]]:
     pendientes += [f"[PENDIENTE: {a}]" for a in per["avisos"] if a.startswith("Periodo incompleto")]
 
     base.update({
-        "desglose_por_ano": [{"ano": a, "importe_concedido": round(v, 2), "base_imponible": True}
-                             for a, v in sorted(por_ano.items())],
+        "desglose_por_ano": [{"ano": a, "importe_concedido": round(v, 2), "base_imponible": True,
+                              "tramo": _tramo(a, per)} for a, v in sorted(por_ano.items())],
         "sumas_por_reglamento": {k: round(v, 2) for k, v in sumas.items() if v},
         "total_concedido_3anos": total,
         "saldo_disponible": saldo,
