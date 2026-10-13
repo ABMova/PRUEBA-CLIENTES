@@ -21,7 +21,7 @@ Flask + waitress + SQLite, empaquetado con PyInstaller (no Electron). Responder 
   `mova_minimis_servidor.spec` en carpeta + electron-builder desde `%LOCALAPPDATA%\Temp\mova-minimis-esc`).
   Deja `escritorio\dist\MOVAMinimis-Setup-X.Y.Z.exe`. La versión va en `escritorio/package.json` y en `config.VERSION`.
 - Sin login: `permissions.usuario_del_equipo()`; la administración pide la contraseña de configuración
-  (ajuste `clave_configuracion`, ruta `/desbloquear`). Sin gestión de usuarios ni botón de apagado.
+  (ajuste `clave_configuracion`; si no existe, manda la huella de serie `config.CLAVE_CONFIG_DEFECTO`; ruta `/desbloquear`). La contraseña de serie la eligió el usuario: no escribirla en claro en ningún fichero. Sin gestión de usuarios ni botón de apagado.
 
 ## Datos
 - Desarrollo: `%LOCALAPPDATA%\MOVA Minimis\data-dev`; ejecutable: `...\data`. Nunca en OneDrive.

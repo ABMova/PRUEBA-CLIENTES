@@ -358,18 +358,22 @@ class Escritorio(unittest.TestCase):
         self.assertEqual(c.get("/login").status_code, 302)
 
     def test_administracion_con_candado(self):
+        from auth import user
         from models import db
         from routes.auth import CLAVE_CONFIG
+        # Sin ajuste en la base manda la contraseña de serie (aquí, una de prueba en su lugar)
         db.guardar_ajuste(CLAVE_CONFIG, None)
+        antes = self.config.CLAVE_CONFIG_DEFECTO
+        self.config.CLAVE_CONFIG_DEFECTO = user.hash_clave("ConfigSegura123")
+        self.addCleanup(setattr, self.config, "CLAVE_CONFIG_DEFECTO", antes)
         c = self._cliente()
         csrf = self._csrf(c)
         for ruta in ("/admin/configuracion", "/admin/backups", "/admin/auditoria"):
             r = c.get(ruta)
             self.assertEqual(r.status_code, 302, ruta)
             self.assertIn("/desbloquear", r.headers["Location"])
-        # La primera vez se crea la contraseña
-        r = c.post("/desbloquear?next=/admin/backups",
-                   data={"csrf": csrf, "clave": "ConfigSegura123", "repetir": "ConfigSegura123"})
+        self.assertNotIn(b"repetir", c.get("/desbloquear").data)  # no hay que crearla: viene puesta
+        r = c.post("/desbloquear?next=/admin/backups", data={"csrf": csrf, "clave": "ConfigSegura123"})
         self.assertEqual(r.headers["Location"], "/admin/backups")
         self.assertEqual(c.get("/admin/backups").status_code, 200)
         self.assertEqual(c.get("/admin/usuarios").status_code, 302)  # sin gestión de usuarios
@@ -380,6 +384,29 @@ class Escritorio(unittest.TestCase):
         self.assertEqual(c.get("/admin/configuracion").status_code, 302)
         c.post("/desbloquear", data={"csrf": csrf, "clave": "ConfigSegura123"})
         self.assertEqual(c.get("/admin/configuracion").status_code, 200)
+
+    def test_cambiarla_sustituye_a_la_de_serie(self):
+        from auth import user
+        from models import db
+        from routes.auth import CLAVE_CONFIG
+        db.guardar_ajuste(CLAVE_CONFIG, None)
+        antes = self.config.CLAVE_CONFIG_DEFECTO
+        self.config.CLAVE_CONFIG_DEFECTO = user.hash_clave("DeSerie12345")
+        self.addCleanup(setattr, self.config, "CLAVE_CONFIG_DEFECTO", antes)
+        c = self._cliente()
+        csrf = self._csrf(c)
+        c.post("/desbloquear", data={"csrf": csrf, "clave": "DeSerie12345"})
+        c.post("/admin/configuracion", data={"csrf": csrf, "accion": "cambiar_clave_config", "actual": "DeSerie12345",
+                                             "nueva": "Propia123456", "repetir": "Propia123456"})
+        c.post("/bloquear", data={"csrf": csrf})
+        c.post("/desbloquear", data={"csrf": csrf, "clave": "DeSerie12345"})
+        self.assertEqual(c.get("/admin/configuracion").status_code, 302)  # la de serie ya no vale
+        c.post("/desbloquear", data={"csrf": csrf, "clave": "Propia123456"})
+        self.assertEqual(c.get("/admin/configuracion").status_code, 200)
+
+    def test_la_de_serie_no_esta_en_claro(self):
+        import config
+        self.assertTrue(config.CLAVE_CONFIG_DEFECTO.startswith("pbkdf2_sha256$"))
 
     def test_otra_sesion_no_hereda_el_desbloqueo(self):
         from models import db

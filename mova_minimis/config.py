@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 NOMBRE_APP = "MOVA Minimis"
 
 CONGELADO = getattr(sys, "frozen", False)
@@ -49,6 +49,10 @@ ESCRITORIO = os.environ.get("MOVA_MODO_ESCRITORIO", "0") == "1"
 TOKEN_ESCRITORIO = os.environ.get("MOVA_TOKEN", "")
 PID_PADRE = int(os.environ.get("MOVA_PID_PADRE", "0") or 0)
 MINUTOS_DESBLOQUEO = 30
+# Contraseña de configuración de serie (la pidió así el usuario). Solo su huella PBKDF2: la contraseña
+# no está escrita ni en el código ni en el instalador. Se cambia desde Configuración y entonces manda
+# el ajuste 'clave_configuracion' de la base.
+CLAVE_CONFIG_DEFECTO = "pbkdf2_sha256$390000$WpvJ96VpzA0n31H6KfDXTQ==$8RCCbgcUoLOMLCw9WeSVIX2fUBvO7AihGU4+YTJpV5o="
 EMAIL_ESCRITORIO = "equipo@local"
 
 HOST = os.environ.get("MOVA_HOST", "127.0.0.1")

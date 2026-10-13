@@ -41,9 +41,10 @@ cuenta, sin permisos de administrador, con accesos en el escritorio y en el men�
 desinstala desde «Agregar o quitar programas».
 
 - **No pide contraseña al entrar.** El usuario es la cuenta de Windows que la abre.
-- **La administración sí:** Configuración, Copias de seguridad y Auditoría piden una contraseña
-  de configuración, que se crea la primera vez que se entra ahí. Queda abierta 30 minutos sin uso
-  o hasta que se bloquea desde el menú del usuario. No se puede recuperar desde la aplicación.
+- **La administración sí:** Configuración, Copias de seguridad y Auditoría piden la contraseña
+  de configuración, que viene puesta de serie (MOVA la facilita a quien deba usarla; no está escrita
+  en el código ni en el instalador, solo su huella). Se puede cambiar en Configuración. Queda abierta
+  30 minutos sin uso o hasta que se bloquea desde el menú del usuario.
 - **Datos** en `%APPDATA%\MOVAMinimis\datos` (separados de la versión de servidor).
 - Por dentro es una ventana Electron que arranca el motor de MOVA Minimis en un puerto privado de
   127.0.0.1; cada petición lleva un token aleatorio, así que nada más del equipo puede usarlo.

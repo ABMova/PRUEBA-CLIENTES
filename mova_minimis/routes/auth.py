@@ -109,29 +109,23 @@ def cambiar_clave():
 CLAVE_CONFIG = "clave_configuracion"
 
 
+def clave_config() -> str:
+    """Huella vigente: la cambiada desde Configuración o, si nunca se cambió, la de serie."""
+    return db.leer_ajuste(CLAVE_CONFIG) or config.CLAVE_CONFIG_DEFECTO
+
+
 @bp.route("/desbloquear", methods=["GET", "POST"])
 def desbloquear():
-    """Escritorio: la administración pide una contraseña propia. La primera vez se crea aquí."""
+    """Escritorio: la administración pide la contraseña de configuración (viene puesta de serie)."""
     if not config.ESCRITORIO:
         return redirect(url_for("admin.configuracion"))
     siguiente = _destino_seguro(request.args.get("next") or url_for("admin.configuracion"))
-    guardada = db.leer_ajuste(CLAVE_CONFIG)
+    guardada = clave_config()
     clave_fallos = (g.ip, "configuracion")
     if request.method == "POST":
         clave = request.form.get("clave", "")
         if _bloqueado(clave_fallos):
             flash("Demasiados intentos fallidos. Espera unos minutos.", "err")
-        elif not guardada:
-            if clave != request.form.get("repetir", ""):
-                flash("Las dos contraseñas no coinciden.", "err")
-            elif problemas := user.problemas_clave(clave):
-                flash("La contraseña necesita " + ", ".join(problemas) + ".", "err")
-            else:
-                db.guardar_ajuste(CLAVE_CONFIG, user.hash_clave(clave))
-                permissions.desbloquear_configuracion()
-                db.auditar(g.usuario["id"], g.usuario["email"], "clave_configuracion_creada", "configuracion", None, g.ip)
-                flash("Contraseña de configuración creada. Guárdala: sin ella no se puede entrar en la administración.", "ok")
-                return redirect(siguiente)
         elif user.verificar_clave(clave, guardada):
             _fallos.pop(clave_fallos, None)
             permissions.desbloquear_configuracion()
@@ -141,7 +135,7 @@ def desbloquear():
             _fallos.setdefault(clave_fallos, deque()).append(time.time())
             db.auditar(g.usuario["id"], g.usuario["email"], "desbloqueo_fallido", "configuracion", None, g.ip)
             flash("Contraseña incorrecta.", "err")
-    return render_template("desbloquear.html", crear=not guardada, siguiente=siguiente,
+    return render_template("desbloquear.html", siguiente=siguiente,
                            minutos=config.MINUTOS_DESBLOQUEO)
 
 

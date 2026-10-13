@@ -241,9 +241,9 @@ def configuracion():
                 except claude_api.ErrorClaude as e:
                     flash(str(e), "err")
         elif accion == "cambiar_clave_config" and config.ESCRITORIO:
-            from routes.auth import CLAVE_CONFIG
+            from routes.auth import CLAVE_CONFIG, clave_config
             nueva = request.form.get("nueva", "")
-            if not user.verificar_clave(request.form.get("actual", ""), db.leer_ajuste(CLAVE_CONFIG, "")):
+            if not user.verificar_clave(request.form.get("actual", ""), clave_config()):
                 flash("La contraseña actual no es correcta.", "err")
             elif nueva != request.form.get("repetir", ""):
                 flash("Las dos contraseñas nuevas no coinciden.", "err")
