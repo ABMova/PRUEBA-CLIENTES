@@ -41,6 +41,13 @@ Desde la 1.0.4 la aplicación viste como el CRM de MOVA (skill mova-crm-claro): 
 de la hoja de la skill y no se edita; lo propio va en `static/minimis.css`. Logotipo MOVA IA negro en el menú y en el
 acceso. Los informes (Word, PDF, Excel) NO siguen este aspecto: el usuario pidió dejarlos como salían.
 
+## Informes (desde 1.1.2)
+Word y PDF con la skill mova-informes: `logic/informe_mova.py` es COPIA de su `generar_informe.py` (cambios
+anotados en su cabecera) y `plantillas_informe/plantilla_mova.docx` su plantilla. `exportador.markdown_informe`
+escribe el Markdown de la skill; `integrations/word_pdf.py` usa Word por COM (hilo propio, se calienta al abrir
+resultados, se cierra a los 5 min sin uso) para actualizar el índice y exportar el PDF; sin Word, LibreOffice.
+El Excel es propio. En las pruebas no se abre Word (`word_pdf._disponible = False`).
+
 ## Arquitectura
 `logic/` no importa Flask ni `models`: la red, la caché y el progreso se inyectan desde
 `routes/orquestador.py`. Todo el SQL vive en `models/db.py`. Columnas nuevas: añadir a

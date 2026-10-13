@@ -86,7 +86,12 @@ pueden leer y la aplicación lo avisa para introducir esos datos a mano.
    **ejercicios** concretos.
 3. **Resultados**: progreso en vivo, saldo por cliente, detalle de cada concesión con enlace
    a la BDNS, calendario de salida de ayudas y pendientes.
-4. **Exportar**: Word, PDF, Excel (resumen, detalle y referencias) o JSON.
+4. **Exportar**: Word, PDF, Excel (resumen, detalle y ayudas computadas) o JSON.
+   Word y PDF salen con el formato corporativo MOVA (plantilla oficial: logotipo, marca de agua,
+   pie de contacto, portada, índice con páginas y tablas en blanco y negro). El PDF se obtiene del
+   propio Word, así que hace falta **Word** (o, en su defecto, LibreOffice) en el equipo. La primera
+   exportación tras abrir Word puede tardar cerca de un minuto (Windows consulta la impresora
+   predeterminada); la aplicación lo prepara en segundo plano al abrir una consulta terminada.
 
 El **Historial** busca consultas anteriores por razón social o CIF.
 

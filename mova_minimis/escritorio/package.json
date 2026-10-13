@@ -1,7 +1,7 @@
 {
   "name": "mova-minimis",
   "productName": "MOVAMinimis",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "MOVA Minimis: saldo de ayudas de minimis por cliente con los datos de la BDNS",
   "author": "MOVA IA",
   "main": "main.js",
@@ -25,7 +25,6 @@
       "preload.js",
       "index.html",
       "arranque.js",
-      "logo.png",
       "icono.ico"
     ],
     "extraResources": [

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Icono MOVA IA en los colores de la aplicación · mediano: 48 a 128 px (sin la píldora).
+       Redibujado del icono del usuario; regenerar los .ico con escritorio/generar_icono.py -->
+  <defs>
+    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e2c172"/><stop offset=".55" stop-color="#c99a3c"/><stop offset="1" stop-color="#a87a25"/>
+    </linearGradient>
+    <linearGradient id="oroIA" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="110" y2="100">
+      <stop offset="0" stop-color="#e2c172"/><stop offset=".55" stop-color="#c99a3c"/><stop offset="1" stop-color="#a87a25"/>
+    </linearGradient>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f7f3ea"/>
+    </linearGradient>
+    <!-- Anillo: arco superior (del punto a la derecha) y arco inferior (de la izquierda a la flecha) -->
+    <g id="anillo" fill="none" stroke="url(#oro)" stroke-linecap="round">
+      <path d="M 112.7 131.6 A 175 175 0 0 1 430.3 247.3"/>
+      <path d="M 83.7 262.4 A 175 175 0 0 0 414.6 306.0"/>
+    </g>
+    <g id="flecha"><path d="M 430.7 271.6 L 428.8 318.1 L 396.2 302.9 Z" fill="url(#oro)"/></g>
+    <g id="punto"><circle cx="112.7" cy="131.6" r="13" fill="#f6e6b4" stroke="url(#oro)" stroke-width="6"/></g>
+    <!-- MOVA: el trazo del logotipo del CRM, escalado -->
+    <g id="mova" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M75 590V214L263 403L447 214V590"/><circle cx="735" cy="403" r="190"/>
+      <path d="M981 214L1167 590L1356 214"/><path d="M1318 590L1506 214L1694 590"/><path d="M1458 586H1548"/>
+    </g>
+    <g id="ia" fill="none" stroke="url(#oroIA)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 0V100"/><path d="M34 100L72 0L110 100"/>
+    </g>
+  </defs>
+    <rect x="10" y="10" width="492" height="492" rx="104" fill="url(#fondo)" stroke="#e1ddd2" stroke-width="6"/>
+    <g transform="translate(0 24)"><use href="#anillo" stroke-width="16"/><use href="#flecha"/><use href="#punto"/>
+    <g transform="translate(90.2 141.9) scale(.1875)" style="color:#16171b"><use href="#mova" stroke-width="56"/></g>
+    <g transform="translate(227.1 270) scale(.525)"><use href="#ia" stroke-width="29"/></g></g>
+  </svg>

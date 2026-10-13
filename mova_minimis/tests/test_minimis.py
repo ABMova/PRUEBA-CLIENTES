@@ -427,7 +427,7 @@ class Documentos(unittest.TestCase):
     def test_excel_word_y_pdf(self):
         from docx import Document
         from openpyxl import Workbook
-        from reportlab.pdfgen import canvas
+        import pymupdf
         wb = Workbook()
         wb.active.append(["Cliente", "CIF/NIF", "Año"])
         wb.active.append(["MERCADONA SA", "A46103834", 2025])
@@ -435,9 +435,9 @@ class Documentos(unittest.TestCase):
         d = Document()
         d.add_paragraph("La empresa CAL PETITO DE TORA SL con CIF B66894452 solicita la ayuda.")
         d.save(self.dir / "c.docx")
-        cv = canvas.Canvas(str(self.dir / "c.pdf"))
-        cv.drawString(72, 750, "Beneficiario: MOSQUITO BOOKS BARCELONA SL - NIF: B17884859")
-        cv.save()
+        pdf = pymupdf.open()
+        pdf.new_page().insert_text((72, 72), "Beneficiario: MOSQUITO BOOKS BARCELONA SL - NIF: B17884859")
+        pdf.save(self.dir / "c.pdf")
         for nombre, cif in (("c.xlsx", "A46103834"), ("c.docx", "B66894452"), ("c.pdf", "B17884859")):
             salida = parser.procesar_documento(self.dir / nombre, nombre)
             self.assertEqual([c["cif"] for c in salida["clientes"]], [cif], nombre)
@@ -492,8 +492,48 @@ class Orquestacion(unittest.TestCase):
         r = self.db.resultados_de(cid)[0]
         self.assertEqual(r["saldo_disponible"], 180_000)
         self.assertEqual(r["ayudas"][0]["programa"], "Programa de prueba")
-        for f in ("docx", "pdf", "xlsx", "json"):
+        # Sin abrir Word (tarda un minuto la primera vez): el .docx sale del motor de la plantilla MOVA
+        # y el PDF se prueba con el ejecutable. Aquí: Word, Excel y JSON, y el contenido del informe.
+        from docx import Document
+        from integrations import word_pdf
+        antes = word_pdf._disponible
+        word_pdf._disponible = False
+        self.addCleanup(setattr, word_pdf, "_disponible", antes)
+        for f in ("docx", "xlsx", "json"):
             self.assertTrue(orquestador.exportar(cid, f, {"id": self.uid}).exists(), f)
+        ruta = orquestador.exportar(cid, "docx", {"id": self.uid})
+        texto = " ".join(p.text for p in Document(ruta).paragraphs)
+        self.assertIn("RESUMEN EJECUTIVO", texto)        # título de nivel 1 de la plantilla MOVA
+        self.assertNotIn("Referencias de fuente", texto)
+        celdas = [c.text for t in Document(ruta).tables for f in t.rows for c in f.cells]
+        self.assertIn("TOTAL", celdas)
+        self.assertIn("General · 2023/2831", celdas)
+
+    def test_informe_sin_ayudas_que_no_computan(self):
+        from logic import exportador
+        inf = {"informe": {
+            "titulo": "Informe", "reglamento": "Reglamento (UE) 2023/2831", "umbral": 300000,
+            "periodo_consulta": "14/10/2023 – 13/10/2026", "fecha_generacion": "2026-10-13T10:00:00Z",
+            "usuario": "Prueba", "audit_trail": {"consulta_id": "x"}, "errores_entrada": [],
+            "notas_importantes": ["[PENDIENTE: única empresa] nota"],
+            "resumen_ejecutivo": {"clientes_consultados": 1, "clientes_con_saldo": 1, "clientes_en_limite": 0,
+                                  "clientes_superado_limite": 0, "clientes_pendientes": 0,
+                                  "total_saldo_disponible_conjunto": 290000, "total_concedido_periodo": 10000,
+                                  "total_limite_superado": 0},
+            "detalle_clientes": [{
+                "razon_social": "PRUEBA | SL", "cif": "B66894452", "saldo_disponible": 290000, "estado_texto": "Saldo disponible",
+                "total_concedido": 10000, "desglose_por_ano": [], "proxima_actualizacion_limite": None,
+                "fecha_recupera_saldo": None, "sublimites": [], "pendientes": [], "notas": "", "notas_busqueda": "",
+                "referencias_fuente": [
+                    {"fecha_concesion": "01/01/2025", "programa": "Computa", "convocante": "ESTADO", "computa": True,
+                     "reglamento": "REG (UE) 2023/2831 de minimis, General", "clase": "General", "importe": 10000},
+                    {"fecha_concesion": "01/01/2021", "programa": "Antigua", "convocante": "ESTADO", "computa": False,
+                     "reglamento": "REG (UE) 1407/2013 de minimis", "clase": "General", "importe": 5000}]}]}}
+        md = exportador.markdown_informe(inf)
+        self.assertIn("Computa · ESTADO", md)
+        self.assertNotIn("Antigua", md)
+        self.assertIn("| TOTAL |", md)
+        self.assertIn("PRUEBA / SL", md)  # la barra vertical rompería la tabla Markdown
 
     def test_cancelada(self):
         from routes import orquestador

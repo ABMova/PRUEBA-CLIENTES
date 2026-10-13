@@ -14,6 +14,7 @@ const path = require('path');
 const ESPERA_ARRANQUE_MS = 90000; // el primer arranque crea la base y hace la copia de seguridad
 let servidor = null;
 let base = null;
+let credencial = null; // { puerto, token } del motor en marcha
 let ventana = null;
 let saliendo = false;
 
@@ -109,6 +110,20 @@ async function arrancarServidor() {
   return null;
 }
 
+// Cierre ordenado: el motor cierra antes su Word invisible (Windows lo arranca aparte y no muere con él).
+// Con tope de 4 s; si no responde, pararServidor() lo fuerza.
+function pedirCierre() {
+  return new Promise((resolve) => {
+    if (!credencial || !servidor || servidor.exitCode !== null) return resolve();
+    const fin = setTimeout(resolve, 4000);
+    servidor.once('exit', () => { clearTimeout(fin); resolve(); });
+    const req = http.get({ host: '127.0.0.1', port: credencial.puerto, path: '/escritorio/cerrar', timeout: 2000,
+      headers: { 'X-MOVA-Token': credencial.token } }, (res) => res.resume());
+    req.on('error', () => {});
+    req.on('timeout', () => req.destroy());
+  });
+}
+
 function pararServidor() {
   saliendo = true;
   if (servidor && servidor.pid && servidor.exitCode === null) {
@@ -175,6 +190,7 @@ app.whenReady().then(async () => {
   const listo = await arrancarServidor();
   if (!listo) return;
   base = 'http://127.0.0.1:' + listo.puerto + '/';
+  credencial = listo;
   // El token viaja en cada petición de la ventana al motor, y solo a él
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: [base + '*'] }, (det, cb) => {
     det.requestHeaders['X-MOVA-Token'] = listo.token;
@@ -184,4 +200,9 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', pararServidor);
-app.on('window-all-closed', () => { pararServidor(); app.quit(); });
+app.on('window-all-closed', async () => {
+  saliendo = true;
+  await pedirCierre();
+  pararServidor();
+  app.quit();
+});

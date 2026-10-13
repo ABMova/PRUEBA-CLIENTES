@@ -1,24 +1,20 @@
 """Agente 3b · Exportador a Word, PDF y Excel.
 
-Determinista (python-docx, reportlab, openpyxl): no necesita IA y así el
-documento es idéntico cada vez. El documento va en claro, porque se imprime o se
-envía; la marca va en los títulos dorados y en las cabeceras de tabla oscuras.
-Sin macros ni contraseñas.
+Word y PDF salen con el formato corporativo de la skill «mova-informes»: el informe se escribe en su
+Markdown y lo maqueta su motor (logic/informe_mova.py) sobre plantillas_informe/plantilla_mova.docx;
+el PDF sale del propio .docx (Word, o LibreOffice si no hay Word). El Excel es propio (openpyxl).
+Determinista: no necesita IA y el documento es idéntico cada vez. Sin macros ni contraseñas.
 """
+import re
 from datetime import datetime
 from pathlib import Path
 
-import config
 from logic.calculador import euros
 
 DORADO = "B8892F"       # --gold-d: legible sobre blanco (el #d9b45b se pierde en papel)
 DORADO_CLARO = "D9B45B"
 OSCURO = "141518"       # --card
-BORDE = "2A2D33"
-VERDE, AMBAR, ROJO, GRIS = "16A34A", "D97706", "DC2626", "6B7280"
-COLOR_ESTADO = {"SALDO_DISPONIBLE": VERDE, "LIMITE_ALCANZADO": AMBAR, "LIMITE_SUPERADO": ROJO, "PENDIENTE": GRIS}
 LEYENDA = "Datos extraídos de fuentes públicas. Requiere validación oficial."
-LOGO = config.RAIZ_CODIGO / "static" / "marca" / "mova-ia-negro.png"
 
 
 def _fecha_local(iso: str) -> str:
@@ -55,326 +51,156 @@ def _kpis(inf: dict) -> list[tuple[str, str]]:
     ]
 
 
-# ======================================================================= WORD
-def exportar_docx(informe: dict, destino: Path) -> Path:
-    from docx import Document
-    from docx.enum.section import WD_ORIENT
-    from docx.enum.table import WD_TABLE_ALIGNMENT
-    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-    from docx.shared import Cm, Pt, RGBColor
+# ======================================================================= WORD Y PDF (formato MOVA)
+MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+         "noviembre", "diciembre"]
 
+
+def _fecha_larga(iso: str) -> str:
+    try:
+        d = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return iso
+    return f"{d.day} de {MESES[d.month - 1]} de {d.year}"
+
+
+def _md(texto) -> str:
+    """Texto de datos dentro del Markdown: sin saltos ni caracteres que el motor lea como marcas."""
+    t = " ".join(str("" if texto is None else texto).split())
+    return t.replace("|", "/").replace("*", "·")
+
+
+def _tabla(cabecera: list[str], filas: list[list]) -> list[str]:
+    lineas = ["| " + " | ".join(cabecera) + " |", "|" + "---|" * len(cabecera)]
+    lineas += ["| " + " | ".join(_md(c) for c in f) + " |" for f in filas]
+    return lineas + [""]
+
+
+def _reglamento_corto(x: dict) -> str:
+    """'REG (UE) 2023/2831 de minimis, General' -> 'General · 2023/2831'."""
+    numero = re.search(r"\d{3,4}/\d{4}", x.get("reglamento") or "")
+    return f"{x['clase']} · {numero.group(0)}" if numero else (x.get("clase") or "")
+
+
+def markdown_informe(informe: dict) -> str:
+    """El informe en la sintaxis de la skill mova-informes (references/formato_entrada.md)."""
     inf = informe["informe"]
-    doc = Document()
-    sec = doc.sections[0]
-    sec.orientation = WD_ORIENT.PORTRAIT
-    sec.left_margin = sec.right_margin = Cm(2)
-    sec.top_margin, sec.bottom_margin = Cm(2), Cm(1.8)
+    r = inf["resumen_ejecutivo"]
+    m = [
+        "---",
+        "tipo: Informe",
+        f"titulo: {_md(inf['titulo'])}",
+        f"subtitulo: {_md(inf['reglamento'])} · techo de {euros(inf['umbral'])} por única empresa",
+        f"clientes consultados: {r['clientes_consultados']}",
+        f"periodo de calculo: {_md(inf['periodo_consulta'])}",
+        f"fecha: {_fecha_larga(inf['fecha_generacion'])}",
+        f"consulta: {inf['audit_trail']['consulta_id']}",
+        f"elaborado por: {_md(inf['usuario'])}",
+        "confidencial: si",
+        "autor: MOVA",
+        "---",
+        "",
+        "# Resumen ejecutivo",
+        "",
+        f"Se ha consultado la Base de Datos Nacional de Subvenciones (BDNS) para {r['clientes_consultados']} "
+        f"cliente(s) y se ha calculado el saldo disponible de ayudas de minimis conforme al {_md(inf['reglamento'])}, "
+        f"en el periodo {_md(inf['periodo_consulta'])}.",
+        "",
+    ]
+    m += _tabla(["Indicador", "Valor"], _kpis(inf))
+    m += [f"> **Resultado:** {r['clientes_con_saldo']} cliente(s) con saldo disponible; "
+          f"{r['clientes_en_limite'] + r['clientes_superado_limite']} en el límite o por encima del techo. "
+          f"Saldo disponible conjunto: {euros(r['total_saldo_disponible_conjunto'])}.", ""]
 
-    est = doc.styles["Normal"]
-    est.font.name = "Calibri"
-    est.font.size = Pt(10)
-    for nombre, tam in (("Heading 1", 16), ("Heading 2", 13), ("Heading 3", 11)):
-        h = doc.styles[nombre]
-        h.font.name = "Calibri"
-        h.font.size = Pt(tam)
-        h.font.bold = True
-        h.font.color.rgb = RGBColor.from_string(DORADO)
-
-    def sombrear(celda, color):
-        tc = celda._tc.get_or_add_tcPr()
-        shd = OxmlElement("w:shd")
-        shd.set(qn("w:val"), "clear")
-        shd.set(qn("w:color"), "auto")
-        shd.set(qn("w:fill"), color)
-        tc.append(shd)
-
-    def tabla(cabeceras, filas, anchos=None, tam=8.5):
-        t = doc.add_table(rows=1, cols=len(cabeceras))
-        t.style = "Table Grid"
-        t.alignment = WD_TABLE_ALIGNMENT.CENTER
-        for i, c in enumerate(cabeceras):
-            cel = t.rows[0].cells[i]
-            cel.text = ""
-            run = cel.paragraphs[0].add_run(c)
-            run.bold = True
-            run.font.size = Pt(tam)
-            run.font.color.rgb = RGBColor.from_string(DORADO_CLARO)
-            sombrear(cel, OSCURO)
-        for fila in filas:
-            celdas = t.add_row().cells
-            for i, v in enumerate(fila):
-                color = None
-                if isinstance(v, tuple):
-                    v, color = v
-                celdas[i].text = ""
-                run = celdas[i].paragraphs[0].add_run("" if v is None else str(v))
-                run.font.size = Pt(tam)
-                if color:
-                    run.bold = True
-                    run.font.color.rgb = RGBColor.from_string(color)
-        if anchos:
-            for fila in t.rows:
-                for i, w in enumerate(anchos):
-                    fila.cells[i].width = Cm(w)
-        return t
-
-    # Pie con leyenda, usuario y número de página
-    pie = sec.footer.paragraphs[0]
-    pie.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = pie.add_run(f"{LEYENDA} · Generado el {_fecha_local(inf['fecha_generacion'])} por {inf['usuario']} · Página ")
-    r.font.size = Pt(7.5)
-    r.font.color.rgb = RGBColor.from_string(GRIS)
-    for tipo, texto in (("begin", None), (None, "PAGE"), ("end", None)):
-        run = pie.add_run()
-        run.font.size = Pt(7.5)
-        if tipo:
-            fld = OxmlElement("w:fldChar")
-            fld.set(qn("w:fldCharType"), tipo)
-            run._r.append(fld)
-        else:
-            instr = OxmlElement("w:instrText")
-            instr.set(qn("xml:space"), "preserve")
-            instr.text = texto
-            run._r.append(instr)
-
-    # Portada
-    if LOGO.exists():
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        p.add_run().add_picture(str(LOGO), width=Cm(6))
-    for _ in range(5):
-        doc.add_paragraph()
-    t = doc.add_paragraph()
-    run = t.add_run(inf["titulo"])
-    run.bold = True
-    run.font.size = Pt(24)
-    run.font.color.rgb = RGBColor.from_string(DORADO)
-    doc.add_paragraph()
-    for etiqueta, valor in (("Periodo de consulta", inf["periodo_consulta"]),
-                            ("Normativa", f"{inf['reglamento']} · techo {euros(inf['umbral'])}"),
-                            ("Consultado por", inf["usuario"]),
-                            ("Fecha de generación", _fecha_local(inf["fecha_generacion"])),
-                            ("Identificador de consulta", inf["audit_trail"]["consulta_id"])):
-        p = doc.add_paragraph()
-        a = p.add_run(f"{etiqueta}: ")
-        a.bold = True
-        p.add_run(str(valor))
-    for _ in range(4):
-        doc.add_paragraph()
-    p = doc.add_paragraph()
-    r = p.add_run(LEYENDA)
-    r.italic = True
-    r.font.color.rgb = RGBColor.from_string(GRIS)
-    doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-
-    # Resumen
-    doc.add_heading("Resumen ejecutivo", level=1)
-    tabla(["Indicador", "Valor"], _kpis(inf), anchos=[9, 6], tam=9.5)
-
-    doc.add_heading("Detalle por cliente", level=1)
-    tabla(["CIF", "Razón social", "Saldo disponible", "Estado", "Años", "Total computado"],
-          [(d["cif"], d["razon_social"],
-            euros(d["saldo_disponible"]) if d["saldo_disponible"] is not None else "[PENDIENTE]",
-            (d["estado_texto"], COLOR_ESTADO[d["estado"]]),
-            ", ".join(map(str, d["anos_consultados"])),
-            euros(d["total_concedido"]) if d["total_concedido"] is not None else "[PENDIENTE]")
-           for d in inf["detalle_clientes"]],
-          anchos=[2.3, 5.2, 2.6, 2.4, 2.2, 2.6])
-
+    m += ["# Detalle por cliente", ""]
+    m += _tabla(["Cliente", "CIF", "Saldo disponible", "Estado", "Computado"],
+                [[d["razon_social"], d["cif"], euros(d["saldo_disponible"]), d["estado_texto"],
+                  euros(d["total_concedido"])] for d in inf["detalle_clientes"]])
     for d in inf["detalle_clientes"]:
-        doc.add_heading(f"{d['razon_social']} · {d['cif']}", level=2)
-        p = doc.add_paragraph()
-        p.add_run("Estado: ").bold = True
-        r = p.add_run(d["estado_texto"])
-        r.bold = True
-        r.font.color.rgb = RGBColor.from_string(COLOR_ESTADO[d["estado"]])
-        p.add_run(f"   ·   Saldo disponible: {euros(d['saldo_disponible'])}"
-                  f"   ·   Computado en el periodo: {euros(d['total_concedido'])}")
+        m += [f"## {_md(d['razon_social'])}", "",
+              f"**CIF:** {d['cif']}. **Estado:** {_md(d['estado_texto'])}. **Saldo disponible:** "
+              f"{euros(d['saldo_disponible'])}. **Computado en el periodo:** {euros(d['total_concedido'])}.", ""]
         if d["desglose_por_ano"]:
-            p = doc.add_paragraph()
-            p.add_run("Desglose por año: ").bold = True
-            p.add_run("; ".join(f"{x['ano']}{' (' + x['tramo'] + ')' if x.get('tramo') else ''}: {euros(x['importe_concedido'])}"
-            for x in d["desglose_por_ano"]))
+            m += _tabla(["Año", "Importe computado"],
+                        [[f"{x['ano']}" + (f" ({x['tramo']})" if x.get("tramo") else ""), euros(x["importe_concedido"])]
+                         for x in d["desglose_por_ano"]])
+        hechos = []
         if d["proxima_actualizacion_limite"]:
-            p = doc.add_paragraph()
-            p.add_run("Próxima salida de una ayuda del periodo: ").bold = True
-            p.add_run(d["proxima_actualizacion_limite"])
+            hechos.append(f"Próxima salida de una ayuda del periodo: {d['proxima_actualizacion_limite']}.")
         if d["fecha_recupera_saldo"]:
-            p = doc.add_paragraph()
-            p.add_run("Vuelve a tener saldo a partir del: ").bold = True
-            p.add_run(d["fecha_recupera_saldo"])
+            hechos.append(f"Vuelve a tener saldo a partir del {d['fecha_recupera_saldo']}.")
         for s in d["sublimites"]:
-            doc.add_paragraph(f"Sublímite {s['clase']} ({s.get('norma', '')}): computado {euros(s['computado'])} de {euros(s['tope'])}; "
-                              f"disponible {euros(s['disponible'])}.")
+            hechos.append(f"Sublímite {s['clase']} ({_md(s.get('norma', ''))}): computado {euros(s['computado'])} "
+                          f"de {euros(s['tope'])}; disponible {euros(s['disponible'])}.")
+        m += [f"- {_md(h)}" for h in hechos] + ([""] if hechos else [])
         computan = _computan(d)
         if computan:
-            tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe"],
-                  [(x["fecha_concesion"], x["programa"], x["convocante"], x["reglamento"], euros(x["importe"]))
-                   for x in computan],
-                  anchos=[1.9, 6.4, 3.6, 2.9, 2.4], tam=7.5)
+            m += [f"### Ayudas que computan en el periodo", ""]
+            # Cuatro columnas: el motor reparte el ancho por longitud de texto, y con el concedente en su propia
+            # columna la fecha y el importe quedaban tan estrechos que se partían
+            m += _tabla(["Fecha", "Convocatoria / programa · concedente", "Reglamento", "Importe"],
+                        [[x["fecha_concesion"], f"{x['programa']} · {x['convocante']}" if x["convocante"] else x["programa"],
+                          _reglamento_corto(x), euros(x["importe"])] for x in computan]
+                        + [["TOTAL", "", "", euros(sum(x["importe"] or 0 for x in computan))]])
         else:
-            doc.add_paragraph(_SIN_AYUDAS)
-        for pend in d["pendientes"]:
-            p = doc.add_paragraph()
-            r = p.add_run(pend)
-            r.bold = True
-            r.font.color.rgb = RGBColor.from_string(AMBAR)
+            m += [_SIN_AYUDAS, ""]
+        for p in d["pendientes"]:  # el motor resalta [PENDIENTE: ...] en amarillo y negrita
+            m += [_md(p), ""]
         if d["notas"]:
-            doc.add_paragraph(d["notas"])
+            m += [_md(d["notas"]), ""]
         if d["notas_busqueda"]:
-            p = doc.add_paragraph()
-            r = p.add_run("Búsqueda: " + d["notas_busqueda"])
-            r.italic = True
-            r.font.size = Pt(8.5)
-
+            m += [f"*Búsqueda: {_md(d['notas_busqueda'])}*", ""]
 
     if inf.get("errores_entrada"):
-        doc.add_heading("Entradas descartadas", level=1)
-        tabla(["Entrada", "Motivo"], [(e["entrada"], e["error"]) for e in inf["errores_entrada"]], anchos=[8, 9])
+        m += ["# Entradas descartadas", "",
+              "Identificadores leídos de los documentos o de la entrada manual que no se han consultado.", ""]
+        m += _tabla(["Entrada", "Motivo"], [[e["entrada"], e["error"]] for e in inf["errores_entrada"]])
 
-    doc.add_heading("Notas importantes", level=1)
-    for n in inf["notas_importantes"]:
-        doc.add_paragraph(n, style="List Bullet")
-
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(destino)
-    return destino
+    m += ["# Notas importantes", ""] + [f"- {_md(n)}" for n in inf["notas_importantes"]] + [""]
+    return "\n".join(m)
 
 
-# ======================================================================= PDF
-def exportar_pdf(informe: dict, destino: Path) -> Path:
-    from reportlab.lib import colors
-    from reportlab.lib.enums import TA_CENTER
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import cm
-    from reportlab.platypus import (Image, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer,
-                                    Table, TableStyle)
-    from xml.sax.saxutils import escape
+def exportar_mova(informe: dict, carpeta: Path, base: str, formatos: set[str]) -> dict[str, Path]:
+    """Word y/o PDF con la plantilla MOVA. El PDF sale del propio .docx (como pide la skill)."""
+    import tempfile
+    from integrations import word_pdf
+    from logic import informe_mova
 
-    inf = informe["informe"]
-    hex_ = lambda h: colors.HexColor("#" + h)  # noqa: E731
-    base = getSampleStyleSheet()
-    st = {
-        "n": ParagraphStyle("n", parent=base["Normal"], fontName="Helvetica", fontSize=9, leading=12),
-        "p": ParagraphStyle("p", parent=base["Normal"], fontName="Helvetica", fontSize=7.5, leading=9.5),
-        "pc": ParagraphStyle("pc", parent=base["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=9.5,
-                             textColor=hex_(DORADO_CLARO)),
-        "h1": ParagraphStyle("h1", parent=base["Heading1"], fontName="Helvetica-Bold", fontSize=15,
-                             textColor=hex_(DORADO), spaceBefore=10, spaceAfter=6),
-        "h2": ParagraphStyle("h2", parent=base["Heading2"], fontName="Helvetica-Bold", fontSize=11.5,
-                             textColor=hex_(DORADO), spaceBefore=10, spaceAfter=4),
-        "tit": ParagraphStyle("tit", parent=base["Title"], fontName="Helvetica-Bold", fontSize=24, leading=29,
-                              textColor=hex_(DORADO), alignment=0),
-        "ley": ParagraphStyle("ley", parent=base["Normal"], fontName="Helvetica-Oblique", fontSize=9,
-                              textColor=hex_(GRIS)),
-        "pend": ParagraphStyle("pend", parent=base["Normal"], fontName="Helvetica-Bold", fontSize=8.5,
-                               textColor=hex_(AMBAR)),
-    }
-    P = lambda t, s="n": Paragraph(escape("" if t is None else str(t)), st[s])  # noqa: E731
-
-    def tabla(cab, filas, anchos):
-        datos = [[Paragraph(escape(c), st["pc"]) for c in cab]]
-        estilos = [("BACKGROUND", (0, 0), (-1, 0), hex_(OSCURO)),
-                   ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#c9c9c9")),
-                   ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                   ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f6f3ea")])]
-        for i, f in enumerate(filas, start=1):
-            fila = []
-            for j, v in enumerate(f):
-                if isinstance(v, tuple):
-                    v, color = v
-                    fila.append(Paragraph(f'<font color="#{color}"><b>{escape(str(v))}</b></font>', st["p"]))
-                else:
-                    fila.append(P(v, "p"))
-            datos.append(fila)
-        t = Table(datos, colWidths=[a * cm for a in anchos], repeatRows=1)
-        t.setStyle(TableStyle(estilos))
-        return t
-
-    def pie(canvas, doc_):
-        canvas.saveState()
-        canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(hex_(GRIS))
-        canvas.drawCentredString(A4[0] / 2, 1.0 * cm,
-                                 f"{LEYENDA} · {_fecha_local(inf['fecha_generacion'])} · {inf['usuario']} · "
-                                 f"Página {doc_.page}")
-        canvas.setStrokeColor(hex_(DORADO))
-        canvas.setLineWidth(0.6)
-        canvas.line(2 * cm, A4[1] - 1.3 * cm, A4[0] - 2 * cm, A4[1] - 1.3 * cm)
-        canvas.restoreState()
-
-    h = []
-    if LOGO.exists():
-        h.append(Image(str(LOGO), width=6 * cm, height=6 * cm * 137 / 640, hAlign="LEFT"))
-    h += [Spacer(1, 5 * cm), Paragraph(escape(inf["titulo"]), st["tit"]), Spacer(1, 0.8 * cm)]
-    for etq, val in (("Periodo de consulta", inf["periodo_consulta"]),
-                     ("Normativa", f"{inf['reglamento']} · techo {euros(inf['umbral'])}"),
-                     ("Consultado por", inf["usuario"]),
-                     ("Fecha de generación", _fecha_local(inf["fecha_generacion"])),
-                     ("Identificador de consulta", inf["audit_trail"]["consulta_id"])):
-        h.append(Paragraph(f"<b>{escape(etq)}:</b> {escape(str(val))}", st["n"]))
-    h += [Spacer(1, 4 * cm), Paragraph(escape(LEYENDA), st["ley"]), PageBreak()]
-
-    h.append(Paragraph("Resumen ejecutivo", st["h1"]))
-    h.append(tabla(["Indicador", "Valor"], _kpis(inf), [9, 6]))
-    h.append(Paragraph("Detalle por cliente", st["h1"]))
-    h.append(tabla(["CIF", "Razón social", "Saldo disponible", "Estado", "Años", "Total computado"],
-                   [(d["cif"], d["razon_social"], euros(d["saldo_disponible"]),
-                     (d["estado_texto"], COLOR_ESTADO[d["estado"]]),
-                     ", ".join(map(str, d["anos_consultados"])), euros(d["total_concedido"]))
-                    for d in inf["detalle_clientes"]],
-                   [2.2, 5.0, 2.6, 2.5, 2.2, 2.5]))
-
-    for d in inf["detalle_clientes"]:
-        bloque = [Paragraph(escape(f"{d['razon_social']} · {d['cif']}"), st["h2"]),
-                  Paragraph(f'<b>Estado:</b> <font color="#{COLOR_ESTADO[d["estado"]]}"><b>'
-                            f'{escape(d["estado_texto"])}</b></font> · <b>Saldo disponible:</b> '
-                            f'{escape(euros(d["saldo_disponible"]))} · <b>Computado:</b> '
-                            f'{escape(euros(d["total_concedido"]))}', st["n"])]
-        if d["desglose_por_ano"]:
-            bloque.append(P("Desglose por año: " + "; ".join(
-                f"{x['ano']}{' (' + x['tramo'] + ')' if x.get('tramo') else ''}: {euros(x['importe_concedido'])}"
-            for x in d["desglose_por_ano"])))
-        if d["proxima_actualizacion_limite"]:
-            bloque.append(P(f"Próxima salida de una ayuda del periodo: {d['proxima_actualizacion_limite']}"))
-        if d["fecha_recupera_saldo"]:
-            bloque.append(P(f"Vuelve a tener saldo a partir del: {d['fecha_recupera_saldo']}"))
-        h.append(KeepTogether(bloque))
-        for s in d["sublimites"]:
-            h.append(P(f"Sublímite {s['clase']} ({s.get('norma', '')}): computado {euros(s['computado'])} de {euros(s['tope'])}; "
-                       f"disponible {euros(s['disponible'])}."))
-        computan = _computan(d)
-        if computan:
-            h.append(Spacer(1, 4))
-            h.append(tabla(["Fecha", "Convocatoria / programa", "Concedente", "Reglamento", "Importe"],
-                           [(x["fecha_concesion"], x["programa"], x["convocante"], x["reglamento"], euros(x["importe"]))
-                            for x in computan],
-                           [1.8, 6.3, 3.6, 2.9, 2.4]))
-        else:
-            h.append(P(_SIN_AYUDAS))
-        for pend in d["pendientes"]:
-            h.append(P(pend, "pend"))
-        if d["notas"]:
-            h.append(P(d["notas"]))
-        if d["notas_busqueda"]:
-            h.append(P("Búsqueda: " + d["notas_busqueda"], "p"))
-
-    if inf.get("errores_entrada"):
-        h.append(Paragraph("Entradas descartadas", st["h1"]))
-        h.append(tabla(["Entrada", "Motivo"], [(e["entrada"], e["error"]) for e in inf["errores_entrada"]], [8, 9]))
-    h.append(Paragraph("Notas importantes", st["h1"]))
-    for n in inf["notas_importantes"]:
-        h.append(Paragraph("• " + escape(n), st["n"]))
-        h.append(Spacer(1, 3))
-
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    doc = SimpleDocTemplate(str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=1.8 * cm,
-                            bottomMargin=1.8 * cm, title=inf["titulo"], author="MOVA IA · MOVA Minimis")
-    doc.build(h, onFirstPage=pie, onLaterPages=pie)
-    return destino
+    carpeta.mkdir(parents=True, exist_ok=True)
+    docx, pdf = carpeta / f"{base}.docx", carpeta / f"{base}.pdf"
+    with tempfile.TemporaryDirectory(prefix="mova_md_") as tmp:
+        md = Path(tmp) / "informe.md"
+        md.write_text(markdown_informe(informe), encoding="utf-8")
+        meta, bloques = informe_mova.lee_entrada(md)
+        gen = informe_mova.GeneradorInforme(meta, bloques, md.parent).construye()
+        gen.guarda(docx, None)
+        # Word: actualiza el índice con las páginas reales, guarda y exporta el PDF en el mismo paso
+        if not word_pdf.preparar(docx, pdf if "pdf" in formatos else None):
+            if "pdf" in formatos:  # sin Word: LibreOffice, con la medición de páginas de la skill
+                with_indice = gen._marca_indice is not None
+                paginas = None
+                if with_indice:
+                    prov = Path(tmp) / "provisional.docx"
+                    gen.guarda(prov, {t["marcador"]: 88 for t in gen.titulos})
+                    try:
+                        paginas = informe_mova.paginas_de_titulos(
+                            informe_mova.docx_a_pdf(prov, Path(tmp)), [t for t in gen.titulos if t["nivel"] <= 2])
+                    except RuntimeError as e:
+                        raise RuntimeError("Para el PDF hace falta Word o LibreOffice en este equipo.") from e
+                    gen = informe_mova.GeneradorInforme(meta, bloques, md.parent).construye()
+                    gen.guarda(docx, paginas)
+                generado = informe_mova.docx_a_pdf(docx, carpeta)
+                if generado != pdf:
+                    generado.replace(pdf)
+            # solo Word sin Word instalado: el .docx pide actualizar el índice al abrirlo
+    salida = {}
+    if "docx" in formatos:
+        salida["docx"] = docx
+    else:
+        docx.unlink(missing_ok=True)
+    if "pdf" in formatos:
+        salida["pdf"] = pdf
+    return salida
 
 
 # ======================================================================= EXCEL
@@ -493,5 +319,6 @@ def exportar_xlsx(informe: dict, destino: Path) -> Path:
 
 def exportar(informe: dict, formato: str, carpeta: Path, base: str | None = None) -> Path:
     base = base or nombre_base(informe["informe"])
-    funciones = {"docx": exportar_docx, "pdf": exportar_pdf, "xlsx": exportar_xlsx}
-    return funciones[formato](informe, carpeta / f"{base}.{formato}")
+    if formato == "xlsx":
+        return exportar_xlsx(informe, carpeta / f"{base}.xlsx")
+    return exportar_mova(informe, carpeta, base, {formato})[formato]

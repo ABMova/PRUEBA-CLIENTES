@@ -67,10 +67,15 @@ def regenerar_informe(cid: str) -> dict:
     return inf
 
 
-def exportar(cid: str, formato: str, usuario: dict):
+def _informe_para_exportar(cid: str) -> dict:
     q = db.consulta(cid)
     inf = json.loads(q["informe_json"]) if q.get("informe_json") else regenerar_informe(cid)
     inf["informe"]["usuario"] = q["usuario_nombre"]
+    return inf
+
+
+def exportar(cid: str, formato: str, usuario: dict):
+    inf = _informe_para_exportar(cid)
     base = exportador.nombre_base(inf["informe"])
     if formato == "json":
         ruta = config.DIR_INFORMES / f"{base}.json"
@@ -79,6 +84,17 @@ def exportar(cid: str, formato: str, usuario: dict):
         ruta = exportador.exportar(inf, formato, config.DIR_INFORMES, base)
     db.registrar_informe(cid, formato, str(ruta), usuario["id"])
     return ruta
+
+
+def exportar_todo(cid: str, usuario: dict) -> list:
+    """Word, PDF y Excel. Word y PDF de una sola pasada: el PDF sale del mismo .docx."""
+    inf = _informe_para_exportar(cid)
+    base = exportador.nombre_base(inf["informe"])
+    rutas = exportador.exportar_mova(inf, config.DIR_INFORMES, base, {"docx", "pdf"})
+    rutas["xlsx"] = exportador.exportar(inf, "xlsx", config.DIR_INFORMES, base)
+    for formato, ruta in rutas.items():
+        db.registrar_informe(cid, formato, str(ruta), usuario["id"])
+    return [rutas["docx"], rutas["pdf"], rutas["xlsx"]]
 
 
 # ---------------------------------------------------------------- recalcular un resultado

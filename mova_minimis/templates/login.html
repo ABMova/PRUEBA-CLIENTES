@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf" content="{{ csrf }}">
 <title>Entrar · MOVA Minimis</title>
-<link rel="icon" href="{{ iconos.cerebro }}">
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='marca/icono-movaia.svg') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='mova-crm.css') }}?v={{ version }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='minimis.css') }}?v={{ version }}">
 </head>
@@ -31,7 +31,7 @@
   <div class="mv-login-panel">
     <svg class="mv-login-ondas" id="mvLoginOndas" viewBox="0 0 640 240" preserveAspectRatio="none" aria-hidden="true"></svg>
     <div class="mv-login-marca">
-      <span class="mv-logo"><img class="mv-mova" src="{{ iconos.logo }}" alt="MOVA IA"><em>MINIMIS</em></span>
+      <span class="mv-logo">{% include "_marca_mova.html" %}<em>MINIMIS</em></span>
       <span class="mv-login-lema">Saldo de ayudas de minimis por cliente, con los datos de la BDNS</span>
     </div>
   </div>

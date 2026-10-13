@@ -47,11 +47,30 @@ def bloquear_configuracion() -> None:
     session.pop("config_hasta", None)
 
 
+def nombre_de_windows() -> str:
+    """'MOVA  Antonio Bastidas' -> 'Antonio Bastidas'. Si Windows no da nombre visible, el usuario."""
+    nombre = ""
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            n = wintypes.ULONG(256)
+            b = ctypes.create_unicode_buffer(256)
+            if ctypes.windll.secur32.GetUserNameExW(3, b, ctypes.byref(n)):  # 3 = NameDisplay
+                nombre = " ".join(b.value.split())
+        except (OSError, AttributeError):
+            pass
+    palabras = nombre.split()
+    if len(palabras) > 2 and palabras[0].upper() == "MOVA":
+        nombre = " ".join(palabras[1:])
+    return nombre or os.environ.get("USERNAME") or "Usuario del equipo"
+
+
 def usuario_del_equipo():
     """El único usuario de la versión de escritorio: la cuenta de Windows que la abre."""
     from auth import user
     u = db.usuario_por_email(config.EMAIL_ESCRITORIO)
-    nombre = os.environ.get("USERNAME") or "Usuario del equipo"
+    nombre = nombre_de_windows()
     if not u:
         # Contraseña aleatoria que nadie conoce: este usuario no entra por /login
         db.crear_usuario(config.EMAIL_ESCRITORIO, nombre, user.hash_clave(secrets.token_urlsafe(32)), "admin",

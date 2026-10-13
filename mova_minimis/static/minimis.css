@@ -3,9 +3,9 @@
 
 /* Marca: logotipo MOVA IA + nombre de la herramienta.
    La hoja del CRM fija .mv-marca img a 34x26 (su icono): aquí el logotipo manda su proporción. */
-.mv-marca{flex-direction:column;align-items:flex-start;gap:.35rem}
-.mv-marca img.mv-mova{height:28px;width:auto}
-.mv-logo{align-items:center;gap:.5rem}
+/* Logotipo MOVA vectorial del CRM (sin «IA») y el nombre de la herramienta al lado */
+.mv-marca .mv-mova{height:24px;width:auto}
+.mv-logo{align-items:flex-end;gap:.5rem}
 .mv-logo em{font-size:.7rem}
 
 /* Avisos tras cada acción */
@@ -82,8 +82,8 @@ button.enlace-rojo{background:none;border:none;color:var(--mv-err);font:inherit;
 .acceso-form form{width:100%;max-width:420px;display:grid;gap:.9rem}
 .acceso-form .form-control{height:46px}
 .acceso .mv-login-panel{display:flex}
-.mv-login-marca img.mv-mova{height:80px;width:auto}
-@media(max-width:900px){.acceso{grid-template-columns:1fr}.acceso .mv-login-panel{order:-1;min-height:180px}.mv-login-marca img.mv-mova{height:52px}}
+.mv-login-marca .mv-mova{height:72px;width:auto}
+@media(max-width:900px){.acceso{grid-template-columns:1fr}.acceso .mv-login-panel{order:-1;min-height:180px}.mv-login-marca .mv-mova{height:48px}}
 
 /* Pantallas sueltas (cambio de contraseña obligatorio, error) */
 .centrada{max-width:460px;margin:2.5rem auto}

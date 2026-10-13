@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf" content="{{ csrf }}">
 <title>{% block titulo %}MOVA Minimis{% endblock %} · MOVA Minimis</title>
-<link rel="icon" href="{{ iconos.cerebro }}">
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='marca/icono-movaia.svg') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='mova-crm.css') }}?v={{ version }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='minimis.css') }}?v={{ version }}">
 </head>
@@ -22,8 +22,7 @@
 <div class="mv-app" id="app">
   <aside class="mv-side">
     <a class="mv-marca" href="{{ url_for('dashboard.inicio') }}">
-      <span class="mv-logo"><img class="mv-mova" src="{{ iconos.logo }}" alt="MOVA IA"><em>MINIMIS</em></span>
-      <span class="mv-marca-sub">Mova Strategy</span>
+      <span class="mv-logo">{% include "_marca_mova.html" %}<em>MINIMIS</em></span>
     </a>
     <nav class="mv-nav">
       <div class="mv-grupo">Consultas</div>
@@ -60,7 +59,7 @@
       <div class="mv-der">
         <div class="mv-drop">
           <button type="button" class="mv-usuario" data-mv-drop>
-            <img src="{{ iconos.cerebro }}" alt="">
+            <img src="{{ url_for('static', filename='marca/icono-movaia.svg') }}" alt="">
             <span class="mv-usuario-txt"><b>{{ usuario.nombre }}</b><span>{% if escritorio %}{{ 'Administración abierta' if config_desbloqueada else 'Este equipo' }}{% else %}{{ ROLES[usuario.rol] }}{% endif %}</span></span>
           </button>
           <div class="mv-pop">

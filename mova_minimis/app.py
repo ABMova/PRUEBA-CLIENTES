@@ -3,7 +3,6 @@
 python app.py  ->  aplica el esquema, hace copia de seguridad, levanta waitress
 en 127.0.0.1:5000 y abre el navegador.
 """
-import base64
 import os
 import logging
 import secrets
@@ -33,11 +32,6 @@ def _configurar_registro() -> None:
     raiz.addHandler(manejador)
     if not config.CONGELADO:
         raiz.addHandler(logging.StreamHandler(sys.stdout))
-
-
-def _data_uri(nombre: str) -> str:
-    ruta = config.RAIZ_CODIGO / "static" / "marca" / nombre
-    return "data:image/png;base64," + base64.b64encode(ruta.read_bytes()).decode() if ruta.exists() else ""
 
 
 def _asegurar_admin() -> None:
@@ -84,8 +78,6 @@ def crear_app() -> Flask:
     for bp in (rutas_auth.bp, dashboard.bp, consultas.bp, resultados.bp, admin.bp):
         app.register_blueprint(bp)
 
-    iconos = {"cerebro": _data_uri("icono-cerebro.png"), "logo": _data_uri("mova-ia-negro.png")}  # tema claro del CRM
-
     @app.before_request
     def antes():
         if config.ESCRITORIO:
@@ -119,7 +111,7 @@ def crear_app() -> Flask:
 
     @app.context_processor
     def globales():
-        return {"usuario": g.get("usuario"), "puede": permissions.puede, "iconos": iconos,
+        return {"usuario": g.get("usuario"), "puede": permissions.puede,
                 "version": config.VERSION, "csrf": session.get("csrf", ""), "ROLES": permissions.ROLES,
                 "ultima_consulta": session.get("ultima_consulta"), "escritorio": config.ESCRITORIO,
                 "config_desbloqueada": permissions.configuracion_desbloqueada()}
@@ -140,6 +132,14 @@ def crear_app() -> Flask:
             return datetime.fromisoformat(iso[:10]).strftime("%d/%m/%Y")
         except ValueError:
             return iso
+
+    @app.route("/escritorio/cerrar")
+    def cerrar_escritorio():
+        """La ventana lo pide al cerrarse (protegido por el token, como todo en escritorio)."""
+        if not config.ESCRITORIO:
+            abort(404)
+        threading.Timer(0.3, _salir).start()
+        return {"ok": True}
 
     @app.route("/salud")
     def salud():
@@ -197,6 +197,13 @@ def _vigilar_padre(pid: int) -> None:
         os._exit(0)
     k32.WaitForSingleObject(h, 0xFFFFFFFF)  # espera a que termine, sin consumir nada
     log.info("La ventana se cerró: el servidor se cierra.")
+    _salir()
+
+
+def _salir() -> None:
+    """Cierre del motor de escritorio: primero el Word invisible, que si no quedaría vivo."""
+    from integrations import word_pdf
+    word_pdf.cerrar_word()
     os._exit(0)
 
 

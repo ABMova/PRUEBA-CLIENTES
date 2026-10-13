@@ -10,7 +10,7 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 
 import config
 from auth import user
-from auth.permissions import requiere
+from auth.permissions import puede, requiere
 from logic.consultor import clase_reglamento
 from models import db
 from routes import orquestador
@@ -50,6 +50,9 @@ def ver(cid):
     q = db.consulta(cid) or abort(404)
     session["ultima_consulta"] = cid
     informe = json.loads(q["informe_json"])["informe"] if q.get("informe_json") else None
+    if informe and puede("exportar"):
+        from integrations import word_pdf
+        word_pdf.calentar()  # la primera exportación de Word es lenta: que pase mientras se lee el resultado
     return render_template("resultados.html", q=q, informe=informe, entrada=json.loads(q["clientes_buscados"]),
                            documentos=db.documentos_de(cid), informes=db.informes_de(cid), formatos=FORMATOS,
                            reglamentos=REGLAMENTOS_MANUALES, hoy=date.today().isoformat())
@@ -63,7 +66,11 @@ def exportar(cid, formato):
     q = db.consulta(cid) or abort(404)
     if q["estado"] != "completada":
         abort(400, "La consulta no ha terminado.")
-    ruta = orquestador.exportar(cid, formato, g.usuario)
+    try:
+        ruta = orquestador.exportar(cid, formato, g.usuario)
+    except RuntimeError as e:  # sin Word ni LibreOffice para el PDF
+        flash(str(e), "err")
+        return redirect(url_for("resultados.ver", cid=cid) + "#exportar")
     db.auditar(g.usuario["id"], g.usuario["email"], "exportacion", f"consulta:{cid}",
                {"formato": formato, "fichero": ruta.name}, g.ip)
     return send_file(ruta, as_attachment=True, download_name=ruta.name)
@@ -75,7 +82,11 @@ def exportar_todo(cid):
     q = db.consulta(cid) or abort(404)
     if q["estado"] != "completada":
         abort(400, "La consulta no ha terminado.")
-    rutas = [orquestador.exportar(cid, f, g.usuario) for f in ("docx", "pdf", "xlsx")]
+    try:
+        rutas = orquestador.exportar_todo(cid, g.usuario)
+    except RuntimeError as e:  # sin Word ni LibreOffice para el PDF
+        flash(str(e), "err")
+        return redirect(url_for("resultados.ver", cid=cid) + "#exportar")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for r in rutas:

@@ -12,10 +12,11 @@ a = Analysis(
         ("templates", "templates"),
         ("static", "static"),
         ("models/schema.sql", "models"),
+        ("plantillas_informe", "plantillas_informe"),
     ],
     hiddenimports=[
         "waitress", "routes.auth", "routes.dashboard", "routes.consultas", "routes.resultados", "routes.admin",
-        "reportlab.graphics.barcode.common", "reportlab.graphics.barcode.code128",
+        "win32com.client", "pythoncom", "pypdf",
     ],
     hookspath=[],
     runtime_hooks=[],
