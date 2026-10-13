@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% set paso = 'config' %}{% set pestana = 'config' %}
+{% block titulo %}Configuración{% endblock %}
+{% block contenido %}
+{% include "admin/_pestanas.html" %}
+<section class="card">
+  <h2>Configuración</h2>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="accion" value="guardar">
+    <div class="grid two">
+      <div>
+        <label for="modelo">Modelo de Claude para leer documentos</label>
+        <select id="modelo" name="modelo">{% for k, v in modelos.items() %}<option value="{{ k }}" {{ 'selected' if k == modelo }}>{{ v }} · {{ k }}</option>{% endfor %}</select>
+        <label for="modo_periodo">Periodo por defecto en las consultas nuevas</label>
+        <select id="modo_periodo" name="modo_periodo">
+          <option value="movil" {{ 'selected' if modo == 'movil' }}>Tres años móviles (Reglamento 2023/2831)</option>
+          <option value="ejercicios" {{ 'selected' if modo == 'ejercicios' }}>Últimos tres ejercicios completos</option>
+        </select>
+      </div>
+      <div>
+        <label for="api_key">Clave de la API de Anthropic</label>
+        <input id="api_key" name="api_key" type="password" autocomplete="off" placeholder="{{ ('Guardada: ' ~ clave_mascara) if clave_mascara else 'sk-ant-...' }}">
+        <p class="hint">{% if origen_clave %}En uso: {{ clave_mascara }} · origen: {{ origen_clave }}.{% else %}Sin clave: los documentos se leen sin IA (texto directo y OCR).{% endif %}
+          Se guarda cifrada (Fernet); la llave de cifrado está en <code>cipher.key</code>, fuera de la base de datos.</p>
+      </div>
+    </div>
+    <div class="row" style="margin-top:.8rem"><button class="btn btn-primary" type="submit">Guardar configuración</button></div>
+  </form>
+  <div class="sep"></div>
+  <div class="row">
+    <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="probar_bdns">
+      <button class="btn btn-sm" type="submit">Comprobar la BDNS</button></form>
+    <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="probar_claude">
+      <button class="btn btn-sm" type="submit">Comprobar Claude</button></form>
+    <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="vaciar_cache">
+      <button class="btn btn-sm" type="submit">Vaciar caché de la BDNS</button></form>
+    <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="accion" value="borrar_clave">
+      <button class="btn btn-sm btn-danger" type="submit" data-confirmar="¿Borrar la clave de Claude guardada?">Borrar clave de Claude</button></form>
+  </div>
+</section>
+<section class="card">
+  <h2>Entorno</h2>
+  <div class="tabla"><table><tbody>
+    <tr><td>Versión</td><td>{{ version }}</td></tr>
+    <tr><td>Carpeta de datos</td><td><code>{{ datos }}</code></td></tr>
+    <tr><td>API de la BDNS</td><td><code>{{ bdns }}</code></td></tr>
+    <tr><td>Servidor</td><td><form method="post" action="{{ url_for('admin.apagar') }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-danger btn-sm" type="submit" data-confirmar="¿Cerrar MOVA Minimis? Las consultas en curso se interrumpirán.">Cerrar la aplicación</button></form></td></tr>
+    <tr><td>OCR (Tesseract)</td><td>{% if tesseract %}<span class="badge ok">DISPONIBLE</span> <code>{{ tesseract }}</code>{% else %}<span class="badge warn">NO INSTALADO</span> Instálelo desde github.com/UB-Mannheim/tesseract/wiki (con el idioma español) y reinicie la aplicación.{% endif %}</td></tr>
+  </tbody></table></div>
+</section>
+{% endblock %}

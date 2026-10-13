@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block ancho %}{% endblock %}
+{% block contenido %}
+<section class="card">
+  <h2>{% if codigo %}{{ codigo }} · {% endif %}{{ titulo }}</h2>
+  {% if detalle %}<div class="banner {{ 'err' if codigo else 'ok' }}">{{ detalle }}</div>{% endif %}
+  <p style="margin-top:1rem"><a class="btn" href="{{ url_for('dashboard.inicio') }}">Volver al inicio</a></p>
+</section>
+{% endblock %}

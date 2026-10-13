@@ -1,0 +1,13 @@
+data/
+data-dev/
+*.db
+*.db-wal
+*.db-shm
+cipher.key
+.env
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec.bak
+.venv/

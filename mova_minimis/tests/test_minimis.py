@@ -1,0 +1,250 @@
+"""Pruebas sin red: cálculo de saldo, validación de identificadores y permisos.
+
+    python -m unittest discover -s tests -v
+"""
+import os
+import sys
+import tempfile
+import unittest
+from datetime import date
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(RAIZ))
+os.environ["MOVA_MINIMIS_DATOS"] = tempfile.mkdtemp(prefix="minimis_test_")
+
+from logic import calculador, parser  # noqa: E402
+
+
+def ayuda(fecha, importe, reglamento="REG (UE) 2023/2831 de minimis, General"):
+    from logic.consultor import clase_reglamento
+    return {"fecha_concesion": fecha, "importe_concedido": importe, "reglamento": reglamento,
+            "clase_reglamento": clase_reglamento(reglamento), "codigo_concesion": "X"}
+
+
+def res(*ayudas, completa=True, confianza="alta"):
+    return {"cif": "B66894452", "razon_social": "PRUEBA SL", "ayudas_minimis_encontradas": list(ayudas),
+            "busqueda_completa": completa, "confianza_busqueda": confianza}
+
+
+class Calculo(unittest.TestCase):
+    def setUp(self):
+        self.per = calculador.periodo("movil", date(2026, 10, 13), None)
+
+    def test_techo_y_ventana_movil(self):
+        self.assertEqual(self.per["techo"], 300_000)
+        c, ay = calculador.calcular_cliente(res(ayuda("2023-10-13", 50_000), ayuda("2023-10-14", 10_000)), self.per)
+        # el 13/10/2023 ya está fuera (periodo = (13/10/2023, 13/10/2026]); el 14/10/2023 dentro
+        self.assertEqual(c["total_concedido_3anos"], 10_000)
+        self.assertEqual(c["saldo_disponible"], 290_000)
+        self.assertEqual([a["computa"] for a in ay], [False, True])
+
+    def test_estados(self):
+        casos = [(100_000, "SALDO_DISPONIBLE"), (296_000, "LIMITE_ALCANZADO"), (300_000, "LIMITE_ALCANZADO"),
+                 (300_001, "LIMITE_SUPERADO")]
+        for importe, estado in casos:
+            c, _ = calculador.calcular_cliente(res(ayuda("2025-01-01", importe)), self.per)
+            self.assertEqual(c["estado"], estado, importe)
+
+    def test_agricola_suma_al_techo_general_y_tiene_sublimite(self):
+        c, _ = calculador.calcular_cliente(res(ayuda("2025-05-05", 200_000),
+                                               ayuda("2025-06-06", 45_000, "REG (UE) 1408/2013 de minimis")), self.per)
+        self.assertEqual(c["saldo_disponible"], 55_000)
+        self.assertEqual(c["sublimites"][0]["disponible"], 5_000)
+
+    def test_sieg_techo_combinado(self):
+        c, _ = calculador.calcular_cliente(res(ayuda("2025-05-05", 100_000),
+                                               ayuda("2025-06-06", 600_000, "REG (UE) 2023/2832 de minimis, SIEG")),
+                                           self.per)
+        self.assertEqual(c["saldo_disponible"], 50_000)  # 750.000 - 700.000 < 300.000 - 100.000
+
+    def test_futura_no_computa(self):
+        c, ay = calculador.calcular_cliente(res(ayuda("2026-12-01", 99_000)), self.per)
+        self.assertEqual(c["total_concedido_3anos"], 0)
+        self.assertFalse(ay[0]["computa"])
+
+    def test_liberacion_y_recuperacion(self):
+        c, _ = calculador.calcular_cliente(res(ayuda("2024-02-29", 250_000), ayuda("2025-01-10", 60_000)), self.per)
+        self.assertEqual(c["estado"], "LIMITE_SUPERADO")
+        self.assertEqual(c["fecha_recupera_saldo"], "2027-02-28")  # 29/02 + 3 años
+
+    def test_busqueda_incompleta_es_pendiente(self):
+        c, _ = calculador.calcular_cliente(res(completa=False), self.per)
+        self.assertEqual(c["estado"], "PENDIENTE")
+        self.assertIsNone(c["saldo_disponible"])
+
+    def test_no_encontrado_tiene_saldo_pero_queda_pendiente(self):
+        c, _ = calculador.calcular_cliente(res(confianza="no encontrado"), self.per)
+        self.assertEqual(c["saldo_disponible"], 300_000)
+        self.assertTrue(any("PENDIENTE" in p for p in c["pendientes"]))
+
+    def test_ejercicios_antiguos_usan_1407(self):
+        per = calculador.periodo("ejercicios", date(2026, 1, 1), [2021, 2022, 2023])
+        self.assertEqual(per["techo"], 200_000)
+        per = calculador.periodo("ejercicios", date(2026, 1, 1), [2025])
+        self.assertTrue(any("incompleto" in a for a in per["avisos"]))
+
+
+class Identificadores(unittest.TestCase):
+    def test_validos(self):
+        for v in ("A46103834", "B66894452", "ES-B66894452", "b 66.894.452", "12345678Z", "X1234567L", "P0800000B"):
+            self.assertTrue(parser.validar_identificador(v)[2], v)
+
+    def test_invalidos(self):
+        for v in ("B12345678", "12345678A", "B1234", "ACME"):
+            self.assertFalse(parser.validar_identificador(v)[2], v)
+
+    def test_texto_libre(self):
+        d, e = {}, []
+        parser.extraer_de_texto("Cliente: CAL PETITO DE TORA SL, CIF B-66894452\nOtro B12345678", "t", d, e)
+        self.assertIn("B66894452", d)
+        self.assertEqual(d["B66894452"]["razon_social"], "CAL PETITO DE TORA SL")
+        self.assertEqual(len(e), 1)
+
+    def test_tabla_con_cabecera(self):
+        d, e = {}, []
+        parser.extraer_de_tabla([["Razón social", "NIF"], ["MERCADONA SA", "A46103834"]], "x", d, e)
+        self.assertEqual(d["A46103834"]["razon_social"], "MERCADONA SA")
+
+
+class Documentos(unittest.TestCase):
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+
+    def test_excel_word_y_pdf(self):
+        from docx import Document
+        from openpyxl import Workbook
+        from reportlab.pdfgen import canvas
+        wb = Workbook()
+        wb.active.append(["Cliente", "CIF/NIF", "Año"])
+        wb.active.append(["MERCADONA SA", "A46103834", 2025])
+        wb.save(self.dir / "c.xlsx")
+        d = Document()
+        d.add_paragraph("La empresa CAL PETITO DE TORA SL con CIF B66894452 solicita la ayuda.")
+        d.save(self.dir / "c.docx")
+        cv = canvas.Canvas(str(self.dir / "c.pdf"))
+        cv.drawString(72, 750, "Beneficiario: MOSQUITO BOOKS BARCELONA SL - NIF: B17884859")
+        cv.save()
+        for nombre, cif in (("c.xlsx", "A46103834"), ("c.docx", "B66894452"), ("c.pdf", "B17884859")):
+            salida = parser.procesar_documento(self.dir / nombre, nombre)
+            self.assertEqual([c["cif"] for c in salida["clientes"]], [cif], nombre)
+
+    def test_imagen_sin_ocr_ni_claude_avisa(self):
+        from PIL import Image
+        Image.new("RGB", (50, 50), "white").save(self.dir / "s.png")
+        if parser.tesseract_disponible():
+            self.skipTest("Tesseract instalado")
+        salida = parser.procesar_documento(self.dir / "s.png", "s.png")
+        self.assertIn("OCR no disponible", salida["avisos"][0])
+
+
+class Orquestacion(unittest.TestCase):
+    """La cadena entera en el mismo hilo, con la BDNS sustituida por datos fijos."""
+
+    @classmethod
+    def setUpClass(cls):
+        import app as aplicacion
+        from integrations import web_scraper
+        from models import db
+        aplicacion.crear_app()
+        cls.db = db
+        cls.ws = web_scraper
+        cls.originales = (web_scraper.buscar_beneficiarios, web_scraper.concesiones_minimis,
+                          web_scraper.ficha_convocatoria)
+        web_scraper.buscar_beneficiarios = lambda t, c=None: [{"id": 1, "cif": t, "nombre": "PRUEBA SL"}]
+        web_scraper.concesiones_minimis = lambda i, c=None: [{
+            "codigoConcesion": "SB1", "fechaConcesion": "2025-05-05", "fechaRegistro": "2025-06-01",
+            "convocante": "ESTADO", "reglamento": "REG (UE) 2023/2831 de minimis, General",
+            "instrumento": "SUBVENCIÓN", "numeroConvocatoria": "1", "ayudaEquivalente": 120000}]
+        web_scraper.ficha_convocatoria = lambda n, c=None: {"titulo": "Programa de prueba", "url_bases": None}
+        cls.uid = db.usuario_por_email("admin@local")["id"]
+
+    @classmethod
+    def tearDownClass(cls):
+        (cls.ws.buscar_beneficiarios, cls.ws.concesiones_minimis, cls.ws.ficha_convocatoria) = cls.originales
+
+    def _consulta(self, cif):
+        import uuid
+        cid = str(uuid.uuid4())
+        self.db.crear_consulta(cid, self.uid, "movil", "2026-10-13", [], {
+            "clientes": [{"cif": cif, "razon_social": "Prueba SL"}], "errores": [], "avisos": []})
+        return cid
+
+    def test_completa_y_exporta(self):
+        from routes import orquestador
+        cid = self._consulta("B66894452")
+        orquestador._ejecutar(cid)
+        q = self.db.consulta(cid)
+        self.assertEqual(q["estado"], "completada")
+        r = self.db.resultados_de(cid)[0]
+        self.assertEqual(r["saldo_disponible"], 180_000)
+        self.assertEqual(r["ayudas"][0]["programa"], "Programa de prueba")
+        for f in ("docx", "pdf", "xlsx", "json"):
+            self.assertTrue(orquestador.exportar(cid, f, {"id": self.uid}).exists(), f)
+
+    def test_cancelada(self):
+        from routes import orquestador
+        cid = self._consulta("A46103834")
+        self.db.pedir_cancelacion(cid)
+        orquestador._ejecutar(cid)
+        self.assertEqual(self.db.consulta(cid)["estado"], "cancelada")
+
+    def test_interrumpida_al_arrancar(self):
+        cid = self._consulta("A46103834")
+        self.db.marcar_interrumpidas()
+        self.assertEqual(self.db.consulta(cid)["estado"], "interrumpida")
+
+
+class Permisos(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import app as aplicacion
+        from auth import user
+        from models import db
+        cls.app = aplicacion.crear_app()
+        cls.app.testing = True
+        db.crear_usuario("lector@prueba", "Lector", user.hash_clave("ClaveLector123"), "viewer", cambiar_clave=0)
+
+    def _entrar(self, email, clave):
+        c = self.app.test_client()
+        c.get("/login")
+        with c.session_transaction() as s:
+            csrf = s["csrf"]
+        r = c.post("/login", data={"email": email, "clave": clave, "csrf": csrf})
+        return c, csrf, r
+
+    def test_sin_sesion_redirige(self):
+        r = self.app.test_client().get("/consultas/nueva")
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/login", r.headers["Location"])
+
+    def test_admin_inicial_obligado_a_cambiar(self):
+        c, _, r = self._entrar("admin@local", "TemporalAdmin123")
+        self.assertIn("/cambiar-clave", r.headers["Location"])
+        self.assertIn("/cambiar-clave", c.get("/").headers["Location"])
+
+    def test_lector_no_consulta_ni_administra(self):
+        c, csrf, _ = self._entrar("lector@prueba", "ClaveLector123")
+        self.assertEqual(c.get("/").status_code, 200)
+        self.assertEqual(c.get("/consultas/nueva").status_code, 403)
+        self.assertEqual(c.get("/admin/usuarios").status_code, 403)
+        r = c.post("/api/consultas", json={"clientes": [{"cif": "A46103834"}]}, headers={"X-CSRF": csrf})
+        self.assertEqual(r.status_code, 403)
+
+    def test_desactivado_queda_fuera_al_instante(self):
+        from models import db
+        c, _, _ = self._entrar("lector@prueba", "ClaveLector123")
+        u = db.usuario_por_email("lector@prueba")
+        db.actualizar_usuario(u["id"], activo=0)
+        try:
+            self.assertEqual(c.get("/").status_code, 302)
+        finally:
+            db.actualizar_usuario(u["id"], activo=1)
+
+    def test_post_sin_csrf_rechazado(self):
+        c, _, _ = self._entrar("lector@prueba", "ClaveLector123")
+        self.assertEqual(c.post("/logout").status_code, 400)
+
+
+if __name__ == "__main__":
+    unittest.main()

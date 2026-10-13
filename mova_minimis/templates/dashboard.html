@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% set paso = 'historial' %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
+<section class="card">
+  <div class="row space">
+    <h2 style="margin:0">Consultas de minimis</h2>
+    {% if puede('consultar') %}<a class="btn btn-primary" href="{{ url_for('consultas.nueva') }}">Nueva consulta</a>{% endif %}
+  </div>
+  <div class="kpis" style="margin-top:.9rem">
+    <div class="kpi"><b>{{ estados.get('completada', 0) }}</b><span>Consultas completadas</span></div>
+    <div class="kpi"><b>{{ estados.get('en_proceso', 0) }}</b><span>En proceso</span></div>
+    <div class="kpi"><b>{{ estados.get('error', 0) + estados.get('interrumpida', 0) }}</b><span>Con error o interrumpidas</span></div>
+  </div>
+  <form method="get" class="row" style="margin-bottom:.6rem">
+    <input type="search" name="q" value="{{ texto }}" placeholder="Buscar en el historial por razón social o CIF" style="flex:1;min-width:240px">
+    <button class="btn" type="submit">Buscar</button>
+    {% if texto %}<a class="btn" href="{{ url_for('dashboard.inicio') }}">Quitar filtro</a>{% endif %}
+  </form>
+  {% if consultas %}
+  <div class="tabla">
+    <table>
+      <thead><tr><th>Fecha</th><th>Clientes</th><th>Periodo</th><th>Usuario</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {% for c in consultas %}
+        <tr>
+          <td>{{ c.fecha_consulta|fecha }}</td>
+          <td><b>{{ c.n_clientes }}</b> · <span class="muted">{{ (c.nombres or '')[:140] }}{% if (c.nombres or '')|length > 140 %}…{% endif %}</span></td>
+          <td>{% if c.modo_periodo == 'movil' %}3 años hasta {{ c.fecha_referencia|fecha }}{% else %}Ejercicios {{ c.anos_solicitados|replace('[','')|replace(']','') }}{% endif %}</td>
+          <td>{{ c.usuario_nombre }}</td>
+          <td><span class="badge {{ c.estado }}">{{ c.estado|replace('_',' ')|upper }}</span></td>
+          <td><a class="btn btn-sm" href="{{ url_for('resultados.ver', cid=c.id) }}">Abrir</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="hint">{% if texto %}Ninguna consulta contiene «{{ texto }}».{% else %}Todavía no hay consultas.{% endif %}</p>
+  {% endif %}
+</section>
+{% endblock %}

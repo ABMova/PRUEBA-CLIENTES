@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="csrf" content="{{ csrf }}">
+<title>{% block titulo %}MOVA Minimis{% endblock %} · MOVA IA</title>
+<link rel="icon" href="{{ iconos.cerebro }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}?v={{ version }}">
+</head>
+<body>
+<header>
+  <div class="hwrap">
+    <div class="hleft">
+      <img class="brain" src="{{ iconos.cerebro }}" alt="">
+      <div>
+        <h1>MOVA Minimis</h1>
+        <p>Consulta de ayudas de minimis</p>
+      </div>
+    </div>
+    <div class="hright">
+      {% if usuario %}
+      <div class="who">
+        <b>{{ usuario.nombre }}</b> · {{ ROLES[usuario.rol] }}<br>
+        <a href="{{ url_for('auth.cambiar_clave') }}">Contraseña</a>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="btn btn-sm">Salir</button>
+        </form>
+      </div>
+      {% endif %}
+      {% if iconos.logo %}
+      <img class="mova-logo" src="{{ iconos.logo }}" alt="MOVA IA">
+      {% else %}
+      <span class="brand-txt"><b>MOVA</b><i>IA</i></span>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+{% if usuario and not usuario.cambiar_clave %}
+{% set paso = paso|default('') %}
+<div class="navrow">
+  <div class="wrapnav row" style="width:100%">
+    {% if puede('consultar') %}
+    <a href="{{ url_for('consultas.nueva') }}" class="{{ 'active' if paso == 'busqueda' }}"><span class="num">1</span>Búsqueda</a>
+    {% endif %}
+    <a href="{{ url_for('resultados.ver', cid=ultima_consulta) if ultima_consulta else url_for('dashboard.inicio') }}"
+       class="{{ 'active' if paso == 'resultados' }}"><span class="num">2</span>Resultados</a>
+    <a href="{{ (url_for('resultados.ver', cid=ultima_consulta) ~ '#exportar') if ultima_consulta else url_for('dashboard.inicio') }}"
+       class="{{ 'active' if paso == 'exportar' }} {{ '' if puede('exportar') else 'off' }}"><span class="num">3</span>Exportar</a>
+    <a href="{{ url_for('dashboard.inicio') }}" class="{{ 'active' if paso == 'historial' }}">Historial</a>
+    <span class="sepnav"></span>
+    {% if puede('administrar') %}
+    <span class="vsep"></span>
+    <a href="{{ url_for('admin.configuracion') }}" class="lock {{ 'active' if paso == 'config' }}">🔒 Configuración</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<main class="{% block ancho %}wide{% endblock %}">
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+  {% if mensajes %}
+  <div class="flashes">
+    {% for cat, m in mensajes %}<div class="banner {{ cat }}">{{ m }}</div>{% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% block contenido %}{% endblock %}
+</main>
+
+<footer>MOVA Minimis {{ version }} · MOVA IA · Datos de la Base de Datos Nacional de Subvenciones (infosubvenciones.es). Requiere validación oficial.</footer>
+<div id="toast" class="toast"></div>
+<script src="{{ url_for('static', filename='app.js') }}?v={{ version }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

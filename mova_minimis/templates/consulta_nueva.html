@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set paso = 'busqueda' %}
+{% block titulo %}Nueva consulta{% endblock %}
+{% block contenido %}
+<div id="pagNueva"></div>
+
+<section class="card">
+  <h2>1 · Clientes</h2>
+  <p class="hint">Suba documentos con los CIF de los clientes o escríbalos a mano. Se valida el dígito de control;
+     la razón social oficial la pone después la BDNS.</p>
+  <div class="grid two">
+    <div>
+      <label>Documentos ({{ extensiones }})</label>
+      <div id="drop" class="dropzone">
+        <b>Arrastre aquí PDF, imágenes, Excel, Word, CSV o TXT</b>
+        <small>o selecciónelos · máx. 25 MB por fichero</small>
+        <input type="file" id="fileInput" multiple style="margin-top:.6rem"
+               accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.xlsx,.xlsm,.csv,.txt,.docx">
+      </div>
+      <div class="hint" style="margin-top:.4rem">
+        OCR: {% if hay_ocr %}<span class="oktxt">Tesseract disponible</span>{% else %}<span class="warntxt">Tesseract no instalado</span>{% endif %}
+        · Lectura con Claude: {% if hay_claude %}<span class="oktxt">configurada</span>{% else %}<span class="warntxt">sin clave</span>{% endif %}
+        {% if not hay_ocr and not hay_claude %}<br>Los PDF escaneados y las imágenes no se podrán leer: introduzca esos datos a mano.{% endif %}
+      </div>
+      <div id="listaDocs"></div>
+    </div>
+    <div>
+      <label for="manual">Entrada manual · una línea por cliente: CIF y razón social</label>
+      <textarea id="manual" class="prosa" placeholder="B12345674 ; Ejemplo Industrial SL&#10;A46103834 Mercadona SA"></textarea>
+      <div class="row" style="margin-top:.5rem"><button id="btnManual" class="btn" type="button">Añadir a la lista</button></div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>2 · Periodo de cálculo</h2>
+  <div class="grid two">
+    <div>
+      <label class="inline"><input type="radio" name="modo" value="movil" {{ 'checked' if modo_defecto == 'movil' }}>
+        <b>Tres años móviles</b> hasta una fecha (Reglamento UE 2023/2831, vigente)</label>
+      <label class="inline"><input type="radio" name="modo" value="ejercicios" {{ 'checked' if modo_defecto == 'ejercicios' }}>
+        <b>Ejercicios fiscales</b> elegidos (criterio del Reglamento 1407/2013, para revisar periodos pasados)</label>
+      <p class="hint">El techo general es de 300.000 € por única empresa en cualquier periodo de tres años
+        (200.000 € antes de 2024). Las ayudas agrícolas y de pesca suman contra el mismo techo.</p>
+    </div>
+    <div>
+      <div id="bloqueMovil">
+        <label for="fechaRef">Fecha de referencia (fecha prevista de concesión de la nueva ayuda)</label>
+        <input type="date" id="fechaRef" value="{{ hoy }}">
+      </div>
+      <div id="bloqueEjercicios" class="oculto">
+        <label>Ejercicios (hasta tres consecutivos)</label>
+        <div class="chiprow" id="anos" data-defecto="{{ anos_defecto|join(',') }}"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="row space">
+    <h2 style="margin:0">3 · Revisión de la lista</h2>
+    <span class="hint" id="cuenta" style="margin:0">Sin clientes</span>
+  </div>
+  <div id="errores"></div>
+  <div class="tabla" style="margin-top:.6rem">
+    <table>
+      <thead><tr><th>CIF / NIF</th><th>Razón social (de la entrada)</th><th>Origen</th><th>Confianza</th><th>Notas</th><th></th></tr></thead>
+      <tbody id="tbClientes"><tr><td colspan="6" class="muted">Añada clientes desde documentos o a mano.</td></tr></tbody>
+    </table>
+  </div>
+  <div class="row" style="margin-top:.9rem">
+    <button id="btnConsultar" class="btn btn-primary" type="button" disabled>Consultar saldo en la BDNS</button>
+    <button id="btnVaciar" class="btn btn-danger" type="button">Vaciar lista</button>
+  </div>
+</section>
+{% endblock %}
