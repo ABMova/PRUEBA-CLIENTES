@@ -7,8 +7,7 @@ ejecuciones con los mismos datos.
 """
 from datetime import date, datetime, timezone
 
-from config import AVISO_BDNS
-from logic.calculador import euros
+from logic.calculador import euros, fecha_enero
 
 ORDEN_ESTADO = {"SALDO_DISPONIBLE": 0, "LIMITE_ALCANZADO": 1, "LIMITE_SUPERADO": 2, "PENDIENTE": 3}
 ETIQUETA_ESTADO = {
@@ -56,6 +55,7 @@ def generar(consulta: dict, periodo: dict, resultados: list[dict], usuario: str,
             "razon_social_entrada": d.get("razon_social"),
             "cif": d["cif"],
             "saldo_disponible": d.get("saldo_disponible"),
+            "saldo_1_enero": d.get("saldo_1_enero"),
             "estado": d["estado"],
             "estado_texto": ETIQUETA_ESTADO[d["estado"]],
             "anos_consultados": [x["ano"] for x in d.get("desglose_por_ano", [])],
@@ -80,15 +80,21 @@ def generar(consulta: dict, periodo: dict, resultados: list[dict], usuario: str,
     superado = [x for x in detalle if x["estado"] == "LIMITE_SUPERADO"]
     pendientes = [x for x in detalle if x["estado"] == "PENDIENTE" or x["pendientes"]]
 
+    enero = fecha_enero(periodo)
+    # «hoy» es la fecha del informe en el periodo móvil; por ejercicios el saldo es el de los años elegidos
+    etiqueta_saldo = (f"Saldo a {_fmt_fecha(periodo['hasta'])}" if periodo["modo"] == "movil"
+                      else f"Saldo en los ejercicios {periodo['etiqueta']}")
+    etiqueta_enero = f"Saldo a {enero:%d/%m/%Y}"
     notas = [
-        "Datos extraídos de fuentes públicas: " + AVISO_BDNS + " Requiere validación oficial.",
+        "Datos extraídos de fuentes públicas. La información es dinámica: puede corregirse o completarse "
+        "después de la consulta. Requiere validación oficial.",
         f"Cálculo conforme al {periodo['reglamento']}: techo de {euros(periodo['techo'])} por única "
         f"empresa en el periodo {periodo['etiqueta']}.",
         "[PENDIENTE: única empresa] El techo se aplica al grupo de empresas vinculadas (art. 2.2 del "
         "Reglamento 2023/2831). La consulta solo cubre el CIF indicado: deben sumarse las ayudas de las "
         "empresas del mismo grupo.",
-        "La BDNS registra las concesiones con retraso (las ventajas fiscales pueden tardar meses). Conviene "
-        "completar el cálculo con la declaración responsable de ayudas de minimis del cliente.",
+        f"El saldo a {enero:%d/%m/%Y} cuenta las ayudas ya concedidas que siguen dentro del periodo en esa "
+        "fecha y supone que no se conceden ni registran ayudas nuevas entretanto.",
     ]
     notas += periodo.get("avisos", [])
     if pendientes:
@@ -104,6 +110,8 @@ def generar(consulta: dict, periodo: dict, resultados: list[dict], usuario: str,
         "modo_periodo": periodo["modo"],
         "reglamento": periodo["reglamento"],
         "umbral": periodo["techo"],
+        "etiqueta_saldo": etiqueta_saldo,
+        "etiqueta_saldo_enero": etiqueta_enero,
         "resumen_ejecutivo": {
             "clientes_consultados": len(detalle),
             "clientes_con_saldo": len(con_saldo),
@@ -111,6 +119,7 @@ def generar(consulta: dict, periodo: dict, resultados: list[dict], usuario: str,
             "clientes_superado_limite": len(superado),
             "clientes_pendientes": len(pendientes),
             "total_saldo_disponible_conjunto": round(sum(max(0, x["saldo_disponible"] or 0) for x in detalle), 2),
+            "total_saldo_1_enero_conjunto": round(sum(max(0, x["saldo_1_enero"] or 0) for x in detalle), 2),
             "total_limite_superado": round(sum(-x["saldo_disponible"] for x in superado), 2),
             "total_concedido_periodo": round(sum(x["total_concedido"] or 0 for x in detalle), 2),
         },

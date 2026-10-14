@@ -84,7 +84,7 @@ def periodo(modo: str, fecha_ref: date, anos: list[int] | None) -> dict:
                           "este cálculo por ejercicios es orientativo.")
         etiqueta = f"{anos[0]}-{anos[-1]}" if len(anos) > 1 else str(anos[0])
         return {"modo": modo, "desde": desde, "hasta": hasta, "techo": techo, "anos": anos,
-                "etiqueta": etiqueta, "avisos": avisos,
+                "etiqueta": etiqueta, "avisos": avisos, "fecha_ref": fecha_ref.isoformat(),
                 "reglamento": "Reglamento (UE) 2023/2831" if techo == TECHO_GENERAL else "Reglamento (UE) 1407/2013"}
     # móvil: (fecha_ref - 3 años, fecha_ref]
     desde = sumar_anos(fecha_ref, -3)
@@ -95,6 +95,7 @@ def periodo(modo: str, fecha_ref: date, anos: list[int] | None) -> dict:
     anos = list(range((desde + timedelta(days=1)).year, fecha_ref.year + 1))  # años que tienen algún día dentro
     return {"modo": "movil", "desde": desde, "hasta": fecha_ref, "techo": techo, "anos": anos,
             "etiqueta": f"{(desde + timedelta(days=1)):%d/%m/%Y} – {fecha_ref:%d/%m/%Y}", "avisos": avisos,
+            "fecha_ref": fecha_ref.isoformat(),
             "reglamento": "Reglamento (UE) 2023/2831" if techo == TECHO_GENERAL else "Reglamento (UE) 1407/2013"}
 
 
@@ -126,6 +127,24 @@ def _saldo(sumas: dict, techo: float) -> float:
     return round(saldo, 2)
 
 
+def fecha_enero(per: dict) -> date:
+    """1 de enero del año siguiente al de la fecha del informe."""
+    return date(date.fromisoformat(per["fecha_ref"]).year + 1, 1, 1)
+
+
+def _saldo_a_enero(ayudas: list[dict], per: dict) -> float:
+    """Saldo el 1 de enero siguiente con las ayudas ya conocidas: supone que no hay concesiones nuevas
+    entretanto. Mismo modo de cálculo que el del informe (móvil o por ejercicios)."""
+    per_e = periodo(per["modo"], fecha_enero(per), None)
+    sumas = {"general": 0.0, "agricola": 0.0, "pesca": 0.0, "sieg": 0.0, "otro": 0.0}
+    for a in ayudas:
+        f = _fecha(a.get("fecha_concesion"))
+        if f is not None and _en_periodo(f, per_e):
+            clase = a.get("clase_reglamento") or "otro"
+            sumas[clase] = sumas.get(clase, 0.0) + float(a.get("importe_concedido") or 0)
+    return _saldo(sumas, per_e["techo"])
+
+
 def _estado(saldo: float) -> str:
     if saldo < 0:
         return "LIMITE_SUPERADO"
@@ -147,6 +166,7 @@ def calcular_cliente(res: dict, per: dict) -> tuple[dict, list[dict]]:
         "reglamento_aplicado": per["reglamento"], "periodo_referencia": per["etiqueta"],
         "modo_periodo": per["modo"], "fecha_desde": per["desde"].isoformat(),
         "fecha_hasta": per["hasta"].isoformat(), "confianza_busqueda": res.get("confianza_busqueda"),
+        "fecha_saldo_enero": fecha_enero(per).isoformat(), "saldo_1_enero": None,
         "url_beneficiario": res.get("url_beneficiario"), "notas_busqueda": res.get("notas_busqueda") or "",
     }
 
@@ -250,6 +270,7 @@ def calcular_cliente(res: dict, per: dict) -> tuple[dict, list[dict]]:
         "sumas_por_reglamento": {k: round(v, 2) for k, v in sumas.items() if v},
         "total_concedido_3anos": total,
         "saldo_disponible": saldo,
+        "saldo_1_enero": _saldo_a_enero(ayudas, per),
         "estado": estado,
         "sublimites": sublimites,
         "liberaciones": liberaciones,

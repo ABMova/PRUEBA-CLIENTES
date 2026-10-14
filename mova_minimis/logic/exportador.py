@@ -45,7 +45,8 @@ def _kpis(inf: dict) -> list[tuple[str, str]]:
         ("En el límite (≤ 5.000 €)", str(r["clientes_en_limite"])),
         ("Límite superado", str(r["clientes_superado_limite"])),
         ("Con datos pendientes", str(r["clientes_pendientes"])),
-        ("Saldo disponible conjunto", euros(r["total_saldo_disponible_conjunto"])),
+        (f"{inf.get('etiqueta_saldo', 'Saldo disponible')} (conjunto)", euros(r["total_saldo_disponible_conjunto"])),
+        (f"{inf.get('etiqueta_saldo_enero', 'Saldo a 1 de enero')} (conjunto)", euros(r.get("total_saldo_1_enero_conjunto"))),
         ("Total concedido en el periodo", euros(r["total_concedido_periodo"])),
         ("Exceso sobre el techo", euros(r["total_limite_superado"])),
     ]
@@ -82,6 +83,11 @@ def _reglamento_corto(x: dict) -> str:
     return f"{x['clase']} · {numero.group(0)}" if numero else (x.get("clase") or "")
 
 
+def _saldos(inf: dict, hoy, enero) -> str:
+    return (f"{inf.get('etiqueta_saldo', 'Saldo disponible')}: {euros(hoy)}; "
+            f"{inf.get('etiqueta_saldo_enero', 'saldo a 1 de enero').lower()}: {euros(enero)}")
+
+
 def markdown_informe(informe: dict) -> str:
     """El informe en la sintaxis de la skill mova-informes (references/formato_entrada.md)."""
     inf = informe["informe"]
@@ -94,7 +100,6 @@ def markdown_informe(informe: dict) -> str:
         f"clientes consultados: {r['clientes_consultados']}",
         f"periodo de calculo: {_md(inf['periodo_consulta'])}",
         f"fecha: {_fecha_larga(inf['fecha_generacion'])}",
-        f"consulta: {inf['audit_trail']['consulta_id']}",
         f"elaborado por: {_md(inf['usuario'])}",
         "confidencial: si",
         "autor: MOVA",
@@ -110,16 +115,19 @@ def markdown_informe(informe: dict) -> str:
     m += _tabla(["Indicador", "Valor"], _kpis(inf))
     m += [f"> **Resultado:** {r['clientes_con_saldo']} cliente(s) con saldo disponible; "
           f"{r['clientes_en_limite'] + r['clientes_superado_limite']} en el límite o por encima del techo. "
-          f"Saldo disponible conjunto: {euros(r['total_saldo_disponible_conjunto'])}.", ""]
+          f"{_saldos(inf, r['total_saldo_disponible_conjunto'], r.get('total_saldo_1_enero_conjunto'))} (conjunto).", ""]
 
     m += ["# Detalle por cliente", ""]
-    m += _tabla(["Cliente", "CIF", "Saldo disponible", "Estado", "Computado"],
-                [[d["razon_social"], d["cif"], euros(d["saldo_disponible"]), d["estado_texto"],
-                  euros(d["total_concedido"])] for d in inf["detalle_clientes"]])
+    m += _tabla(["Cliente", "CIF", inf.get("etiqueta_saldo", "Saldo disponible"),
+                 inf.get("etiqueta_saldo_enero", "Saldo a 1 de enero"), "Estado"],
+                [[d["razon_social"], d["cif"], euros(d["saldo_disponible"]), euros(d.get("saldo_1_enero")),
+                  d["estado_texto"]] for d in inf["detalle_clientes"]])
     for d in inf["detalle_clientes"]:
         m += [f"## {_md(d['razon_social'])}", "",
-              f"**CIF:** {d['cif']}. **Estado:** {_md(d['estado_texto'])}. **Saldo disponible:** "
-              f"{euros(d['saldo_disponible'])}. **Computado en el periodo:** {euros(d['total_concedido'])}.", ""]
+              f"**CIF:** {d['cif']}. **Estado:** {_md(d['estado_texto'])}. "
+              f"**{inf.get('etiqueta_saldo', 'Saldo disponible')}:** {euros(d['saldo_disponible'])}. "
+              f"**{inf.get('etiqueta_saldo_enero', 'Saldo a 1 de enero')}:** {euros(d.get('saldo_1_enero'))}. "
+              f"**Computado en el periodo:** {euros(d['total_concedido'])}.", ""]
         if d["desglose_por_ano"]:
             m += _tabla(["Año", "Importe computado"],
                         [[f"{x['ano']}" + (f" ({x['tramo']})" if x.get("tramo") else ""), euros(x["importe_concedido"])]
@@ -234,7 +242,7 @@ def exportar_xlsx(informe: dict, destino: Path) -> Path:
     meta = [("Periodo de consulta", inf["periodo_consulta"]), ("Normativa", inf["reglamento"]),
             ("Techo aplicado", inf["umbral"]), ("Consultado por", inf["usuario"]),
             ("Fecha de generación", _fecha_local(inf["fecha_generacion"])),
-            ("Consulta", inf["audit_trail"]["consulta_id"]), ("Aviso", LEYENDA)]
+            ("Aviso", LEYENDA)]
     for i, (k, v) in enumerate(meta, start=3):
         ws.cell(row=i, column=1, value=k).font = Font(bold=True)
         c = ws.cell(row=i, column=2, value=v)
@@ -248,7 +256,8 @@ def exportar_xlsx(informe: dict, destino: Path) -> Path:
                    ("En el límite (≤ 5.000 €)", r["clientes_en_limite"], None),
                    ("Límite superado", r["clientes_superado_limite"], None),
                    ("Con datos pendientes", r["clientes_pendientes"], None),
-                   ("Saldo disponible conjunto", r["total_saldo_disponible_conjunto"], moneda),
+                   (f"{inf.get('etiqueta_saldo', 'Saldo disponible')} (conjunto)", r["total_saldo_disponible_conjunto"], moneda),
+                   (f"{inf.get('etiqueta_saldo_enero', 'Saldo a 1 de enero')} (conjunto)", r.get("total_saldo_1_enero_conjunto"), moneda),
                    ("Total concedido en el periodo", r["total_concedido_periodo"], moneda),
                    ("Exceso sobre el techo", r["total_limite_superado"], moneda)]
     for i, (k, v, fmt) in enumerate(indicadores, start=fila0 + 1):
@@ -262,36 +271,37 @@ def exportar_xlsx(informe: dict, destino: Path) -> Path:
 
     # Hoja 2 · Detalle
     wd = wb.create_sheet("Detalle")
-    cabecera(wd, 1, ["CIF", "Razón social", "Saldo disponible", "Estado", "Años consultados", "Total concedido",
-                     "Próxima salida del periodo", "Recupera saldo", "Pendientes", "Notas"],
-             [12, 40, 16, 20, 18, 16, 16, 14, 50, 70])
+    cabecera(wd, 1, ["CIF", "Razón social", inf.get("etiqueta_saldo", "Saldo disponible"),
+                     inf.get("etiqueta_saldo_enero", "Saldo a 1 de enero"), "Estado", "Años consultados",
+                     "Total concedido", "Próxima salida del periodo", "Recupera saldo", "Pendientes", "Notas"],
+             [12, 40, 16, 16, 20, 18, 16, 16, 14, 50, 70])
     for i, d in enumerate(inf["detalle_clientes"], start=2):
-        valores = [d["cif"], d["razon_social"], d["saldo_disponible"], d["estado_texto"],
+        valores = [d["cif"], d["razon_social"], d["saldo_disponible"], d.get("saldo_1_enero"), d["estado_texto"],
                    ", ".join(map(str, d["anos_consultados"])), d["total_concedido"],
                    d["proxima_actualizacion_limite"], d["fecha_recupera_saldo"],
                    " ".join(d["pendientes"]), d["notas"]]
         for j, v in enumerate(valores, start=1):
             c = wd.cell(row=i, column=j, value=v)
             c.border = borde
-            c.alignment = Alignment(vertical="top", wrap_text=j in (2, 9, 10))
-            if j in (3, 6):
+            c.alignment = Alignment(vertical="top", wrap_text=j in (2, 10, 11))
+            if j in (3, 4, 7):
                 c.number_format = moneda
     n = len(inf["detalle_clientes"])
     if n:
         tot = n + 2
         wd.cell(row=tot, column=2, value="TOTAL").font = Font(bold=True)
-        for col in (3, 6):
+        for col in (3, 4, 7):
             letra = get_column_letter(col)
             # el saldo negativo (límite superado) no resta del saldo conjunto, igual que en el resumen
-            formula = f'=SUMIF({letra}2:{letra}{n + 1},">0")' if col == 3 else f"=SUM({letra}2:{letra}{n + 1})"
+            formula = f'=SUMIF({letra}2:{letra}{n + 1},">0")' if col in (3, 4) else f"=SUM({letra}2:{letra}{n + 1})"
             c = wd.cell(row=tot, column=col, value=formula)
             c.number_format, c.font = moneda, Font(bold=True)
-        rango = f"A2:J{n + 1}"
+        rango = f"A2:K{n + 1}"
         for texto, color in (("Saldo disponible", "DCFCE7"), ("En el límite", "FEF3C7"),
                              ("Límite superado", "FEE2E2"), ("Pendiente de revisión", "E5E7EB")):
-            wd.conditional_formatting.add(rango, FormulaRule(formula=[f'$D2="{texto}"'],
+            wd.conditional_formatting.add(rango, FormulaRule(formula=[f'$E2="{texto}"'],
                                                              fill=PatternFill("solid", fgColor=color)))
-    wd.auto_filter.ref = f"A1:J{max(n, 1) + 1}"
+    wd.auto_filter.ref = f"A1:K{max(n, 1) + 1}"
 
     # Hoja 3 · Ayudas computadas (como en Word y PDF: sin referencias de fuente ni ayudas que no computan)
     wr = wb.create_sheet("Ayudas computadas")

@@ -49,7 +49,8 @@ def _importe(texto: str) -> float:
 def ver(cid):
     q = db.consulta(cid) or abort(404)
     session["ultima_consulta"] = cid
-    informe = json.loads(q["informe_json"])["informe"] if q.get("informe_json") else None
+    al_dia = orquestador.informe_al_dia(cid) if q["estado"] == "completada" else None
+    informe = al_dia["informe"] if al_dia else (json.loads(q["informe_json"])["informe"] if q.get("informe_json") else None)
     if informe and puede("exportar"):
         from integrations import word_pdf
         word_pdf.calentar()  # la primera exportación de Word es lenta: que pase mientras se lee el resultado

@@ -67,9 +67,23 @@ def regenerar_informe(cid: str) -> dict:
     return inf
 
 
+def informe_al_dia(cid: str) -> dict | None:
+    """El informe guardado; si es de antes de la 1.1.4 (sin saldo a 1 de enero), se recalcula con sus mismas
+    ayudas: no vuelve a consultar la BDNS."""
+    q = db.consulta(cid)
+    if not q.get("informe_json"):
+        return None
+    inf = json.loads(q["informe_json"])
+    if "etiqueta_saldo_enero" not in inf["informe"]:
+        for r in db.resultados_de(cid):
+            recalcular_resultado(r["id"], regenerar=False)
+        inf = regenerar_informe(cid)
+    return inf
+
+
 def _informe_para_exportar(cid: str) -> dict:
     q = db.consulta(cid)
-    inf = json.loads(q["informe_json"]) if q.get("informe_json") else regenerar_informe(cid)
+    inf = informe_al_dia(cid) or regenerar_informe(cid)
     inf["informe"]["usuario"] = q["usuario_nombre"]
     return inf
 
@@ -98,7 +112,7 @@ def exportar_todo(cid: str, usuario: dict) -> list:
 
 
 # ---------------------------------------------------------------- recalcular un resultado
-def recalcular_resultado(rid: int) -> None:
+def recalcular_resultado(rid: int, regenerar: bool = True) -> None:
     r = db.resultado(rid)
     q = db.consulta(r["consulta_id"])
     d = r["detalles"]
@@ -112,7 +126,8 @@ def recalcular_resultado(rid: int) -> None:
     }
     calc, ayudas = calculador.calcular_cliente(res, per)
     db.actualizar_resultado(rid, calc, ayudas)
-    regenerar_informe(r["consulta_id"])
+    if regenerar:
+        regenerar_informe(r["consulta_id"])
 
 
 # ---------------------------------------------------------------- la cadena en un hilo

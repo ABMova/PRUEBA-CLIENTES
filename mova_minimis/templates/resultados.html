@@ -48,7 +48,8 @@
 {% set r = informe.resumen_ejecutivo %}
 <div class="en-kpis">
   <div class="en-kpi"><span class="ic c-pri">{{ icono('usuarios', 20) }}</span><div><b>{{ r.clientes_consultados }}</b><span>Clientes consultados · {{ informe.reglamento }}</span></div></div>
-  <div class="en-kpi"><span class="ic c-ok">{{ icono('euro', 20) }}</span><div><b>{{ r.total_saldo_disponible_conjunto|euros }}</b><span>Saldo disponible conjunto · techo {{ informe.umbral|euros }} por cliente</span></div></div>
+  <div class="en-kpi"><span class="ic c-ok">{{ icono('euro', 20) }}</span><div><b>{{ r.total_saldo_disponible_conjunto|euros }}</b><span>{{ informe.etiqueta_saldo }} (conjunto) · techo {{ informe.umbral|euros }} por cliente</span></div></div>
+  <div class="en-kpi"><span class="ic c-ok">{{ icono('euro', 20) }}</span><div><b>{{ r.total_saldo_1_enero_conjunto|euros }}</b><span>{{ informe.etiqueta_saldo_enero }} (conjunto) · sin ayudas nuevas</span></div></div>
   {% set en_limite = r.clientes_en_limite + r.clientes_superado_limite %}
   <div class="en-kpi"><span class="ic c-warn">{{ icono('alerta', 20) }}</span><div><b{% if en_limite %} class="en-rojo"{% endif %}>{{ en_limite }}</b><span>En el límite o superado</span></div></div>
 </div>
@@ -64,13 +65,14 @@
   </details>
   {% endif %}
   <div class="en-tabla"><table>
-    <thead><tr><th>Cliente</th><th class="num">Saldo disponible</th><th>Estado</th><th class="num">Computado en el periodo</th><th>Vuelve a tener saldo</th></tr></thead>
+    <thead><tr><th>Cliente</th><th class="num">{{ informe.etiqueta_saldo }}</th><th class="num">{{ informe.etiqueta_saldo_enero }}</th><th>Estado</th><th class="num">Computado en el periodo</th><th>Vuelve a tener saldo</th></tr></thead>
     <tbody>
     {% for d in informe.detalle_clientes %}
       <tr class="clic">
         <td><div class="en-celda"><span class="en-ini {{ INI[d.estado] }}">{{ iniciales(d.razon_social) }}</span>
           <div class="txt"><a class="fuerte" href="#cli-{{ d.resultado_id }}">{{ d.razon_social }}</a><small>{{ d.cif }}{% if d.pendientes %} · con pendientes{% endif %}</small></div></div></td>
         <td class="num{{ ' en-rojo' if (d.saldo_disponible or 0) < 0 }}" {% if (d.saldo_disponible or 0) < 0 %}style="color:var(--mv-err)"{% endif %}>{{ d.saldo_disponible|euros }}</td>
+        <td class="num"{% if (d.saldo_1_enero or 0) < 0 %} style="color:var(--mv-err)"{% endif %}>{{ d.saldo_1_enero|euros }}</td>
         <td><span class="en-tag {{ TAG[d.estado] }}"><i></i>{{ d.estado_texto }}</span></td>
         <td class="num">{{ d.total_concedido|euros }}</td>
         <td class="en-tenue-td">{{ d.fecha_recupera_saldo or '' }}</td>
@@ -87,7 +89,9 @@
     <div class="cliente-cab">
       <div><h3>{{ d.razon_social }} · {{ d.cif }}</h3>
         {% if d.razon_social_entrada and d.razon_social_entrada != d.razon_social %}<div class="mini">En la entrada: {{ d.razon_social_entrada }}</div>{% endif %}</div>
-      <div><div class="saldo {{ 'neg' if (d.saldo_disponible or 0) < 0 }}">{{ d.saldo_disponible|euros }}</div>
+      <div><div class="mini" style="text-align:right">{{ informe.etiqueta_saldo }}</div>
+        <div class="saldo {{ 'neg' if (d.saldo_disponible or 0) < 0 }}">{{ d.saldo_disponible|euros }}</div>
+        <div class="mini" style="text-align:right">{{ informe.etiqueta_saldo_enero }}: <b>{{ d.saldo_1_enero|euros }}</b></div>
         <div style="text-align:right"><span class="en-tag {{ TAG[d.estado] }}"><i></i>{{ d.estado_texto }}</span></div></div>
     </div>
     {% for p in d.pendientes %}<div class="pend">{{ p }}</div>{% endfor %}

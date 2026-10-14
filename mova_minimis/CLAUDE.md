@@ -52,6 +52,12 @@ El Excel es propio. En las pruebas no se abre Word (`word_pdf._disponible = Fals
 Resultados en pantalla solo con las ayudas que computan. Único modelo: Claude Haiku 5.5 (`config.MODELOS_CLAUDE`).
 Botón «Salir» del menú (escritorio): `window.mova.salir()` → IPC `mova-salir` → `ventana.close()`.
 
+## Desde 1.1.4
+Dos saldos: a la fecha del informe y a 1 de enero del año siguiente (`calculador._saldo_a_enero`, mismo modo de
+cálculo, cuenta las ayudas ya conocidas y supone que no hay nuevas). Sin la fila «Consulta» (portada y Excel), sin
+el aviso legal de la BDNS ni la nota de «La BDNS registra…» (petición del usuario). Las consultas guardadas antes
+se recalculan solas al abrirlas o exportarlas (`orquestador.informe_al_dia`), sin volver a la BDNS.
+
 ## Arquitectura
 `logic/` no importa Flask ni `models`: la red, la caché y el progreso se inyectan desde
 `routes/orquestador.py`. Todo el SQL vive en `models/db.py`. Columnas nuevas: añadir a

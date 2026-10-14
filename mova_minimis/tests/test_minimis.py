@@ -68,10 +68,30 @@ class Calculo(unittest.TestCase):
         self.assertEqual(c["estado"], "LIMITE_SUPERADO")
         self.assertEqual(c["fecha_recupera_saldo"], "2027-03-01")  # el 28/02/2027 aún computa
 
+    def test_saldo_a_1_de_enero(self):
+        # el 01/01/2027 el periodo es (01/01/2024, 01/01/2027]: salen las de 2023 y la del mismo 01/01/2024
+        c, _ = calculador.calcular_cliente(res(ayuda("2023-12-01", 20_000), ayuda("2024-01-01", 50_000),
+                                               ayuda("2024-01-02", 30_000)), self.per)
+        self.assertEqual(c["saldo_disponible"], 200_000)
+        self.assertEqual(c["fecha_saldo_enero"], "2027-01-01")
+        self.assertEqual(c["saldo_1_enero"], 270_000)
+
+    def test_saldo_a_1_de_enero_cuenta_las_ya_concedidas_despues(self):
+        c, _ = calculador.calcular_cliente(res(ayuda("2026-12-01", 99_000)), self.per)
+        self.assertEqual(c["saldo_disponible"], 300_000)
+        self.assertEqual(c["saldo_1_enero"], 201_000)
+
+    def test_saldo_a_1_de_enero_por_ejercicios(self):
+        per = calculador.periodo("ejercicios", date(2026, 10, 13), None)  # 2023-2025 -> el 1 de enero, 2024-2026
+        c, _ = calculador.calcular_cliente(res(ayuda("2023-05-05", 10_000), ayuda("2026-03-03", 5_000)), per)
+        self.assertEqual(c["saldo_disponible"], 290_000)
+        self.assertEqual(c["saldo_1_enero"], 295_000)
+
     def test_busqueda_incompleta_es_pendiente(self):
         c, _ = calculador.calcular_cliente(res(completa=False), self.per)
         self.assertEqual(c["estado"], "PENDIENTE")
         self.assertIsNone(c["saldo_disponible"])
+        self.assertIsNone(c["saldo_1_enero"])
 
     def test_no_encontrado_tiene_saldo_pero_queda_pendiente(self):
         c, _ = calculador.calcular_cliente(res(confianza="no encontrado"), self.per)
@@ -505,7 +525,24 @@ class Orquestacion(unittest.TestCase):
         texto = " ".join(p.text for p in Document(ruta).paragraphs)
         self.assertIn("RESUMEN EJECUTIVO", texto)        # título de nivel 1 de la plantilla MOVA
         self.assertNotIn("Referencias de fuente", texto)
+        # quitado a petición del usuario (1.1.4); el [PENDIENTE: única empresa] se queda
+        self.assertNotIn("infosubvenciones.es", texto)
+        self.assertNotIn("La BDNS registra", texto)
+        self.assertIn("única empresa", texto)
         celdas = [c.text for t in Document(ruta).tables for f in t.rows for c in f.cells]
+        self.assertNotIn(cid, celdas)  # sin la fila «Consulta» de la portada
+        self.assertTrue(any(c.startswith("Saldo a 01/01/") for c in celdas))
+        import openpyxl
+        libro = openpyxl.load_workbook(orquestador.exportar(cid, "xlsx", {"id": self.uid}))
+        valores = [c.value for f in libro["Resumen"].iter_rows() for c in f]
+        self.assertNotIn(cid, valores)
+        self.assertNotIn("Consulta", valores)
+        # una consulta de antes de la 1.1.4 se pone al día al abrirla, sin volver a la BDNS
+        import json
+        viejo = json.loads(self.db.consulta(cid)["informe_json"])
+        del viejo["informe"]["etiqueta_saldo_enero"]
+        self.db.actualizar_consulta(cid, informe_json=json.dumps(viejo))
+        self.assertIn("etiqueta_saldo_enero", orquestador.informe_al_dia(cid)["informe"])
         self.assertIn("TOTAL", celdas)
         self.assertIn("General · 2023/2831", celdas)
 
@@ -529,7 +566,13 @@ class Orquestacion(unittest.TestCase):
                      "reglamento": "REG (UE) 2023/2831 de minimis, General", "clase": "General", "importe": 10000},
                     {"fecha_concesion": "01/01/2021", "programa": "Antigua", "convocante": "ESTADO", "computa": False,
                      "reglamento": "REG (UE) 1407/2013 de minimis", "clase": "General", "importe": 5000}]}]}}
+        inf["informe"].update({"etiqueta_saldo": "Saldo a 13/10/2026", "etiqueta_saldo_enero": "Saldo a 01/01/2027"})
+        inf["informe"]["resumen_ejecutivo"]["total_saldo_1_enero_conjunto"] = 295000
+        inf["informe"]["detalle_clientes"][0]["saldo_1_enero"] = 295000
         md = exportador.markdown_informe(inf)
+        self.assertIn("Saldo a 01/01/2027", md)
+        self.assertIn("295.000,00 €", md)
+        self.assertNotIn("consulta:", md)  # el identificador de la consulta no sale en la portada
         self.assertIn("Computa · ESTADO", md)
         self.assertNotIn("Antigua", md)
         self.assertIn("| TOTAL |", md)
