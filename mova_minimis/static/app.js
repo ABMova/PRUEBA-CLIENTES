@@ -74,6 +74,16 @@ function hora(iso) {
   svg.innerHTML = s;
 })();
 
+/* Salir (escritorio): la ventana se cierra por el mismo camino que la X, que cierra antes el Word de fondo */
+(function salir() {
+  const b = $("btnSalir");
+  if (!b) return;
+  b.addEventListener("click", () => {
+    if (!window.confirm("¿Salir de MOVA Minimis? Las consultas en curso se interrumpirán.")) return;
+    if (window.mova && window.mova.salir) window.mova.salir(); else window.close();
+  });
+})();
+
 /* Confirmación para botones marcados con data-confirmar */
 document.addEventListener("submit", e => {
   const b = e.submitter;

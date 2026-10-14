@@ -3,7 +3,7 @@
 // en un puerto libre de 127.0.0.1 y lo muestra. Cada petición de la ventana lleva un token
 // aleatorio que el servidor exige: ningún otro programa del equipo ni ninguna web abierta en el
 // navegador puede usar ese puerto. Sin inicio de sesión: la administración tiene su propia contraseña.
-const { app, BrowserWindow, shell, session } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session } = require('electron');
 const { spawn, execFile } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -197,6 +197,11 @@ app.whenReady().then(async () => {
     cb({ requestHeaders: det.requestHeaders });
   });
   ventana.loadURL(base);
+});
+
+// Botón «Salir» de la interfaz: cierra la ventana y se sigue el camino de window-all-closed
+ipcMain.on('mova-salir', (e) => {
+  if (ventana && !ventana.isDestroyed() && e.sender === ventana.webContents) ventana.close();
 });
 
 app.on('before-quit', pararServidor);

@@ -32,7 +32,6 @@
 .cliente:first-of-type{border-top:0;padding-top:0;margin-top:0}
 .cliente-cab{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap}
 .cliente-cab h3{font-family:var(--mv-geo);font-weight:400;font-size:1.15rem;letter-spacing:.02em;margin:0}
-tr.nocomputa td{color:var(--mv-muted-2)}
 .mini{font-size:.76rem;color:var(--mv-muted)}
 .en-tabla td.num,.en-tabla th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 details > summary{cursor:pointer;color:var(--mv-muted);font-size:.85rem;margin:.6rem 0}

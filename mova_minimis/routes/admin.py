@@ -203,14 +203,11 @@ def configuracion():
     if request.method == "POST":
         accion = request.form.get("accion")
         if accion == "guardar":
-            modelo = request.form.get("modelo")
-            if modelo in config.MODELOS_CLAUDE:
-                db.guardar_ajuste("modelo_parser", modelo)
             modo = request.form.get("modo_periodo")
             if modo in ("movil", "ejercicios"):
                 db.guardar_ajuste("modo_periodo", modo)
             clave = request.form.get("api_key", "").strip()
-            cambios = {"modelo": modelo, "modo_periodo": modo}
+            cambios = {"modo_periodo": modo}
             if clave:
                 db.guardar_ajuste("anthropic_api_key", user.cifrar(clave))
                 cambios["api_key"] = user.enmascarar(clave)

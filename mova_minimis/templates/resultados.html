@@ -99,19 +99,19 @@
       {% for s in d.sublimites %}<span class="pildora" title="{{ s.norma }}">Sublímite {{ s.clase }}: <b>{{ s.computado|euros }}</b> de {{ s.tope|euros }} ({{ s.norma }})</span>{% endfor %}
       {% if d.url_beneficiario %}<a class="pildora" href="{{ d.url_beneficiario }}" target="_blank" rel="noopener">Ver en la BDNS ↗</a>{% endif %}
     </div>
-    {% if d.referencias_fuente %}
+    {% set computan = d.referencias_fuente|selectattr('computa')|list %}
+    {% if computan %}
     <div class="en-tabla"><table>
-      <thead><tr><th>Fecha</th><th>Convocatoria / programa</th><th>Concedente</th><th>Reglamento</th><th class="num">Importe</th><th>Computa</th><th></th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Convocatoria / programa</th><th>Concedente</th><th>Reglamento</th><th class="num">Importe</th><th></th></tr></thead>
       <tbody>
-      {% for x in d.referencias_fuente %}
-        <tr class="{{ '' if x.computa else 'nocomputa' }}">
+      {% for x in computan %}
+        <tr>
           <td class="en-tenue-td" style="white-space:nowrap">{{ x.fecha_concesion }}</td>
           <td>{% if x.url %}<a href="{{ x.url }}" target="_blank" rel="noopener">{{ x.programa }}</a>{% else %}{{ x.programa }}{% endif %}
             <div class="mini">{{ x.fuente }}{% if x.codigo_concesion %} · {{ x.codigo_concesion }}{% endif %}{% if x.instrumento %} · {{ x.instrumento }}{% endif %}{% if x.notas %} · {{ x.notas }}{% endif %}</div></td>
           <td class="mini">{{ x.convocante or '' }}</td>
           <td class="mini">{{ x.clase }}<br>{{ x.reglamento or '' }}</td>
           <td class="num">{{ x.importe|euros }}</td>
-          <td>{{ 'Sí' if x.computa else 'No' }}</td>
           <td>{% if x.origen == 'manual' and x.ayuda_id and puede('editar_resultados') %}
             <form method="post" action="{{ url_for('resultados.borrar_ayuda', rid=d.resultado_id, aid=x.ayuda_id) }}">
               <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -122,7 +122,7 @@
       </tbody>
     </table></div>
     {% else %}
-    <div class="en-vacio">Sin concesiones de minimis registradas en la BDNS.</div>
+    <div class="en-vacio">{{ 'Ninguna ayuda computa en el periodo de cálculo.' if d.referencias_fuente else 'Sin concesiones de minimis registradas en la BDNS.' }}</div>
     {% endif %}
     {% if d.liberaciones %}
     <details><summary>Calendario de salida de ayudas del periodo</summary>

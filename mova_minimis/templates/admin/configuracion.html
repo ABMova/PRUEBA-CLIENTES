@@ -14,7 +14,7 @@
     <input type="hidden" name="accion" value="guardar">
     <div class="en-campos">
       <div class="en-campo ancho-2"><label for="modelo">Modelo de Claude para leer documentos</label>
-        <select class="form-select" id="modelo" name="modelo">{% for k, v in modelos.items() %}<option value="{{ k }}" {{ 'selected' if k == modelo }}>{{ v }} · {{ k }}</option>{% endfor %}</select></div>
+        <input class="form-control" id="modelo" value="{{ modelos[modelo] }} · {{ modelo }}" readonly></div>
       <div class="en-campo ancho-2"><label for="modo_periodo">Periodo por defecto en las consultas nuevas</label>
         <select class="form-select" id="modo_periodo" name="modo_periodo">
           <option value="movil" {{ 'selected' if modo == 'movil' }}>Tres años hacia atrás desde la fecha del informe (Reglamento 2023/2831)</option>

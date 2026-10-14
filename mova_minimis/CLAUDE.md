@@ -48,6 +48,10 @@ escribe el Markdown de la skill; `integrations/word_pdf.py` usa Word por COM (hi
 resultados, se cierra a los 5 min sin uso) para actualizar el índice y exportar el PDF; sin Word, LibreOffice.
 El Excel es propio. En las pruebas no se abre Word (`word_pdf._disponible = False`).
 
+## Desde 1.1.3
+Resultados en pantalla solo con las ayudas que computan. Único modelo: Claude Haiku 5.5 (`config.MODELOS_CLAUDE`).
+Botón «Salir» del menú (escritorio): `window.mova.salir()` → IPC `mova-salir` → `ventana.close()`.
+
 ## Arquitectura
 `logic/` no importa Flask ni `models`: la red, la caché y el progreso se inyectan desde
 `routes/orquestador.py`. Todo el SQL vive en `models/db.py`. Columnas nuevas: añadir a

@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 NOMBRE_APP = "MOVA Minimis"
 
 CONGELADO = getattr(sys, "frozen", False)
@@ -71,11 +71,9 @@ ADMIN_INICIAL_CLAVE = "TemporalAdmin123"
 
 # Modelos de Claude que se pueden elegir desde Configuración
 MODELOS_CLAUDE = {
-    "claude-opus-5-5": "Claude Opus 5.5 (máxima precisión)",
-    "claude-sonnet-5-5": "Claude Sonnet 5.5 (equilibrado)",
-    "claude-haiku-5-5": "Claude Haiku 5.5 (económico)",
+    "claude-haiku-5-5": "Claude Haiku 5.5 (económico)",  # solo el económico, a petición del usuario
 }
-MODELO_POR_DEFECTO = "claude-opus-5-5"
+MODELO_POR_DEFECTO = "claude-haiku-5-5"
 
 # Base de Datos Nacional de Subvenciones (SNPSAP). API pública sin clave.
 BDNS_API = os.environ.get("BDNS_API", "https://www.infosubvenciones.es/bdnstrans/api")

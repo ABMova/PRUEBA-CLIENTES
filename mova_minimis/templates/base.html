@@ -46,6 +46,9 @@
     {% if puede('consultar') %}
     <div class="mv-nuevo"><a class="mv-btn-nuevo" href="{{ url_for('consultas.nueva') }}">{{ icono('mas', 16) }}Nueva consulta</a></div>
     {% endif %}
+    {% if escritorio %}
+    <div class="mv-salir"><button type="button" class="mv-btn-salir" id="btnSalir">{{ icono('salir', 16) }}Salir</button></div>
+    {% endif %}
     <div class="mv-pie">MOVA Minimis {{ version }}<br>&copy; 2026 Mova Strategy</div>
   </aside>
 
