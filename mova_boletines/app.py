@@ -28,6 +28,7 @@ import config
 from datos import copias, repositorio
 from negocio import orquestador, recuperacion
 from web.api_crm import api_crm as plano_api_crm
+from web.publico import publico as plano_publico
 from web.rutas import web as plano_web
 
 registro = logging.getLogger("mova")
@@ -294,6 +295,7 @@ def crear_aplicacion() -> Flask:
         clave_provisional=provisional,
     )
     aplicacion.register_blueprint(plano_web)
+    aplicacion.register_blueprint(plano_publico)
     aplicacion.register_blueprint(plano_api_crm)
     if config.DETRAS_DE_PROXY:
         # Un solo salto (Nginx o el tunel): IP, esquema y host reales del visitante.
