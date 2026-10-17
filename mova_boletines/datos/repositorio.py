@@ -905,23 +905,26 @@ def usar_token_documento(token: str, ip: str) -> None:
 
 
 # ------------------------------------------- lista de seguimiento del equipo --
-def marcar_seguimiento(publicacion_id: int, usuario: str, nota: str = "") -> bool:
-    """Pone una publicacion en la lista comun. Si ya estaba quitada, vuelve a entrar."""
+def marcar_seguimiento(publicacion_id: int) -> bool:
+    """Pone una publicacion en la lista comun. Si ya estaba quitada, vuelve a entrar.
+
+    La lista es del equipo y no guarda quien pulsa: lo que importa es que una
+    ayuda este o no este.
+    """
     if publicacion(publicacion_id) is None:
         return False
     _escribir(
-        "INSERT INTO seguimiento (publicacion_id, usuario, nota) VALUES (?,?,?) "
-        "ON CONFLICT(publicacion_id) DO UPDATE SET quitado_en=NULL, quitado_por='', "
-        "usuario=excluded.usuario, nota=excluded.nota, actualizado_en=datetime('now')",
-        (publicacion_id, usuario.strip().lower(), nota[:300]))
+        "INSERT INTO seguimiento (publicacion_id) VALUES (?) "
+        "ON CONFLICT(publicacion_id) DO UPDATE SET quitado_en=NULL, "
+        "actualizado_en=datetime('now')",
+        (publicacion_id,))
     return True
 
 
-def quitar_seguimiento(publicacion_id: int, usuario: str) -> bool:
+def quitar_seguimiento(publicacion_id: int) -> bool:
     return _escribir(
-        "UPDATE seguimiento SET quitado_en=datetime('now'), quitado_por=?, "
-        "actualizado_en=datetime('now') WHERE publicacion_id=? AND quitado_en IS NULL",
-        (usuario.strip().lower(), publicacion_id)) > 0
+        "UPDATE seguimiento SET quitado_en=datetime('now'), actualizado_en=datetime('now') "
+        "WHERE publicacion_id=? AND quitado_en IS NULL", (publicacion_id,)) > 0
 
 
 def esta_en_seguimiento(publicacion_id: int) -> sqlite3.Row | None:
@@ -929,14 +932,14 @@ def esta_en_seguimiento(publicacion_id: int) -> sqlite3.Row | None:
                 (publicacion_id,))
 
 
-def seguimiento_de(ids: list[int]) -> dict[int, sqlite3.Row]:
-    """Lo que esta en seguimiento de entre varias publicaciones (para el correo)."""
+def seguimiento_de(ids: list[int]) -> set[int]:
+    """Cuales de estas publicaciones estan en la lista (para pintar el correo)."""
     if not ids:
-        return {}
+        return set()
     marcas = ",".join("?" for _ in ids)
-    filas = _consulta(f"SELECT * FROM seguimiento WHERE quitado_en IS NULL "
+    filas = _consulta(f"SELECT publicacion_id FROM seguimiento WHERE quitado_en IS NULL "
                       f"AND publicacion_id IN ({marcas})", tuple(ids))
-    return {fila["publicacion_id"]: fila for fila in filas}
+    return {fila["publicacion_id"] for fila in filas}
 
 
 def en_seguimiento(incluir_vencidas: bool = False, hoy: str = "") -> list[sqlite3.Row]:
@@ -945,9 +948,12 @@ def en_seguimiento(incluir_vencidas: bool = False, hoy: str = "") -> list[sqlite
     Las que ya pasaron su fin de plazo no se envian (se consideran cerradas),
     salvo que se pidan expresamente para verlas en el panel.
     """
-    sql = ("SELECT p.*, s.usuario AS seguido_por, s.creado_en AS seguido_en, s.nota "
+    # Solo las vivas: lo descartado, lo oculto y los duplicados no pueden seguir
+    # llegando cada dos dias. 'enviada' es el estado normal de una publicacion
+    # que ya salio en el correo diario, asi que cuenta como viva.
+    sql = ("SELECT p.*, s.creado_en AS seguido_en "
            "FROM seguimiento s JOIN publicaciones p ON p.id = s.publicacion_id "
-           "WHERE s.quitado_en IS NULL")
+           "WHERE s.quitado_en IS NULL AND p.estado IN ('nueva', 'enviada')")
     parametros: list = []
     if not incluir_vencidas:
         sql += " AND (p.plazo_fin IS NULL OR p.plazo_fin >= ?)"

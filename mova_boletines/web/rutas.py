@@ -476,7 +476,7 @@ def seguimiento_por_token(token: str, accion: str):
 
     titulo = fila["titulo_resumido"] or fila["titulo"][:120]
     if accion == "marcar":
-        repositorio.marcar_seguimiento(fila["id"], "")
+        repositorio.marcar_seguimiento(fila["id"])
         repositorio.registrar_auditoria("correo", "seguimiento", str(fila["id"]),
                                         "Marcada para seguimiento", ip)
         return _pagina_seguimiento(
@@ -484,7 +484,7 @@ def seguimiento_por_token(token: str, accion: str):
             "La recibiras en el correo de seguimiento de los lunes, miercoles y viernes "
             "hasta que venza su plazo o la quites.", publicacion=titulo)
 
-    quitada = repositorio.quitar_seguimiento(fila["id"], "")
+    quitada = repositorio.quitar_seguimiento(fila["id"])
     repositorio.registrar_auditoria("correo", "seguimiento", str(fila["id"]),
                                     "Quitada del seguimiento" if quitada else "No estaba en la lista",
                                     ip)

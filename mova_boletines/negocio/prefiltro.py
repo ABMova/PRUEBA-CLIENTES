@@ -26,11 +26,16 @@ from __future__ import annotations
 
 from negocio.extraccion import normalizar
 
-# Publicaciones que no son ayudas pero interesan: planes y estrategias.
+# Publicaciones que no son ayudas pero interesan: planes y estrategias. Solo
+# expresiones inequivocas: "estrategia" a secas aparece en titulos de empleo
+# publico y de contratacion ("proceso selectivo en el marco de la Estrategia
+# X"), y salvarlos aqui seria pagar al modelo por leerlos.
 SENALES_INTERES = (
     "plan estrategico", "pla estrategic", "planes estrategicos", "plans estrategics",
-    "estrategia", "estrategies", "estrategia valenciana", "plan director", "pla director",
-    "hoja de ruta", "full de ruta", "plan de accion", "pla d'accio",
+    "estrategia valenciana", "estrategia espanola", "estrategia nacional", "estrategia regional",
+    "estrategia andaluza", "estrategia gallega", "aprueba la estrategia", "aprova l'estrategia",
+    "plan director", "pla director", "hoja de ruta", "full de ruta",
+    "plan de accion", "pla d'accio",
 )
 
 # Universidades: sus premios no interesan (los pidio quitar el usuario). Quien
@@ -146,10 +151,14 @@ def motivo_ruido(titulo: str, seccion: str = "", organismo: str = "") -> str | N
         return "premio de universidad"
     if any(senal in texto for senal in SENALES_AYUDA):
         return None
-    if any(senal in texto for senal in SENALES_INTERES):
-        return None
+    interesa = any(senal in texto for senal in SENALES_INTERES)
     for familia, expresiones in RUIDO.items():
         for expresion in expresiones:
             if expresion in texto:
+                # Un plan o una estrategia suele salir a informacion publica: ahi
+                # no es un tramite mas. Pero nombrar una estrategia no salva a un
+                # proceso selectivo ni a una licitacion, que siguen sin interesar.
+                if interesa and familia == "tramite sin convocatoria":
+                    return None
                 return familia
     return None

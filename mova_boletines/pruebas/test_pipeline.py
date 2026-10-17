@@ -1207,6 +1207,12 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                                "", "Conselleria de Innovacion") is None,
               "pero un premio de la Conselleria a empresas sigue entrando")
 
+    comprobar(_pf.motivo_ruido("RESOLUCION por la que se convoca proceso selectivo en el marco "
+                               "de la Estrategia Valenciana de Empleo") == "empleo publico",
+              "nombrar una estrategia no salva a un proceso selectivo")
+    comprobar(_pf.motivo_ruido("Informacion publica del Plan Estrategico de la Comunitat") is None,
+              "pero un plan que sale a informacion publica si entra")
+
     terminos_plan = [f["termino"] for f in repositorio.palabras_clave(solo_activas=True)]
     for titulo in ("ACUERDO por el que se aprueba la Estrategia Valenciana de Industria 2030",
                    "Informacion publica del Plan Estrategico de la Comunitat Valenciana"):
@@ -1290,7 +1296,7 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     sigo = dict(repositorio.publicaciones({}, limite=2)[0])
     otra = dict(repositorio.publicaciones({}, limite=2)[1])
 
-    comprobar(repositorio.marcar_seguimiento(sigo["id"], ""),
+    comprobar(repositorio.marcar_seguimiento(sigo["id"]),
               "el boton del correo mete la ayuda en la lista")
     comprobar(bool(repositorio.esta_en_seguimiento(sigo["id"]))
               and not repositorio.esta_en_seguimiento(otra["id"]),
@@ -1317,10 +1323,21 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(len(repositorio.en_seguimiento(incluir_vencidas=True)) == 1,
               "pero sigue en la lista para verla en el panel")
 
-    comprobar(repositorio.quitar_seguimiento(sigo["id"], ""),
+    comprobar(repositorio.quitar_seguimiento(sigo["id"]),
               "y el boton de quitar la saca del todo")
     comprobar(repositorio.en_seguimiento(incluir_vencidas=True) == [],
               "despues de quitarla, la lista queda vacia")
+
+    # El estado normal de lo que ya salio en el correo es 'enviada': si la lista
+    # solo mirase 'nueva', llegaria vacia siempre.
+    comprobar(repositorio.marcar_seguimiento(otra["id"]), "se marca otra para el ultimo caso")
+    repositorio.marcar_enviadas([otra["id"]])
+    comprobar([f["id"] for f in repositorio.en_seguimiento()] == [otra["id"]],
+              "una ayuda ya enviada en el correo diario sigue en la lista")
+    repositorio.descartar(otra["id"], "prueba")
+    comprobar(repositorio.en_seguimiento() == [],
+              "lo que se descarta deja de llegar en el correo de seguimiento")
+    repositorio.quitar_seguimiento(otra["id"])
 
     aceptado, detalle = orquestador.enviar_seguimiento(enviar=False)
     comprobar(aceptado and "No hay nada en seguimiento" in detalle,

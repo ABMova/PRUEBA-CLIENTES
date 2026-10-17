@@ -268,10 +268,7 @@ CREATE INDEX IF NOT EXISTS ix_crm_pub ON crm_ejecuciones(publicacion_id);
 -- plazo o cuando alguien la quita.
 CREATE TABLE IF NOT EXISTS seguimiento (
     publicacion_id INTEGER PRIMARY KEY REFERENCES publicaciones(id) ON DELETE CASCADE,
-    usuario        TEXT NOT NULL DEFAULT '',
-    nota           TEXT NOT NULL DEFAULT '',
     quitado_en     TEXT,
-    quitado_por    TEXT NOT NULL DEFAULT '',
     creado_en      TEXT NOT NULL DEFAULT (datetime('now')),
     actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
 );

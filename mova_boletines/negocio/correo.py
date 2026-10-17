@@ -66,8 +66,12 @@ def fecha_corta(valor: str | None) -> str:
 
 
 def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None = None,
-                  con_crm: bool = False) -> dict:
-    """Anade a la fila lo que la plantilla necesita: enlace de descarte y vencimiento."""
+                  con_crm: bool = False, crm_hecho: str = "", seguida: bool = False) -> dict:
+    """Anade a la fila lo que la plantilla necesita: enlaces, botones y vencimiento.
+
+    `crm_hecho` y `seguida` llegan ya resueltos desde componer(), que los pide a
+    la base de datos de una vez para todas las publicaciones del correo.
+    """
     fila = dict(publicacion)
     fila["url_descarte"] = f"{url_publica()}/descartar/{token}" if token else ""
     fila["titulo_resumido"] = fila.get("titulo_resumido") or ""
@@ -95,16 +99,12 @@ def preparar_fila(publicacion: dict, token: str | None = None, hoy: date | None 
     # Lo que ya se ha hecho con esta ayuda en el CRM. El texto sirve para los
     # correos que salgan a partir de ahora; la imagen es la unica forma de que un
     # correo ya entregado se entere, porque la vuelve a pedir al abrirlo.
-    fila["crm_hecho"] = (crm_mova.resumen_hecho(repositorio.crm_de_publicacion(identificador))
-                         if (fila["url_crm"] and identificador) else "")
+    fila["crm_hecho"] = crm_hecho if fila["url_crm"] else ""
     fila["url_crm_marca"] = f"{url_publica()}/crm/estado/{token}.png" if fila["url_crm"] else ""
     # Lista de seguimiento: el boton marca, y en el correo de seguimiento quita.
     fila["url_seguir"] = f"{url_publica()}/s/{token}/marcar" if token else ""
     fila["url_no_seguir"] = f"{url_publica()}/s/{token}/quitar" if token else ""
-    if identificador and fila["url_seguir"]:
-        fila["en_seguimiento"] = bool(repositorio.esta_en_seguimiento(identificador))
-    else:
-        fila["en_seguimiento"] = False
+    fila["en_seguimiento"] = bool(seguida and token)
     return fila
 
 
@@ -118,11 +118,19 @@ def componer(publicaciones: list[dict], fecha: date, resumen_boletines: dict,
     "alerta" (correo urgente aparte). Todos comparten plantilla.
     """
     tokens = tokens or {}
+    # Una consulta para todo el correo, no una por publicacion.
+    ids = [p["id"] for p in publicaciones if p.get("id")]
+    seguidas = repositorio.seguimiento_de(ids)
+    marcas_crm = ({identificador: crm_mova.resumen_hecho(filas) for identificador, filas
+                   in repositorio.crm_de_publicaciones(ids).items()} if con_crm else {})
+
     por_comunidad: dict[str, list[dict]] = {}
     for publicacion in publicaciones:
         comunidad = publicacion.get("comunidad") or "Sin comunidad"
-        fila = preparar_fila(publicacion, tokens.get(publicacion.get("id")),
-                             con_crm=con_crm)
+        identificador = publicacion.get("id")
+        fila = preparar_fila(publicacion, tokens.get(identificador), con_crm=con_crm,
+                             crm_hecho=marcas_crm.get(identificador, ""),
+                             seguida=identificador in seguidas)
         por_comunidad.setdefault(comunidad, []).append(fila)
 
     for filas in por_comunidad.values():
