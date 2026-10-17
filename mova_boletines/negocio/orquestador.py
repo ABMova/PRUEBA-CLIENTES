@@ -10,7 +10,7 @@ import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
-from typing import Callable
+from typing import Callable, NamedTuple
 
 import config
 from datos import repositorio
@@ -167,16 +167,22 @@ def _ejecutar(fecha: date, tipo: str, usuario: str, enviar_correo: bool) -> None
         crudas, consultados, fallidos = _fase1(fecha, ejecucion_id, contadores)
         candidatas = _fase2(crudas, contadores, ejecucion_id)
         guardadas = _fases345(candidatas, ejecucion_id, contadores)
+        fallos_correo: list[str] = []
         _fase6(guardadas, fecha, consultados, fallidos, ejecucion_id, enviar_correo, tipo,
-               _avisos_del_dia(fecha, contadores))
+               _avisos_del_dia(fecha, contadores), fallos_correo)
 
         coste = repositorio.coste_de_ejecucion(ejecucion_id)
         if coste:
             progreso.anotar(f"Coste de la ejecucion en la API: {coste:.4f} $")
 
-        if fallidos:
+        if fallidos or fallos_correo:
             estado = "con_avisos"
-            detalle = "Boletines fallidos: " + ", ".join(f["codigo"] for f in fallidos)
+            partes = []
+            if fallidos:
+                partes.append("Boletines fallidos: " + ", ".join(f["codigo"] for f in fallidos))
+            if fallos_correo:
+                partes.append("Sin correo: " + ", ".join(fallos_correo))
+            detalle = ". ".join(partes)
         else:
             detalle = f"{contadores['nuevas']} publicacion(es) nueva(s)"
         progreso.terminar(detalle)
@@ -553,23 +559,41 @@ def _avisos_del_dia(fecha: date, contadores: dict) -> list[str]:
     return avisos
 
 
+class Envio(NamedTuple):
+    """Como fue el envio de un correo que puede salir en dos tandas."""
+
+    alguno: bool                 # llego al menos a una persona
+    detalle: str
+    rutas: list
+    sin_correo: list[str]        # a quien NO le llego, si fallo alguna tanda
+
+    @property
+    def completo(self) -> bool:
+        return self.alguno and not self.sin_correo
+
+
 def _enviar_correo(destinatarios: list[str], hacer_html, asunto: str, ejecucion_id: int | None,
                    nombre_copia: str, publicaciones_n: int, enviar_correo: bool,
-                   urgente: bool = False) -> tuple[bool, str, list]:
+                   urgente: bool = False) -> Envio:
     """Envia el correo. Si solo algunos ven los botones del CRM, salen dos correos.
 
     El HTML no puede ser el mismo para todos: los botones de alta en el CRM solo
     se pintan a los destinatarios autorizados (ajuste `crm_correos`). Cuando no
     hay CRM, o lo ve todo el equipo, sigue saliendo un unico correo.
+
+    Si una de las dos tandas falla, el correo llega a medio equipo. Eso no puede
+    quedar en silencio: se devuelve a quien no le llego para que la ejecucion
+    termine con aviso y se vea en el panel.
     """
     con_crm, sin_crm = crm.reparto(destinatarios)
     grupos = [(grupo, marca) for grupo, marca in ((con_crm, True), (sin_crm, False)) if grupo]
     if not grupos:
-        return False, "No hay destinatarios activos", []
+        return Envio(False, "No hay destinatarios activos", [], list(destinatarios))
 
-    exito_global = False
+    alguno = False
     detalles: list[str] = []
     rutas = []
+    sin_correo: list[str] = []
     for grupo, con in grupos:
         html = hacer_html(con)
         sufijo = "-crm" if con and len(grupos) > 1 else ""
@@ -584,15 +608,20 @@ def _enviar_correo(destinatarios: list[str], hacer_html, asunto: str, ejecucion_
         repositorio.registrar_envio(ejecucion_id, ", ".join(grupo), asunto,
                                     "enviado" if exito else "error", intentos, detalle,
                                     publicaciones_n, str(ruta))
-        exito_global = exito_global or exito
+        if exito:
+            alguno = True
+        else:
+            sin_correo.extend(grupo)
+            detalle = f"{detalle} (no les llego a: {', '.join(grupo)})"
         detalles.append(detalle)
-    return exito_global, "; ".join(detalles), rutas
+    return Envio(alguno, "; ".join(detalles), rutas, sin_correo)
 
 
 def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos: list[dict],
            ejecucion_id: int, enviar_correo: bool, tipo: str = "manual",
-           avisos: list[str] | None = None) -> None:
+           avisos: list[str] | None = None, fallos_correo: list[str] | None = None) -> None:
     progreso.fijar_fase(6, porcentaje=86)
+    fallos_correo = fallos_correo if fallos_correo is not None else []
     destinatarios = [fila["correo"] for fila in repositorio.destinatarios(solo_activos=True)]
     dias_token = repositorio.ajuste_int("dias_token_descarte", 90)
     modo = "tarde" if tipo in ("tarde", "tarde_recuperada") else "diario"
@@ -634,21 +663,27 @@ def _fase6(guardadas: list[dict], fecha: date, consultados: list[str], fallidos:
     asunto = correo.asunto(fecha, len(guardadas),
                            sum(1 for f in guardadas if f["relevancia"] == "alta"), modo=modo,
                            retraso=retraso)
-    exito, detalle, rutas = _enviar_correo(
+    envio = _enviar_correo(
         destinatarios, hacer_html, asunto, ejecucion_id,
         f"correo-{fecha:%Y%m%d}-{ejecucion_id}{sufijo}{{sufijo}}.html", len(guardadas),
         enviar_correo)
 
     if not enviar_correo:
-        if rutas:
-            progreso.anotar(f"Correo generado sin enviar: {rutas[0].name}")
+        if envio.rutas:
+            progreso.anotar(f"Correo generado sin enviar: {envio.rutas[0].name}")
         return
 
-    if exito:
+    if envio.alguno:
+        # Se marcan como enviadas aunque haya fallado una tanda: a quien si le
+        # llego no se le puede mandar otra vez lo mismo manana.
         repositorio.marcar_enviadas([f["id"] for f in guardadas if f.get("id")])
-        progreso.anotar(f"Correo enviado: {detalle}")
+        progreso.anotar(f"Correo enviado: {envio.detalle}")
     else:
-        progreso.anotar(f"Correo NO enviado: {detalle}")
+        progreso.anotar(f"Correo NO enviado: {envio.detalle}")
+    if envio.sin_correo:
+        progreso.anotar(f"AVISO: el correo no ha llegado a {', '.join(envio.sin_correo)}. "
+                        f"Revisa el SMTP y reenvialo desde Publicaciones.")
+        fallos_correo.extend(envio.sin_correo)
     progreso.fijar_fase(6, porcentaje=100)
 
 
@@ -676,7 +711,7 @@ def _alertas(guardadas: list[dict], tokens: dict[int, str], destinatarios: list[
     asunto = correo.asunto(hoy, len(urgentes), len(urgentes), modo="alerta")
     progreso.anotar(f"ALERTA: {len(urgentes)} convocatoria(s) de alta relevancia vencen en "
                     f"{dias} dias o menos")
-    exito, detalle, _rutas = _enviar_correo(
+    envio = _enviar_correo(
         destinatarios, hacer_html, asunto, ejecucion_id,
         f"alerta-{hoy:%Y%m%d}-{ejecucion_id}{{sufijo}}.html", len(urgentes), enviar_correo,
         urgente=True)
@@ -684,11 +719,13 @@ def _alertas(guardadas: list[dict], tokens: dict[int, str], destinatarios: list[
     if not enviar_correo:
         return
 
-    if exito:
+    if envio.alguno:
         repositorio.marcar_alertadas([u["id"] for u in urgentes])
-        progreso.anotar(f"Alerta enviada: {detalle}")
+        progreso.anotar(f"Alerta enviada: {envio.detalle}")
     else:
-        progreso.anotar(f"Alerta NO enviada: {detalle}")
+        progreso.anotar(f"Alerta NO enviada: {envio.detalle}")
+    if envio.sin_correo:
+        progreso.anotar(f"AVISO: la alerta no ha llegado a {', '.join(envio.sin_correo)}")
 
 
 def analizar_apartada(apartada_id: int, usuario: str = "sistema") -> tuple[bool, str]:
@@ -784,14 +821,13 @@ def enviar_seguimiento(usuario: str = "planificador", enviar: bool = True) -> tu
                                modo="seguimiento", con_crm=con_crm)
 
     asunto = correo.asunto_seguimiento(len(filas))
-    exito, detalle, rutas = _enviar_correo(destinatarios, hacer_html, asunto, None,
-                                           f"seguimiento-{hoy:%Y%m%d}{{sufijo}}.html",
-                                           len(filas), enviar)
-    repositorio.registrar_auditoria(usuario, "correo_seguimiento", str(len(filas)), detalle,
-                                    resultado="ok" if exito or not enviar else "error")
+    envio = _enviar_correo(destinatarios, hacer_html, asunto, None,
+                           f"seguimiento-{hoy:%Y%m%d}{{sufijo}}.html", len(filas), enviar)
+    repositorio.registrar_auditoria(usuario, "correo_seguimiento", str(len(filas)), envio.detalle,
+                                    resultado="ok" if envio.completo or not enviar else "error")
     if not enviar:
-        return True, f"Seguimiento generado sin enviar: {rutas[0].name if rutas else ''}"
-    return exito, detalle
+        return True, f"Seguimiento generado sin enviar: {envio.rutas[0].name if envio.rutas else ''}"
+    return envio.completo, envio.detalle
 
 
 def enviar_resumen_semanal(hoy: date | None = None, usuario: str = "planificador",
@@ -851,9 +887,9 @@ def reenviar(ids: list[int], usuario: str) -> tuple[bool, str]:
 
     # Como el correo diario: los botones del CRM solo para quien puede usarlos.
     asunto = f"[MOVA Boletines] Reenvio manual - {len(filas)} publicacion(es)"
-    exito, detalle, _rutas = _enviar_correo(destinatarios, hacer_html, asunto, None,
-                                            f"reenvio-{fecha_ref:%Y%m%d}{{sufijo}}.html",
-                                            len(filas), True)
+    envio = _enviar_correo(destinatarios, hacer_html, asunto, None,
+                           f"reenvio-{fecha_ref:%Y%m%d}{{sufijo}}.html", len(filas), True)
+    exito, detalle = envio.completo, envio.detalle
     repositorio.registrar_auditoria(usuario, "reenvio_manual", ",".join(str(i) for i in ids),
                                     detalle, resultado="ok" if exito else "error")
     return exito, detalle

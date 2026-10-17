@@ -1343,6 +1343,40 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(aceptado and "No hay nada en seguimiento" in detalle,
               "con la lista vacia no se manda ningun correo")
 
+    print("\n32) Un correo que solo llega a medio equipo se avisa")
+    # Con el CRM activo el correo sale en dos tandas: si una falla, el resto del
+    # equipo se queda sin el y eso tiene que verse, no perderse en el registro.
+    repositorio.guardar_ajuste("crm_activo", "1")
+    repositorio.guardar_ajuste("crm_url", "https://crm.prueba.es")
+    repositorio.guardar_ajuste("crm_clave", "clave-de-prueba-del-reparto")
+    repositorio.guardar_ajuste("crm_correos", "antonio@mova.es")
+    for correo_destino in ("antonio@mova.es", "paola@mova.es"):
+        repositorio.anadir_destinatario(correo_destino, correo_destino.split("@")[0])
+
+    envio_normal = correo.enviar
+
+    def _enviar_con_un_fallo(destinatarios, asunto, html, reintentos=3, urgente=False):
+        if "paola@mova.es" in destinatarios:
+            return False, "El servidor SMTP rechaza el mensaje", 3
+        return envio_normal(destinatarios, asunto, html, reintentos, urgente)
+
+    correo.enviar = _enviar_con_un_fallo
+    fila_envio = dict(repositorio.publicaciones({}, limite=1)[0])
+    resultado = orquestador._enviar_correo(  # noqa: SLF001 - se prueba el reparto
+        [f["correo"] for f in repositorio.destinatarios(solo_activos=True)],
+        lambda con_crm: correo.componer([fila_envio], date.today(),
+                                        {"consultados": [], "fallidos": []}, con_crm=con_crm),
+        "[Prueba] envio partido", None, "prueba-parcial{sufijo}.html", 1, True)
+    correo.enviar = envio_normal
+
+    comprobar(resultado.alguno and not resultado.completo,
+              "llego a una parte del equipo, pero el envio no esta completo")
+    comprobar("paola@mova.es" in resultado.sin_correo
+              and "antonio@mova.es" not in resultado.sin_correo,
+              f"y se sabe a quien no le llego ({', '.join(resultado.sin_correo)})")
+    comprobar("no les llego a:" in resultado.detalle and "paola@mova.es" in resultado.detalle,
+              "el detalle lo dice con nombres y apellidos")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)
