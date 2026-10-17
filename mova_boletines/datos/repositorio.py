@@ -945,8 +945,10 @@ def seguimiento_de(ids: list[int]) -> set[int]:
 def en_seguimiento(incluir_vencidas: bool = False, hoy: str = "") -> list[sqlite3.Row]:
     """Publicaciones vivas de la lista, de plazo mas proximo a mas lejano.
 
-    Las que ya pasaron su fin de plazo no se envian (se consideran cerradas),
-    salvo que se pidan expresamente para verlas en el panel.
+    Salen solas de dos maneras: cuando pasa su fin de plazo, y -si no tienen
+    fecha, como pasa con los planes y los seguimientos de convocatoria- a los
+    dias que diga `dias_seguimiento_sin_plazo`. Con `incluir_vencidas` se ven
+    todas, para el panel.
     """
     # Solo las vivas: lo descartado, lo oculto y los duplicados no pueden seguir
     # llegando cada dos dias. 'enviada' es el estado normal de una publicacion
@@ -956,8 +958,11 @@ def en_seguimiento(incluir_vencidas: bool = False, hoy: str = "") -> list[sqlite
            "WHERE s.quitado_en IS NULL AND p.estado IN ('nueva', 'enviada')")
     parametros: list = []
     if not incluir_vencidas:
-        sql += " AND (p.plazo_fin IS NULL OR p.plazo_fin >= ?)"
-        parametros.append(hoy or date.today().isoformat())
+        dia = hoy or date.today().isoformat()
+        caducidad = ajuste_int("dias_seguimiento_sin_plazo", 60)
+        sql += (" AND ((p.plazo_fin IS NOT NULL AND p.plazo_fin >= ?) "
+                "OR (p.plazo_fin IS NULL AND date(s.creado_en) >= date(?, ?)))")
+        parametros.extend([dia, dia, f"-{caducidad} day"])
     sql += " ORDER BY (p.plazo_fin IS NULL), p.plazo_fin, p.id"
     return _consulta(sql, tuple(parametros))
 

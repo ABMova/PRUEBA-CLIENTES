@@ -1330,6 +1330,24 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
 
     # El estado normal de lo que ya salio en el correo es 'enviada': si la lista
     # solo mirase 'nueva', llegaria vacia siempre.
+    # Lo que no trae fin de plazo (planes, seguimientos de convocatoria) caduca
+    # solo: si no, se quedaria en la lista para siempre.
+    sin_plazo = dict(repositorio.publicaciones({}, limite=3)[2])
+    con = repositorio.conexion()
+    con.execute("UPDATE publicaciones SET plazo_fin=NULL WHERE id=?", (sin_plazo["id"],))
+    con.commit()
+    repositorio.marcar_seguimiento(sin_plazo["id"])
+    comprobar(sin_plazo["id"] in [f["id"] for f in repositorio.en_seguimiento()],
+              "una publicacion sin plazo entra en la lista")
+    con.execute("UPDATE seguimiento SET creado_en=date('now','-61 day') WHERE publicacion_id=?",
+                (sin_plazo["id"],))
+    con.commit()
+    comprobar(sin_plazo["id"] not in [f["id"] for f in repositorio.en_seguimiento()],
+              "y a los 60 dias sale sola, sin que nadie la quite")
+    comprobar(sin_plazo["id"] in [f["id"] for f in repositorio.en_seguimiento(incluir_vencidas=True)],
+              "aunque se sigue viendo en el panel")
+    repositorio.quitar_seguimiento(sin_plazo["id"])
+
     comprobar(repositorio.marcar_seguimiento(otra["id"]), "se marca otra para el ultimo caso")
     repositorio.marcar_enviadas([otra["id"]])
     comprobar([f["id"] for f in repositorio.en_seguimiento()] == [otra["id"]],

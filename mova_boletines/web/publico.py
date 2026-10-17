@@ -110,8 +110,10 @@ def seguimiento_por_token(token: str, accion: str):
                                         "Marcada para seguimiento", ip)
         return _pagina_seguimiento(
             "Guardada en seguimiento", "ok",
-            "La recibiras en el correo de seguimiento de los lunes, miercoles y viernes "
-            "hasta que venza su plazo o la quites.", publicacion=titulo)
+            "La recibiras en el correo de seguimiento de los lunes, miercoles y viernes. "
+            "Sale sola de la lista cuando vence su plazo o, si no tiene fecha, a los "
+            f"{repositorio.ajuste_int('dias_seguimiento_sin_plazo', 60)} dias.",
+            publicacion=titulo)
 
     quitada = repositorio.quitar_seguimiento(fila["id"])
     repositorio.registrar_auditoria("correo", "seguimiento", str(fila["id"]),

@@ -662,6 +662,7 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "tarde_activa", "hora_tarde", "alerta_activa", "dias_alerta",
                   "semanal_activo", "dia_semanal", "hora_semanal", "dias_vencimiento_semanal",
                   "seguimiento_activo", "dias_seguimiento", "hora_seguimiento",
+                  "dias_seguimiento_sin_plazo",
                   "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur",
                   "modelo_documentos", "max_tokens_documentos",
                   "crm_activo", "crm_url", "crm_correos")

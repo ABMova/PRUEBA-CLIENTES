@@ -231,6 +231,9 @@
         <span class="apoyo">mon, tue, wed, thu, fri, sat, sun.</span></div>
       <div class="campo"><label for="hora_seguimiento">Hora</label>
         <input type="time" id="hora_seguimiento" name="hora_seguimiento" value="{{ ajustes.hora_seguimiento }}"></div>
+      <div class="campo"><label for="dias_seguimiento_sin_plazo">Caducidad sin plazo (dias)</label>
+        <input type="number" id="dias_seguimiento_sin_plazo" name="dias_seguimiento_sin_plazo" value="{{ ajustes.dias_seguimiento_sin_plazo }}" min="1" step="1">
+        <span class="apoyo">Lo que no trae fin de plazo (planes, seguimientos) sale solo pasados estos dias.</span></div>
     </div>
   </div>
 </div>
