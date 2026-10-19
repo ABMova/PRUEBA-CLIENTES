@@ -76,6 +76,7 @@
 <p>{{ v('credito') }}</p>
 <h2>Plazo de presentación:</h2>
 <p>{{ plazo_txt }}</p>
+{% if plazo_calculo %}<p style="font-size:9pt; color:#555;">{{ plazo_calculo }}</p>{% endif %}
 <h2>Referencias y enlaces:</h2>
 {{ m.vinetas(lista('referencias'), 'dot') }}
 {% for enlace in enlaces %}<p style="margin-top:4px"><a href="{{ enlace }}" target="_blank" rel="noopener noreferrer">{{ enlace }}</a></p>{% endfor %}

@@ -19,7 +19,7 @@ import logging
 import re
 import threading
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime
 from functools import lru_cache
 
 from bs4 import BeautifulSoup
@@ -29,7 +29,7 @@ import config
 from datos import repositorio
 from integraciones import anthropic_cliente
 from negocio.boletines.base import ErrorBoletin, pedir
-from negocio import pdf
+from negocio import pdf, plazos
 from negocio.extraccion import texto_con_paginas
 
 registro = logging.getLogger(__name__)
@@ -80,8 +80,9 @@ REGLAS DE EXTRACCIÓN OBLIGATORIAS:
 11. TIPO DE AYUDA: en "tipo_ayuda" escribe "financiacion" cuando lo que se concede sea un prestamo, credito, aval, garantia, linea de financiacion bonificada, bonificacion de intereses o participacion en capital (aunque lleve un tramo no reembolsable); "empleo" cuando lo subvencionado sea contratar personas, mantener el empleo, bonificar cuotas de la Seguridad Social, fomentar el autoempleo o formar trabajadores; y "general" en los demas casos. Si encajan las dos, elige la que sea el grueso de la ayuda.
 12. CONDICIONES DE FINANCIACION: rellena el objeto "financiacion" SOLO si "tipo_ayuda" es "financiacion". Cada campo con el dato tal como figura en el texto, o null: "inicio_proyecto" (cuanto antes de la solicitud puede haber empezado el proyecto), "financiacion_max" (porcentaje financiable, distinguiendo inversion y circulante si el texto lo distingue), "intereses" (indice y diferencial, p. ej. "Euribor a un ano + un diferencial entre el 0,50 y el 0,75%"), "amortizacion" (plazo de devolucion), "carencia", "tramo_no_reembolsable" (porcentaje, cuantia maxima y regimen si lo indica), "garantias", "comision_apertura". La inversion minima y maxima van, como siempre, en "inversion_min" e "inversion_max".
 13. AYUDAS DE EMPLEO: rellena el objeto "empleo" SOLO si "tipo_ayuda" es "empleo". "personas_destinatarias" describe a QUIEN hay que contratar (edad, titulacion, situacion de desempleo, inscripcion en registros), que no es lo mismo que "beneficiarios" (quien cobra la ayuda: la empresa). "requisitos_contratacion" son las condiciones que debe cumplir el contrato o la empresa (incremento de plantilla, numero maximo de contratos, limites de otras ayudas). "requisitos_trabajadores" son los que debe acreditar la persona contratada. "obligaciones_empresario" son los compromisos posteriores (mantenimiento del empleo y de la plantilla, sustituciones, devolucion si se incumple). "condiciones_contrato" son la modalidad, jornada y duracion exigidas. "cuantias" es una lista con un objeto {"colectivo","importe"} por cada importe distinto segun a quien se contrate (por ejemplo hombres, mujeres, personas con discapacidad, victimas de violencia de genero). Las exclusiones van, como siempre, en "exclusiones".
-14. IDIOMA: redacta SIEMPRE en castellano, aunque el documento original esté en catalán, valenciano, gallego o euskera. Traduce los textos que extraigas (objeto, actuaciones, gastos, requisitos, obligaciones); solo se conservan en su lengua los nombres propios de programas, organismos y normas.
-15. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
+14. PLAZO DE PRESENTACION: si el documento dice cuando se puede solicitar, RELLENA "plazo_inicio" y "plazo_fin"; no remitas a "la correspondiente convocatoria" cuando el dato esta en el texto. Si el plazo se expresa como una duracion ("20 dias naturales a contar desde el dia siguiente al de la publicacion"), copia esa frase literal en "plazo_solicitud" aunque no puedas fechar el final: la fecha exacta la calcula despues la herramienta. Solo se deja a null lo que de verdad no aparece.
+15. IDIOMA: redacta SIEMPRE en castellano, aunque el documento original esté en catalán, valenciano, gallego o euskera. Traduce los textos que extraigas (objeto, actuaciones, gastos, requisitos, obligaciones); solo se conservan en su lengua los nombres propios de programas, organismos y normas.
+16. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
 
 Estructura JSON requerida:
 {"nombre_ayuda":null,"organismo":null,"linea":null,"ambito":null,"regimen":null,"claim":null,"objeto":null,
@@ -308,6 +309,37 @@ def fecha_larga(texto) -> str:
     return f"{int(m.group(1))} de {meses[mes - 1]} de {m.group(3)}" if 1 <= mes <= 12 else t
 
 
+def _plazo_de_solicitud(datos: dict, publicacion: dict) -> tuple[str, str]:
+    """Cuando acaba el plazo y como se ha llegado a esa fecha.
+
+    Manda la fecha mas concreta que se tenga. Si el documento la dice, esa; si
+    no, la que se calculo al analizar la publicacion a partir de la frase del
+    plazo ("20 dias naturales desde el dia siguiente a la publicacion"), que es
+    un calculo hecho en codigo y no por la IA. Solo cuando no hay ninguna de las
+    dos se remite a la convocatoria.
+    """
+    fin = None if _vacio(datos.get("plazo_fin")) else str(datos["plazo_fin"])
+    inicio = None if _vacio(datos.get("plazo_inicio")) else str(datos["plazo_inicio"])
+    if fin:
+        return f"Finaliza el {fecha_larga(fin)}.", ""
+
+    # La publicacion ya trae la fecha calculada y se puede rehacer el calculo
+    # para explicarlo, que es lo que se quiere leer en el resumen.
+    texto_plazo = str(publicacion.get("plazo") or "")
+    calculado = plazos.fin_de_plazo(texto_plazo, str(publicacion.get("fecha_publicacion") or ""),
+                                    str(publicacion.get("comunidad") or ""))
+    if calculado.hay:
+        return f"Finaliza el {plazos.en_letra(date.fromisoformat(calculado.fin))}.", \
+            calculado.explicacion
+    if publicacion.get("plazo_fin"):
+        return f"Finaliza el {plazos.en_letra(date.fromisoformat(publicacion['plazo_fin']))}.", ""
+    if inicio:
+        return f"Desde el {fecha_larga(inicio)}.", ""
+    if texto_plazo and "[PENDIENTE" not in texto_plazo:
+        return item_a_texto(texto_plazo), ""
+    return NO_DISPONIBLE, ""
+
+
 def _contexto(datos: dict, publicacion: dict) -> dict:
     def v(clave: str, defecto: str = NO_DISPONIBLE) -> str:
         valor = datos.get(clave)
@@ -332,10 +364,7 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
     else:
         tipo_cuantia = NO_DISPONIBLE
 
-    fin = None if _vacio(datos.get("plazo_fin")) else str(datos["plazo_fin"])
-    inicio = None if _vacio(datos.get("plazo_inicio")) else str(datos["plazo_inicio"])
-    plazo_txt = (f"Finaliza el {fecha_larga(fin)}." if fin
-                 else f"Desde el {fecha_larga(inicio)}." if inicio else NO_DISPONIBLE)
+    plazo_txt, plazo_calculo = _plazo_de_solicitud(datos, publicacion)
 
     ejecucion = datos.get("ejecucion_pago") if not _vacio(datos.get("ejecucion_pago")) \
         else datos.get("plazo_ejecucion")
@@ -357,7 +386,7 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
 
     return {
         "d": datos, "v": v, "lista": lista, "pub": publicacion,
-        "tipo_cuantia": tipo_cuantia, "plazo_txt": plazo_txt,
+        "tipo_cuantia": tipo_cuantia, "plazo_txt": plazo_txt, "plazo_calculo": plazo_calculo,
         "ejecucion_frase": ejecucion_frase, "inversion_frase": inversion_frase,
         "criterios": criterios,
         "enlaces": [e for e in lista("enlaces") if e.startswith("http")],

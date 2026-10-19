@@ -55,6 +55,7 @@
 
 <h2>Plazo:</h2>
 <p>{{ plazo_txt }}</p>
+{% if plazo_calculo %}<p style="font-size:9pt; color:#555;">{{ plazo_calculo }}</p>{% endif %}
 </div></td></tr></tbody>
 </table>
 {{ m.pie() }}

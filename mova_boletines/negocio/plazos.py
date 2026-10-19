@@ -1,12 +1,21 @@
 """Calculo determinista del fin del plazo de solicitud.
 
 El plazo llega como texto libre ("del 1 al 30 de octubre de 2026", "10 dias
-habiles desde el dia siguiente a la publicacion", "un mes a contar desde...").
-Para alertar y ordenar por urgencia hace falta una fecha. Este modulo la saca
-del texto sin IA, de forma trazable:
+habiles desde el dia siguiente a la publicacion", "un mes a contar desde..."):
+para alertar, ordenar por urgencia y decirlo en el resumen hace falta una fecha.
+Este modulo la saca del texto SIN IA, porque los modelos calculan fechas mal, y
+deja escrito como la ha sacado:
 
-  - "fecha_literal": el texto trae la fecha escrita. Se toma la ultima.
+  - "fecha_literal": el texto trae la fecha escrita. Se toma la mas tardia.
   - "calculado": el texto da una duracion contada desde la publicacion.
+
+Reglas (Ley 39/2015, arts. 30 y 31):
+  - se cuenta desde el DIA SIGUIENTE al de la publicacion;
+  - en dias habiles no cuentan sabados, domingos ni festivos;
+  - en dias naturales cuentan todos, pero si el ultimo cae en inhabil, el plazo
+    se prorroga al siguiente habil;
+  - los meses van de fecha a fecha, y si no existe el dia equivalente (31 en un
+    mes de 30), vence el ultimo del mes.
 
 Si no se puede deducir sin suponer nada, devuelve None. Nunca adivina.
 """
@@ -15,14 +24,17 @@ from __future__ import annotations
 import calendar
 import re
 from datetime import date, datetime, timedelta
+from typing import NamedTuple
 
 from negocio.extraccion import normalizar
+from negocio.festivos import es_habil, siguiente_habil
 
 _MESES = {
     "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
     "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11,
     "diciembre": 12,
 }
+_NOMBRE_MES = {numero: nombre for nombre, numero in _MESES.items() if nombre != "setiembre"}
 
 _NUMEROS = {
     "un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
@@ -45,6 +57,24 @@ _DESDE_PUBLICACION = re.compile(
     r"(publicacion|publicado|publique|entrada en vigor|a partir del dia siguiente)")
 _OTRO_ORIGEN = re.compile(r"desde (la|su) (notificacion|solicitud|resolucion|recepcion)")
 
+AVISO_LOCALES = "No incluye festivos locales."
+
+
+class Plazo(NamedTuple):
+    """Fecha de fin, de donde sale y como se ha llegado a ella."""
+
+    fin: str | None
+    origen: str          # fecha_literal | calculado | ""
+    explicacion: str = ""
+
+    @property
+    def hay(self) -> bool:
+        return bool(self.fin)
+
+
+def en_letra(dia: date) -> str:
+    return f"{dia.day} de {_NOMBRE_MES[dia.month]} de {dia.year}"
+
 
 def _numero(texto: str) -> int | None:
     texto = texto.strip()
@@ -53,37 +83,45 @@ def _numero(texto: str) -> int | None:
     return _NUMEROS.get(texto)
 
 
-def _sumar_habiles(inicio: date, dias: int) -> date:
-    """Dias habiles administrativos: excluye sabados y domingos (Ley 39/2015).
-
-    No descuenta festivos: dependen de la comunidad y del municipio. Por eso el
-    resultado se presenta como fecha estimada.
-    """
-    actual = inicio
+def _sumar_habiles(publicacion: date, dias: int, comunidad: str) -> date:
+    """Cuenta dias habiles a partir del dia siguiente al de la publicacion."""
+    actual = publicacion
     contados = 0
     while contados < dias:
         actual += timedelta(days=1)
-        if actual.weekday() < 5:
+        if es_habil(actual, comunidad):
             contados += 1
     return actual
 
 
-def _sumar_meses(inicio: date, meses: int) -> date:
-    mes = inicio.month - 1 + meses
-    ano = inicio.year + mes // 12
+def _sumar_meses(publicacion: date, meses: int) -> date:
+    """De fecha a fecha: un mes desde el 31 de enero vence el 28 (o 29) de febrero."""
+    mes = publicacion.month - 1 + meses
+    ano = publicacion.year + mes // 12
     mes = mes % 12 + 1
-    dia = min(inicio.day, calendar.monthrange(ano, mes)[1])
+    dia = min(publicacion.day, calendar.monthrange(ano, mes)[1])
     return date(ano, mes, dia)
 
 
-def fin_de_plazo(plazo: str, fecha_publicacion: str) -> tuple[str | None, str]:
-    """Devuelve (fecha ISO o None, origen: 'fecha_literal' | 'calculado' | '')."""
+def _prorrogar(vencimiento: date, comunidad: str, motivo: str) -> tuple[date, str]:
+    """Si vence en inhabil, pasa al siguiente habil (art. 30.5)."""
+    if es_habil(vencimiento, comunidad):
+        return vencimiento, ""
+    habil = siguiente_habil(vencimiento, comunidad)
+    dia_semana = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
+    return habil, (f" El dia {motivo} cae en {dia_semana[vencimiento.weekday()]} "
+                   f"({vencimiento.strftime('%d/%m/%Y')}), inhabil, por lo que el plazo pasa al "
+                   f"siguiente dia habil.")
+
+
+def fin_de_plazo(plazo: str, fecha_publicacion: str, comunidad: str = "") -> Plazo:
+    """Fecha de fin del plazo a partir de su texto y de la fecha de publicacion."""
     if not plazo or "[pendiente" in plazo.lower():
-        return None, ""
+        return Plazo(None, "")
     try:
         publicada = datetime.strptime(fecha_publicacion, "%Y-%m-%d").date()
     except (TypeError, ValueError):
-        return None, ""
+        return Plazo(None, "")
 
     texto = normalizar(plazo)
 
@@ -105,28 +143,48 @@ def fin_de_plazo(plazo: str, fecha_publicacion: str) -> tuple[str | None, str]:
             continue
     validas = [f for f in fechas if f >= publicada]
     if validas:
-        return max(validas).isoformat(), "fecha_literal"
+        fin = max(validas)
+        return Plazo(fin.isoformat(), "fecha_literal",
+                     f"Finaliza el {en_letra(fin)}. La fecha figura escrita en la convocatoria.")
 
     # 2) Duraciones contadas desde la publicacion.
     if _OTRO_ORIGEN.search(texto) or not _DESDE_PUBLICACION.search(texto):
-        return None, ""
+        return Plazo(None, "")
+
+    desde = (f"a contar desde el dia siguiente a la publicacion "
+             f"({publicada.strftime('%d/%m/%Y')})")
 
     encontrado = _DIAS.search(texto)
     if encontrado:
         cantidad = _numero(encontrado.group(1))
         if cantidad:
-            if (encontrado.group(2) or "").strip() == "naturales":
-                return (publicada + timedelta(days=cantidad)).isoformat(), "calculado"
+            calificativo = (encontrado.group(2) or "").strip()
+            if calificativo == "naturales":
+                bruto = publicada + timedelta(days=cantidad)
+                fin, prorroga = _prorrogar(bruto, comunidad, str(cantidad))
+                return Plazo(fin.isoformat(), "calculado",
+                             f"Finaliza el {en_letra(fin)}. Calculo: {cantidad} dias naturales, "
+                             f"segun la propia frase del plazo, {desde}.{prorroga} {AVISO_LOCALES}")
             # Sin calificativo, los plazos administrativos se cuentan en habiles.
-            return _sumar_habiles(publicada, cantidad).isoformat(), "calculado"
+            fin = _sumar_habiles(publicada, cantidad, comunidad)
+            matiz = "" if calificativo else (" El texto no dice si son habiles o naturales: se "
+                                             "cuentan habiles, como manda la Ley 39/2015.")
+            return Plazo(fin.isoformat(), "calculado",
+                         f"Finaliza el {en_letra(fin)}. Calculo: {cantidad} dias habiles (sin "
+                         f"sabados, domingos ni festivos), {desde}.{matiz} {AVISO_LOCALES}")
 
     encontrado = _MESES_DURACION.search(texto)
     if encontrado:
         cantidad = _numero(encontrado.group(1))
         if cantidad:
-            return _sumar_meses(publicada, cantidad).isoformat(), "calculado"
+            bruto = _sumar_meses(publicada, cantidad)
+            fin, prorroga = _prorrogar(bruto, comunidad, "de vencimiento")
+            plural = "mes" if cantidad == 1 else "meses"
+            return Plazo(fin.isoformat(), "calculado",
+                         f"Finaliza el {en_letra(fin)}. Calculo: {cantidad} {plural} de fecha a "
+                         f"fecha, {desde}.{prorroga} {AVISO_LOCALES}")
 
-    return None, ""
+    return Plazo(None, "")
 
 
 def dias_restantes(plazo_fin: str | None, hoy: date | None = None) -> int | None:

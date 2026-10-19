@@ -1407,6 +1407,48 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar("ESCRIBE SIEMPRE EN CASTELLANO" in relevancia.SISTEMA_EXTRACCION,
               "el modelo tiene orden de redactar en castellano")
 
+    print("\n34) El plazo se calcula y se explica, no se remite a la convocatoria")
+    from negocio import documentos as _doc
+    from negocio import plazos as _pl
+
+    # Los dos casos que trajo el usuario, con su fecha exacta.
+    siete = _pl.fin_de_plazo("7 dias habiles a contar desde el dia siguiente al de la "
+                             "publicacion en el DOGC", "2026-10-19", "Cataluna")
+    comprobar(siete.fin == "2026-10-28",
+              f"7 dias habiles desde el 19/10/2026 acaban el 28/10 ({siete.fin})")
+    veinte = _pl.fin_de_plazo("20 dias naturales a contar desde el dia siguiente de la "
+                              "publicacion", "2026-10-19", "Cataluna")
+    comprobar(veinte.fin == "2026-11-09",
+              f"20 dias naturales acaban el 09/11 porque el 08 es domingo ({veinte.fin})")
+    comprobar("pasa al siguiente dia habil" in veinte.explicacion,
+              "y la explicacion dice por que se traslada")
+
+    # Los festivos cuentan: el 9 d'Octubre y el 12 son inhabiles en la Comunitat.
+    con_festivos = _pl.fin_de_plazo("10 dias habiles desde el dia siguiente a la publicacion",
+                                    "2026-10-05", "Comunidad Valenciana")
+    sin_festivos = _pl.fin_de_plazo("10 dias habiles desde el dia siguiente a la publicacion",
+                                    "2026-10-05", "Comunidad de Madrid")
+    comprobar(con_festivos.fin == "2026-10-21" and sin_festivos.fin == "2026-10-20",
+              f"los festivos de cada comunidad cambian la fecha ({con_festivos.fin} frente a "
+              f"{sin_festivos.fin})")
+
+    # Un mes va de fecha a fecha.
+    un_mes = _pl.fin_de_plazo("un mes desde el dia siguiente a la publicacion", "2026-01-31", "")
+    comprobar(un_mes.fin == "2026-03-02",
+              f"un mes desde el 31/01 vence el 28/02, que es sabado, y pasa al lunes ({un_mes.fin})")
+
+    # Y el resumen deja de remitir a la convocatoria si la publicacion trae el plazo.
+    publicacion_con_plazo = {"plazo": "20 dias naturales a contar desde el dia siguiente de la "
+                                      "publicacion", "fecha_publicacion": "2026-10-19",
+                             "comunidad": "Cataluna", "plazo_fin": "2026-11-09"}
+    texto, calculo = _doc._plazo_de_solicitud({}, publicacion_con_plazo)  # noqa: SLF001
+    comprobar(texto == "Finaliza el 9 de noviembre de 2026." and "Calculo:" in calculo,
+              "el resumen da la fecha y explica el calculo en vez del comodin")
+    comprobar(_doc._plazo_de_solicitud({}, {"plazo": "[PENDIENTE: dato]",  # noqa: SLF001
+                                            "fecha_publicacion": "2026-10-19"})[0]
+              == _doc.NO_DISPONIBLE,
+              "y solo cuando no hay nada se remite a la convocatoria")
+
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
         aplicacion_mova_planificador.shutdown(wait=False)

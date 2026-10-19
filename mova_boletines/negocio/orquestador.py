@@ -480,7 +480,9 @@ def _fases345(candidatas: list[dict], ejecucion_id: int, contadores: dict) -> li
         publicacion = salida["publicacion"]
         datos = salida["extraccion"].datos
         clasificacion = salida["clasificacion"]
-        plazo_fin, plazo_origen = relevancia.fin_de_plazo(datos, publicacion["fecha_publicacion"])
+        plazo = relevancia.fin_de_plazo(datos, publicacion["fecha_publicacion"],
+                                        publicacion.get("comunidad", ""))
+        plazo_fin, plazo_origen = plazo.fin, plazo.origen
         fila = {
             "ejecucion_id": ejecucion_id,
             "codigo_boletin": publicacion["codigo_boletin"],
@@ -758,7 +760,8 @@ def analizar_apartada(apartada_id: int, usuario: str = "sistema") -> tuple[bool,
         repositorio.ajuste_int("max_tokens_relevancia", 600),
         [t.strip() for t in repositorio.ajuste("terminos_refuerzo", "").split(",") if t.strip()])
 
-    plazo_fin, plazo_origen = relevancia.fin_de_plazo(datos, fila["fecha_publicacion"])
+    plazo = relevancia.fin_de_plazo(datos, fila["fecha_publicacion"], fila["comunidad"] or "")
+    plazo_fin, plazo_origen = plazo.fin, plazo.origen
     hash_contenido = deduplicador.calcular_hash(fila["codigo_boletin"], fila["titulo"])
     guardada = {
         "ejecucion_id": None, "codigo_boletin": fila["codigo_boletin"],

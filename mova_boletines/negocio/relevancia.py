@@ -333,29 +333,32 @@ def json_crudo(datos: dict, clasificacion: dict) -> str:
 
 
 # ------------------------------------------------------------- fin de plazo --
-def fin_de_plazo(datos: dict, fecha_publicacion: str) -> tuple[str | None, str]:
-    """Fecha limite para solicitar y de donde sale.
+def fin_de_plazo(datos: dict, fecha_publicacion: str, comunidad: str = "") -> plazos.Plazo:
+    """Fecha limite para solicitar, de donde sale y como se ha calculado.
 
     Primero el calculo determinista sobre el texto del plazo (trazable). Solo si
     no da nada se acepta la fecha que propone el modelo, y unicamente si cae en
     una ventana razonable (desde la publicacion hasta dos anos despues): una
     fecha fuera de ahi es con toda probabilidad un error y no se usa.
     """
-    fecha, origen = plazos.fin_de_plazo(str(datos.get("plazo_solicitud", "")), fecha_publicacion)
-    if fecha:
-        return fecha, origen
+    calculado = plazos.fin_de_plazo(str(datos.get("plazo_solicitud", "")), fecha_publicacion,
+                                    comunidad)
+    if calculado.hay:
+        return calculado
 
     propuesta = datos.get("fecha_fin_plazo")
     if not propuesta or not _fecha_iso_valida(str(propuesta)):
-        return None, ""
+        return plazos.Plazo(None, "")
     try:
         publicada = datetime.strptime(fecha_publicacion, "%Y-%m-%d").date()
     except (TypeError, ValueError):
-        return None, ""
+        return plazos.Plazo(None, "")
     fin = datetime.strptime(str(propuesta), "%Y-%m-%d").date()
     if publicada <= fin <= publicada + timedelta(days=730):
-        return fin.isoformat(), "modelo"
-    return None, ""
+        return plazos.Plazo(fin.isoformat(), "modelo",
+                            f"Finaliza el {plazos.en_letra(fin)}, segun la fecha que da la "
+                            f"convocatoria. No se ha podido recalcular desde el texto del plazo.")
+    return plazos.Plazo(None, "")
 
 
 def hoy_iso() -> str:
