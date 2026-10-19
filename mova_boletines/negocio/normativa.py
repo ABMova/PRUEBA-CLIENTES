@@ -44,6 +44,12 @@ MINIMO_UTIL = 500
 
 MAXIMO_NORMAS = 3
 
+# Por encima de esto, lo publicado no es un extracto: son las bases enteras (la
+# Orden JUI/1097/2026 del BOE ocupa 13 paginas y 50.000 caracteres). Entonces no
+# hay nada que ir a buscar, y barrer solo traia normas que el texto nombra de
+# pasada.
+EXTRACTO_MAXIMO = 20_000
+
 
 class Fuente(NamedTuple):
     """Un documento que se le pasa al modelo, con su procedencia."""
@@ -90,7 +96,7 @@ def reunir(publicacion: dict, texto_publicacion: str) -> Normativa:
     # Lo que queda: normas citadas sin decir donde se publicaron. Localizarlas
     # cuesta barrer los sumarios de varios dias, asi que solo se hace cuando el
     # resumen se quedaria con el extracto y nada mas.
-    if not hay_convocatoria and not halladas:
+    if not hay_convocatoria and not halladas and len(texto_publicacion) < EXTRACTO_MAXIMO:
         a_ciegas, sin_localizar = _barrer_normas(publicacion, texto_publicacion, citadas)
         fuentes.extend(a_ciegas)
         pendientes.extend(sin_localizar)

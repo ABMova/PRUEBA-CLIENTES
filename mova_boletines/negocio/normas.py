@@ -82,7 +82,8 @@ _CITA = re.compile(
 # resumen y cada una costaria una llamada y unos miles de caracteres.
 _PAPELES = (
     ("modificacion", re.compile(r"modificad|modificaci[oó]n|se\s+modifica", re.IGNORECASE)),
-    ("ampliacion", re.compile(r"ampliaci[oó]n|se\s+ampl[ií]a|pr[oó]rroga", re.IGNORECASE)),
+    ("ampliacion", re.compile(r"(amplia|ampliaci[oó]n|pr[oó]rroga|prorroga)[^.;]{0,40}"
+                              r"(plazo|cr[eé]dito|dotaci[oó]n|presupuesto)", re.IGNORECASE)),
     ("bases reguladoras", re.compile(r"bases\s+reguladoras|bases\s+que\s+regulan", re.IGNORECASE)),
 )
 # La convocatoria no se busca aqui a proposito: cuando existe la da la BDNS con
@@ -175,6 +176,10 @@ def referencias(texto: str) -> list[Referencia]:
         if not papel:
             continue
 
+        identificador, fecha_norma = _de_la_norma(citada)
+        if not identificador and not fecha_norma:
+            continue  # no es una norma: es una frase que empieza por "resolucion"
+
         publicada = _fecha(dia, mes, ano, citada)
         if not publicada:
             continue
@@ -182,7 +187,6 @@ def referencias(texto: str) -> list[Referencia]:
         if huella in vistas:
             continue
         vistas.add(huella)
-        identificador, fecha_norma = _de_la_norma(citada)
         encontradas.append(Referencia(papel, " ".join(citada.split())[:300],
                                       boletin, publicada, numero or "",
                                       identificador, fecha_norma))
