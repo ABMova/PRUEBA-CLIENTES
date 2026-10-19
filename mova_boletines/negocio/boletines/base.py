@@ -119,6 +119,18 @@ def pedir(url: str, *, metodo: str = "GET", datos: dict | None = None,
     raise ErrorBoletin(f"No se pudo descargar tras {intentos} intentos: {ultimo_error}")
 
 
+def descargar_de_boletin(url: str, codigo_boletin: str):
+    """Descarga de un boletin con las manias de ese boletin.
+
+    El BORM exige identificarse como navegador y el DOGC habla TLS antiguo.
+    Vive aqui para que lo use todo el que baje documentos de un boletin y no
+    haya que acordarse de esto en dos sitios.
+    """
+    es_borm = codigo_boletin == "BORM"
+    return pedir(url, navegador=es_borm, tls_legado=(codigo_boletin == "DOGC"),
+                 cabeceras={"Referer": "https://www.borm.es/"} if es_borm else None)
+
+
 def detectar_anti_bot(texto: str) -> bool:
     """Reconoce las paginas de reto anti-bot para no confundirlas con sumarios."""
     marcas = ("Radware Captcha", "validate.perfdrive.com", "made us think that you are a bot",

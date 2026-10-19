@@ -28,7 +28,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 import config
 from datos import repositorio
 from integraciones import anthropic_cliente
-from negocio.boletines.base import ErrorBoletin, pedir
+from negocio.boletines.base import ErrorBoletin, descargar_de_boletin
 from integraciones.bdns import plazo_de as bdns_plazo
 from negocio import normativa, pdf, plazos
 from negocio.extraccion import texto_con_paginas
@@ -83,7 +83,8 @@ REGLAS DE EXTRACCIÓN OBLIGATORIAS:
 13. AYUDAS DE EMPLEO: rellena el objeto "empleo" SOLO si "tipo_ayuda" es "empleo". "personas_destinatarias" describe a QUIEN hay que contratar (edad, titulacion, situacion de desempleo, inscripcion en registros), que no es lo mismo que "beneficiarios" (quien cobra la ayuda: la empresa). "requisitos_contratacion" son las condiciones que debe cumplir el contrato o la empresa (incremento de plantilla, numero maximo de contratos, limites de otras ayudas). "requisitos_trabajadores" son los que debe acreditar la persona contratada. "obligaciones_empresario" son los compromisos posteriores (mantenimiento del empleo y de la plantilla, sustituciones, devolucion si se incumple). "condiciones_contrato" son la modalidad, jornada y duracion exigidas. "cuantias" es una lista con un objeto {"colectivo","importe"} por cada importe distinto segun a quien se contrate (por ejemplo hombres, mujeres, personas con discapacidad, victimas de violencia de genero). Las exclusiones van, como siempre, en "exclusiones".
 14. PLAZO DE PRESENTACION: si la documentacion dice cuando se puede solicitar, RELLENA "plazo_inicio" y "plazo_fin"; no remitas a "la correspondiente convocatoria" cuando el dato este en alguno de los documentos. Copia SIEMPRE en "plazo_frase" la frase literal del plazo tal como figura ("veinte dias habiles a contar desde el dia siguiente al de la publicacion del extracto"), aunque no puedas fechar el final: la fecha exacta la calcula despues la herramienta, que sabe contar habiles y festivos. Si dos documentos dicen cosas distintas, copia la del mas concreto.
 15. IDIOMA: redacta SIEMPRE en castellano, aunque el documento original esté en catalán, valenciano, gallego o euskera. Traduce los textos que extraigas (objeto, actuaciones, gastos, requisitos, obligaciones); solo se conservan en su lengua los nombres propios de programas, organismos y normas.
-16. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
+16. JERARQUIA ENTRE DOCUMENTOS: la documentacion puede traer el extracto publicado, la convocatoria completa, las BASES REGULADORAS y una MODIFICACION o AMPLIACION posterior de esas bases. Cada documento lleva en su cabecera lo que es y de que fecha. Si dos se contradicen, manda SIEMPRE el mas reciente: una modificacion de 2026 deroga lo que dijeran las bases de 2025 sobre plazos, cuantias, gastos o requisitos. Usa el valor modificado y di en "fuentes" que viene de la modificacion.
+17. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
 
 Estructura JSON requerida:
 {"nombre_ayuda":null,"organismo":null,"linea":null,"ambito":null,"regimen":null,"claim":null,"objeto":null,
@@ -106,12 +107,6 @@ El texto íntegro de la publicación está en las instrucciones de sistema, bajo
 
 
 # ------------------------------------------------------------ texto del PDF --
-def _descargar(url: str, codigo_boletin: str):
-    es_borm = codigo_boletin == "BORM"
-    return pedir(url, navegador=es_borm, tls_legado=(codigo_boletin == "DOGC"),
-                 cabeceras={"Referer": "https://www.borm.es/"} if es_borm else None)
-
-
 def texto_de_publicacion(publicacion: dict) -> tuple[str, str, int, bool]:
     """Devuelve (texto, fuente, paginas, incompleto).
 
@@ -121,7 +116,7 @@ def texto_de_publicacion(publicacion: dict) -> tuple[str, str, int, bool]:
     url_pdf = publicacion.get("url_pdf") or ""
     if url_pdf:
         try:
-            respuesta = _descargar(url_pdf, codigo)
+            respuesta = descargar_de_boletin(url_pdf, codigo)
             if respuesta.content[:5] == b"%PDF-":
                 texto, paginas, incompleto = texto_con_paginas(respuesta.content)
                 if len(texto) >= MINIMO_CARACTERES:
@@ -132,7 +127,7 @@ def texto_de_publicacion(publicacion: dict) -> tuple[str, str, int, bool]:
     url_html = publicacion.get("url_oficial") or ""
     if url_html and "#/" not in url_html:  # las rutas con # son aplicaciones de pagina unica
         try:
-            respuesta = _descargar(url_html, codigo)
+            respuesta = descargar_de_boletin(url_html, codigo)
             sopa = BeautifulSoup(respuesta.text, "html.parser")
             for sobrante in sopa(["script", "style", "nav", "header", "footer"]):
                 sobrante.decompose()
@@ -183,7 +178,8 @@ def extraer_datos(publicacion: dict, llamar=None) -> tuple[dict, dict]:
                   "verificados; si contradicen al texto, mandan estos):\n" + ficha_oficial
                   if ficha_oficial else "")
                + "\n\nDOCUMENTACIÓN OFICIAL APORTADA (texto íntegro con marcas [Página N]). "
-                 "Cuando un dato aparezca en varios documentos, quédate con el más concreto:\n\n"
+                 "Cuando un dato aparezca en varios documentos, quédate con el más concreto, y "
+                 "si se contradicen, con el del documento más reciente:\n\n"
                + documentacion)
     mensaje = PROMPT_EXTRACCION.replace("{PUBLICACION}", _ficha(publicacion))
     modelo = repositorio.ajuste("modelo_documentos", "claude-sonnet-5")
@@ -216,8 +212,9 @@ def extraer_datos(publicacion: dict, llamar=None) -> tuple[dict, dict]:
     datos["enlaces"] = enlaces
 
     # Queda escrito que se ha leido, y el plazo que da la BDNS, para el calculo.
-    datos["fuentes_consultadas"] = ([f"Publicación en el boletín ({fuente})"]
-                                    + [f"{f.titulo}: {f.url}" for f in reunida.fuentes])
+    datos["fuentes_consultadas"] = ([{"titulo": "Publicación en el boletín", "url": fuente}]
+                                    + [{"titulo": f.titulo, "url": f.url}
+                                       for f in reunida.fuentes])
     if reunida.datos_bdns:
         frase, fecha = bdns_plazo(reunida.datos_bdns)
         datos["plazo_bdns"] = {"codigo": reunida.datos_bdns.get("codigoBDNS", ""),
@@ -337,6 +334,26 @@ def fecha_larga(texto) -> str:
     return f"{int(m.group(1))} de {meses[mes - 1]} de {m.group(3)}" if 1 <= mes <= 12 else t
 
 
+def _normativa_analizada(datos: dict) -> list[dict]:
+    """Los documentos que se han leido para hacer el resumen.
+
+    Se guardan desde que el resumen dejo de hacerse solo con el extracto: quien
+    lo lee tiene que poder ver si detras hay las bases y su modificacion. Los
+    documentos generados antes guardaban una cadena "titulo: url", y se siguen
+    entendiendo.
+    """
+    salida = []
+    for apunte in datos.get("fuentes_consultadas") or []:
+        if isinstance(apunte, dict):
+            titulo, url = str(apunte.get("titulo") or ""), str(apunte.get("url") or "")
+        else:
+            titulo, _, resto = str(apunte).partition(": http")
+            url = f"http{resto}" if resto else ""
+        if titulo.strip():
+            salida.append({"titulo": titulo.strip(), "url": url.strip()})
+    return salida
+
+
 def _plazo_de_solicitud(datos: dict, publicacion: dict) -> tuple[str, str]:
     """Cuando acaba el plazo y como se ha llegado a esa fecha.
 
@@ -441,6 +458,7 @@ def _contexto(datos: dict, publicacion: dict) -> dict:
         "empleo": _datos_empleo(datos),
         "edificio": _imagen("edificio-fondo.png"),
         "no_disponible": NO_DISPONIBLE,
+        "normativa": _normativa_analizada(datos),
         "generado": datetime.now().strftime("%d/%m/%Y"),
     }
 

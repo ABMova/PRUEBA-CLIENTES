@@ -1479,8 +1479,65 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               and "20 dias" in oficial,
               "la ficha oficial de la BDNS se le resume al modelo")
 
-    comprobar(_norm._referencias_a_bases(extracto),  # noqa: SLF001
+    print("\n36) Las bases reguladoras se localizan en el sumario de su boletin")
+    from datetime import date as _date
+
+    from negocio import normas as _normas
+    from negocio.boletines.base import PublicacionCruda as _Pub
+
+    citas = _normas.referencias(extracto)
+    comprobar(len(citas) == 1 and citas[0].papel == "bases reguladoras",
               "se detecta la norma de las bases reguladoras que cita el extracto")
+    comprobar(citas and citas[0].boletin == "BORM"
+              and citas[0].fecha == _date(2025, 6, 7) and citas[0].numero == "130",
+              "con el boletin, el numero y el dia exacto en que se publico")
+
+    doble = _normas.referencias(
+        "conforme a las bases reguladoras previstas en la Orden de 2 de junio de 2025, de la "
+        "Consejeria de Turismo (BORM n. 130 de 7 de junio 2025), modificada por la Orden de 9 de "
+        "abril de 2026 de la Consejeria de Turismo (BORM n. 86, del 16 de abril de 2026)")
+    comprobar([c.papel for c in doble] == ["modificacion", "bases reguladoras"],
+              "una modificacion posterior se reconoce como tal y se lee antes que las bases")
+
+    comprobar(not _normas.referencias(
+        "de conformidad con la Ley 38/2003, de 17 de noviembre, General de Subvenciones "
+        "(BOE num. 276, de 18 de noviembre de 2003)"),
+        "las leyes generales que cita toda convocatoria no se van a descargar")
+    comprobar(not _normas.referencias(
+        "se publico en el BORM n. 130 de 7 de junio de 2025"),
+        "y una cita sin norma identificable tampoco")
+
+    # El sumario se deja preparado para no salir a internet en la prueba.
+    sumario = [
+        _Pub(codigo_boletin="BORM", titulo="Orden de 2 de junio de 2025, de la Consejeria de "
+             "Turismo, Cultura, Juventud y Deportes, por la que se aprueban las bases reguladoras "
+             "para la concesion de subvenciones en materia de competitividad turistica",
+             url_pdf="https://www.borm.es/services/anuncio/836715/pdf"),
+        _Pub(codigo_boletin="BORM", titulo="Orden de la Consejeria de Empresa, Empleo y Economia "
+             "Social por la que se aprueban las bases reguladoras de las subvenciones destinadas "
+             "a personas trabajadoras autonomas"),
+        _Pub(codigo_boletin="BORM", titulo="Resolucion de la Direccion General de Funcion Publica "
+             "por la que se fija lugar, fecha y hora de un sorteo"),
+        _Pub(codigo_boletin="BORM", titulo="Anuncio de licitacion de obras de un ayuntamiento"),
+    ]
+    _normas._SUMARIOS[("BORM", _date(2025, 6, 7))] = sumario  # noqa: SLF001
+    acertada = _normas.localizar(citas[0])
+    comprobar(acertada is not None and acertada.url_pdf.endswith("836715/pdf"),
+              "entre varias ordenes de bases del mismo dia se elige la de la ayuda")
+
+    analizada = documentos._normativa_analizada({"fuentes_consultadas": [  # noqa: SLF001
+        {"titulo": "Bases reguladoras (BORM n.º 130 de 07/06/2025)", "url": "https://x/pdf"},
+        "Publicación en el boletín: https://www.borm.es/services/anuncio/1/pdf"]})
+    comprobar([a["titulo"] for a in analizada]
+              == ["Bases reguladoras (BORM n.º 130 de 07/06/2025)", "Publicación en el boletín"]
+              and analizada[1]["url"].endswith("/1/pdf"),
+              "el resumen lista la normativa leida, tambien en documentos ya guardados")
+
+    ajena = citas[0]._replace(
+        cita="Orden de 2 de junio de 2025 de la Consejeria de Agua y Agricultura sobre sanidad "
+             "vegetal y plagas de los frutales")
+    comprobar(_normas.localizar(ajena) is None,
+              "y si ninguna candidata destaca no se descarga nada en vez de arriesgarse")
 
     # El plazo: gana la frase que precisa habiles o naturales.
     comprobar(plazos.mas_concreta(["20 dias a partir del dia siguiente",

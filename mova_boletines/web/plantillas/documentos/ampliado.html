@@ -80,6 +80,8 @@
 <h2>Referencias y enlaces:</h2>
 {{ m.vinetas(lista('referencias'), 'dot') }}
 {% for enlace in enlaces %}<p style="margin-top:4px"><a href="{{ enlace }}" target="_blank" rel="noopener noreferrer">{{ enlace }}</a></p>{% endfor %}
+{% if normativa %}<h2>Normativa analizada:</h2>
+<ul>{% for n in normativa %}<li class="dot">{% if n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener noreferrer">{{ n.titulo }}</a>{% else %}{{ n.titulo }}{% endif %}</li>{% endfor %}</ul>{% endif %}
 {% if d.alertas %}<h2>Avisos del análisis:</h2>{{ m.vinetas(lista('alertas'), 'dot') }}{% endif %}
 </div></td></tr></tbody>
 </table>

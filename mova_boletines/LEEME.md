@@ -17,6 +17,36 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
+### Novedades de las versiones 1.21 y 1.22: el resumen se hace con toda la normativa
+
+Lo que publica un boletín suele ser un **extracto** de media página que remite al
+texto completo. Resumiendo solo eso, el resultado se llenaba de «se establece en
+la correspondiente convocatoria». Ahora, antes de resumir, la herramienta reúne
+la normativa que falta:
+
+| Fuente | Cómo se consigue |
+|---|---|
+| **La convocatoria completa** | El extracto cita su código BDNS. Con él se piden a la Base de Datos Nacional de Subvenciones la ficha oficial (plazo, presupuesto, beneficiarios, régimen de minimis) y el PDF íntegro |
+| **Las bases reguladoras** | La cita trae el boletín y el día exacto («BORM n.º 130 de 7 de junio 2025»), así que se pide el sumario de ese día al adaptador que ya existe y se localiza el anuncio dentro |
+| **Las modificaciones y ampliaciones** | Igual que las bases, y se leen antes: son dos páginas que pueden haber cambiado el plazo o la cuantía |
+
+Para elegir el anuncio correcto dentro de un sumario se pesan las palabras por
+lo **raras que son ese día**: en un boletín lleno de «orden», «consejería» y
+«subvenciones», lo que distingue a la norma buscada es «bodegas» o «turismo». Si
+ninguna candidata destaca con claridad **no se descarga nada** y la cita se le
+pasa al modelo tal cual: antes sin las bases que con las bases equivocadas.
+
+Medido sobre el extracto de las bodegas de las rutas del vino (BORM, 19/10/2026):
+de **3 páginas a 61** (extracto, convocatoria de 40, bases de 15 y la
+modificación de abril de 2026), y el resumen pasa a dar plazo, cuantía máxima,
+intensidad, crédito y gastos subvencionables en vez de remitir a la
+convocatoria. El resumen ampliado termina con la lista de **normativa
+analizada**, enlazada, para poder comprobar de dónde sale cada dato.
+
+**Lo que cuesta**: un resumen con toda la normativa son unos 0,24 $ frente a los
+0,02 $ de antes, porque se analiza unas veinte veces más texto. Solo se paga al
+pulsar el botón, y el tope mensual de gasto sigue cortando igual.
+
 ### Novedades de la versión 1.16: que no se escape ninguna ayuda
 
 Cinco cambios para poder **comprobar** que no se pierde nada, no solo confiarlo:
@@ -585,8 +615,10 @@ diez veces más) y el registro dice cuántas quedaron fuera.
 
 - Descarga del PDF y extracción del texto íntegro para los boletines que solo
   dan título, con caché en `DATOS/adjuntos/`.
-- Cruce automático con la Base de Datos Nacional de Subvenciones (BDNS) a
-  partir del identificador BDNS que ya aparece en algunas publicaciones.
+- Bases reguladoras citadas **sin decir en qué boletín y día** se publicaron:
+  hoy no se localizan (se le pasa la cita al modelo). Haría falta buscar por
+  título en el buscador de cada boletín, o barrer los sumarios de las semanas
+  siguientes a la fecha de la norma.
 - Alertas cuando una convocatoria ya conocida entra en la ventana de
   vencimiento (hoy se avisa al descubrirla, y el resumen semanal recoge el resto).
 - Más comunidades: añadir un módulo en `negocio/boletines/` y registrarlo.

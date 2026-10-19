@@ -3,39 +3,45 @@
 Lo que publica el boletin suele ser un EXTRACTO de media pagina que remite al
 texto completo. Si el resumen se hace solo con eso, sale lleno de "se establece
 en la correspondiente convocatoria": el plazo, los gastos y las cuantias estan
-en la convocatoria entera, no en el extracto.
+en la convocatoria entera y en las bases reguladoras, no en el extracto.
 
 Este modulo busca los documentos que faltan y los devuelve para analizarlos
-juntos. Hoy por la via mas fiable, la Base de Datos Nacional de Subvenciones:
-el extracto cita su codigo BDNS, y con el se consigue la ficha oficial (plazo,
-presupuesto, beneficiarios, regimen) y el PDF integro de la convocatoria.
+juntos, por dos vias:
 
-Las bases reguladoras citadas en el texto ("Orden de 2 de junio de 2025, BORM
-n. 130") todavia no se descargan: haria falta un buscador por cada boletin. La
-referencia se pasa al modelo para que al menos la cite.
+  1. La Base de Datos Nacional de Subvenciones. El extracto cita su codigo
+     BDNS, y con el se consigue la ficha oficial (plazo, presupuesto,
+     beneficiarios, regimen) y el PDF integro de la convocatoria.
+  2. Las normas que cita el propio texto: las bases reguladoras y, cuando las
+     hay, la modificacion o la ampliacion que las cambio despues. La cita trae
+     el boletin y el dia, asi que se van a buscar a su sumario (negocio/normas).
 
-Nunca falla hacia arriba: si la BDNS no responde o la ayuda no tiene codigo, el
+El texto anadido se paga al modelo, asi que hay presupuesto para cada via y un
+orden: primero la convocatoria, luego las modificaciones (dos paginas que
+pueden haber cambiado el plazo) y al final las bases, que son las mas largas.
+
+Nunca falla hacia arriba: si una fuente no responde o no se localiza, el
 resumen se hace con lo que haya, como hasta ahora.
 """
 from __future__ import annotations
 
 import logging
-import re
 from typing import NamedTuple
 
 from integraciones import bdns
+from negocio import normas
 from negocio.extraccion import texto_con_paginas
 
 registro = logging.getLogger(__name__)
 
-# Tope de texto que se anade a la publicacion. Cada caracter se paga al modelo,
-# y una convocatoria entera ronda los 110.000.
-LIMITE_ANADIDO = 400_000
+# Topes de texto anadido a la publicacion. Una convocatoria entera ronda los
+# 110.000 caracteres y unas bases reguladoras los 40.000.
+LIMITE_CONVOCATORIA = 200_000
+LIMITE_NORMAS = 120_000
 
-# "las bases reguladoras previstas en la Orden de 2 de junio de 2025 ... (BORM n. 130 de 7 de junio)"
-_BASES = re.compile(
-    r"(bases\s+reguladoras[^.;]{0,400}?"
-    r"(?:Orden|Resoluci[oó]n|Decreto|Acuerdo|Ley)\s+[^.;]{0,200})", re.IGNORECASE | re.DOTALL)
+# Un PDF sin texto (escaneado) no aporta nada al resumen.
+MINIMO_UTIL = 500
+
+MAXIMO_NORMAS = 3
 
 
 class Fuente(NamedTuple):
@@ -57,28 +63,36 @@ class Normativa(NamedTuple):
         return bool(self.fuentes or self.datos_bdns)
 
 
-def _referencias_a_bases(texto: str) -> list[str]:
-    encontradas = []
-    for trozo in _BASES.findall(texto or "")[:3]:
-        limpio = " ".join(trozo.split())
-        if limpio and limpio not in encontradas:
-            encontradas.append(limpio[:300])
-    return encontradas
-
-
 def reunir(publicacion: dict, texto_publicacion: str) -> Normativa:
     """Documentos y datos oficiales relacionados con esta ayuda."""
-    referencias = _referencias_a_bases(texto_publicacion)
+    fuentes: list[Fuente] = []
+    datos = _ficha_bdns(publicacion, texto_publicacion)
+    if datos:
+        fuentes.extend(_convocatoria(datos))
 
-    codigo = bdns.codigo_en(texto_publicacion) or bdns.codigo_en(publicacion.get("titulo", ""))
+    # Las bases se citan en el extracto, pero tambien (y mejor) en el texto
+    # completo de la convocatoria, que es donde se detalla a que norma remite.
+    texto_citas = "\n".join([texto_publicacion] + [f.texto for f in fuentes])
+    normas_halladas, pendientes = _normas_citadas(texto_citas)
+    fuentes.extend(normas_halladas)
+
+    return Normativa(fuentes, datos, pendientes)
+
+
+def _ficha_bdns(publicacion: dict, texto: str) -> dict:
+    codigo = bdns.codigo_en(texto) or bdns.codigo_en(publicacion.get("titulo", ""))
     if not codigo:
-        return Normativa([], {}, referencias)
-
+        return {}
     datos = bdns.ficha(codigo)
     if not datos:
         registro.info("La ayuda cita el codigo BDNS %s pero no se ha podido consultar", codigo)
-        return Normativa([], {}, referencias)
+        return {}
+    return datos
 
+
+def _convocatoria(datos: dict) -> list[Fuente]:
+    """El PDF integro de la convocatoria, segun la BDNS."""
+    codigo = datos.get("codigoBDNS", "")
     fuentes: list[Fuente] = []
     anadido = 0
     for documento in bdns.documentos(datos)[:2]:
@@ -86,12 +100,9 @@ def reunir(publicacion: dict, texto_publicacion: str) -> Normativa:
         if not contenido:
             continue
         texto, paginas, _ = texto_con_paginas(contenido)
-        if len(texto) < 500:  # un PDF escaneado sin texto no aporta nada
-            continue
-        if anadido + len(texto) > LIMITE_ANADIDO:
-            texto = texto[: max(0, LIMITE_ANADIDO - anadido)]
-            if len(texto) < 500:
-                break
+        texto = _recortar(texto, LIMITE_CONVOCATORIA - anadido)
+        if not texto:
+            break
         anadido += len(texto)
         fuentes.append(Fuente(
             titulo=f"{documento.get('descripcion') or 'Documento de la convocatoria'} "
@@ -99,9 +110,42 @@ def reunir(publicacion: dict, texto_publicacion: str) -> Normativa:
             texto=texto,
             url=bdns.URL_PUBLICA.format(codigo=codigo),
             paginas=paginas))
+    registro.info("BDNS %s: %d documento(s) de la convocatoria", codigo, len(fuentes))
+    return fuentes
 
-    registro.info("BDNS %s: %d documento(s) anadidos al resumen", codigo, len(fuentes))
-    return Normativa(fuentes, datos, referencias)
+
+def _normas_citadas(texto: str) -> tuple[list[Fuente], list[str]]:
+    """Bases reguladoras y sus cambios, buscadas en el sumario de su boletin."""
+    fuentes: list[Fuente] = []
+    pendientes: list[str] = []
+    anadido = 0
+    for referencia in normas.referencias(texto)[:MAXIMO_NORMAS]:
+        anuncio = normas.localizar(referencia)
+        contenido = normas.descargar(anuncio) if anuncio else None
+        if not contenido:
+            pendientes.append(f"{referencia.descripcion}: {referencia.cita}")
+            continue
+        cuerpo, paginas, _ = texto_con_paginas(contenido)
+        cuerpo = _recortar(cuerpo, LIMITE_NORMAS - anadido)
+        if not cuerpo:
+            pendientes.append(f"{referencia.descripcion}: {referencia.cita}")
+            continue
+        anadido += len(cuerpo)
+        fuentes.append(Fuente(
+            titulo=f"{referencia.descripcion} — {anuncio.titulo[:160]}",
+            texto=cuerpo,
+            url=anuncio.url_oficial or anuncio.url_pdf,
+            paginas=paginas))
+    return fuentes, pendientes
+
+
+def _recortar(texto: str, disponible: int) -> str:
+    """El texto que cabe en lo que queda de presupuesto, o nada si no cabe."""
+    if len(texto) < MINIMO_UTIL:
+        return ""
+    if len(texto) > disponible:
+        texto = texto[:max(0, disponible)]
+    return texto if len(texto) >= MINIMO_UTIL else ""
 
 
 def resumen_oficial(datos: dict) -> str:

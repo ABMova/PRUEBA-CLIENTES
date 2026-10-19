@@ -29,12 +29,12 @@ from typing import NamedTuple
 from negocio.extraccion import normalizar
 from negocio.festivos import es_habil, siguiente_habil
 
-_MESES = {
+MESES = {
     "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
     "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11,
     "diciembre": 12,
 }
-_NOMBRE_MES = {numero: nombre for nombre, numero in _MESES.items() if nombre != "setiembre"}
+_NOMBRE_MES = {numero: nombre for nombre, numero in MESES.items() if nombre != "setiembre"}
 
 _NUMEROS = {
     "un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
@@ -45,7 +45,7 @@ _NUMEROS = {
 }
 
 _FECHA_TEXTO = re.compile(
-    r"(\d{1,2})\s+de\s+(" + "|".join(_MESES) + r")(?:\s+(?:de|del)\s+(\d{4}))?")
+    r"(\d{1,2})\s+de\s+(" + "|".join(MESES) + r")(?:\s+(?:de|del)\s+(\d{4}))?")
 _FECHA_NUMERICA = re.compile(r"\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b")
 _NUMERO = r"(\d{1,3}|" + "|".join(sorted(_NUMEROS, key=len, reverse=True)) + r")"
 _DIAS = re.compile(_NUMERO + r"\s+dias?(\s+habiles|\s+naturales)?")
@@ -152,11 +152,11 @@ def fin_de_plazo(plazo: str, fecha_publicacion: str, comunidad: str = "") -> Pla
     for dia, mes, ano in _FECHA_TEXTO.findall(texto):
         anio = int(ano) if ano else publicada.year
         try:
-            candidata = date(anio, _MESES[mes], int(dia))
+            candidata = date(anio, MESES[mes], int(dia))
         except ValueError:
             continue
         if not ano and candidata < publicada:
-            candidata = date(anio + 1, _MESES[mes], int(dia))
+            candidata = date(anio + 1, MESES[mes], int(dia))
         fechas.append(candidata)
     for dia, mes, ano in _FECHA_NUMERICA.findall(texto):
         try:
