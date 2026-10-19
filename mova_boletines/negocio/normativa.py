@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple
 
+from datos import repositorio
 from integraciones import bdns
 from negocio import normas
 from negocio.extraccion import texto_con_paginas
@@ -64,17 +65,35 @@ class Normativa(NamedTuple):
 
 
 def reunir(publicacion: dict, texto_publicacion: str) -> Normativa:
-    """Documentos y datos oficiales relacionados con esta ayuda."""
+    """Documentos y datos oficiales relacionados con esta ayuda.
+
+    Se puede apagar desde Ajustes: con `normativa_activa` a 0 el resumen se
+    hace solo con lo publicado, que cuesta una decima parte.
+    """
+    if repositorio.ajuste("normativa_activa", "1") != "1":
+        registro.info("Normativa desactivada en Ajustes: se resume solo lo publicado")
+        return Normativa([], {}, [])
+
     fuentes: list[Fuente] = []
     datos = _ficha_bdns(publicacion, texto_publicacion)
     if datos:
         fuentes.extend(_convocatoria(datos))
+    hay_convocatoria = bool(fuentes)
 
     # Las bases se citan en el extracto, pero tambien (y mejor) en el texto
     # completo de la convocatoria, que es donde se detalla a que norma remite.
     texto_citas = "\n".join([texto_publicacion] + [f.texto for f in fuentes])
-    normas_halladas, pendientes = _normas_citadas(texto_citas)
-    fuentes.extend(normas_halladas)
+    citadas = normas.referencias(texto_citas)
+    halladas, pendientes = _descargar_normas(citadas)
+    fuentes.extend(halladas)
+
+    # Lo que queda: normas citadas sin decir donde se publicaron. Localizarlas
+    # cuesta barrer los sumarios de varios dias, asi que solo se hace cuando el
+    # resumen se quedaria con el extracto y nada mas.
+    if not hay_convocatoria and not halladas:
+        a_ciegas, sin_localizar = _barrer_normas(publicacion, texto_publicacion, citadas)
+        fuentes.extend(a_ciegas)
+        pendientes.extend(sin_localizar)
 
     return Normativa(fuentes, datos, pendientes)
 
@@ -114,13 +133,30 @@ def _convocatoria(datos: dict) -> list[Fuente]:
     return fuentes
 
 
-def _normas_citadas(texto: str) -> tuple[list[Fuente], list[str]]:
-    """Bases reguladoras y sus cambios, buscadas en el sumario de su boletin."""
+def _barrer_normas(publicacion: dict, texto: str, citadas) -> tuple[list[Fuente], list[str]]:
+    """Las bases que no dicen donde se publicaron, buscadas por los sumarios.
+
+    Solo se barre UNA, la de mas valor segun el orden de papeles: cada barrido
+    son hasta treinta consultas al boletin, y hacer tres multiplicaria el
+    trafico contra una web que no es nuestra.
+    """
+    if repositorio.ajuste("normativa_barrido", "1") != "1":
+        return [], []
+    sueltas = normas.sin_publicacion(texto, str(publicacion.get("codigo_boletin") or ""), citadas)
+    if not sueltas:
+        return [], []
+    dias = repositorio.ajuste_int("dias_barrido_normas", normas.DIAS_BARRIDO)
+    return _descargar_normas(sueltas[:1], dias)
+
+
+def _descargar_normas(referencias, dias_barrido: int = 0) -> tuple[list[Fuente], list[str]]:
+    """Baja el PDF de cada norma localizada y deja apuntadas las que no."""
     fuentes: list[Fuente] = []
     pendientes: list[str] = []
     anadido = 0
-    for referencia in normas.referencias(texto)[:MAXIMO_NORMAS]:
-        anuncio = normas.localizar(referencia)
+    for referencia in list(referencias)[:MAXIMO_NORMAS]:
+        anuncio = (normas.localizar(referencia, dias_barrido) if dias_barrido
+                   else normas.localizar(referencia))
         contenido = normas.descargar(anuncio) if anuncio else None
         if not contenido:
             pendientes.append(f"{referencia.descripcion}: {referencia.cita}")
@@ -132,7 +168,7 @@ def _normas_citadas(texto: str) -> tuple[list[Fuente], list[str]]:
             continue
         anadido += len(cuerpo)
         fuentes.append(Fuente(
-            titulo=f"{referencia.descripcion} — {anuncio.titulo[:110]}",
+            titulo=f"{_descripcion(referencia, anuncio)} — {anuncio.titulo[:110]}",
             texto=cuerpo,
             url=anuncio.url_oficial or anuncio.url_pdf,
             paginas=paginas))
@@ -166,3 +202,16 @@ def resumen_oficial(datos: dict) -> str:
         f"Fin del plazo: {fecha_fin or frase_plazo or ''}",
     ]
     return "\n".join(linea for linea in lineas if linea.split(": ", 1)[1].strip())
+
+
+def _descripcion(referencia, anuncio) -> str:
+    """Como se nombra la norma en la lista de normativa analizada.
+
+    Cuando se ha localizado barriendo, la referencia no sabia el dia: lo pone
+    el anuncio que se ha encontrado.
+    """
+    if referencia.fecha or not anuncio.fecha:
+        return referencia.descripcion
+    dia = anuncio.fecha[8:10], anuncio.fecha[5:7], anuncio.fecha[:4]
+    return (f"{referencia.papel.capitalize()} "
+            f"({referencia.boletin} de {dia[0]}/{dia[1]}/{dia[2]})")

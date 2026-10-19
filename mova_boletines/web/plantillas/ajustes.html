@@ -32,6 +32,30 @@
       <span class="apoyo">Lee el PDF entero de la publicacion. Sonnet 5 da buen resultado; Opus 5
       es mas fino en bases largas y cuesta mas del doble.</span>
     </div>
+    <div class="campo">
+      <label for="normativa_activa">Normativa de la ayuda antes de resumir</label>
+      <select id="normativa_activa" name="normativa_activa">
+        <option value="1" {% if ajustes.normativa_activa == '1' %}selected{% endif %}>Activado</option>
+        <option value="0" {% if ajustes.normativa_activa != '1' %}selected{% endif %}>Desactivado</option>
+      </select>
+      <span class="apoyo">Lo publicado suele ser un extracto de media pagina. Activado, antes de
+      resumir se reunen la convocatoria completa (por la Base de Datos Nacional de Subvenciones)
+      y las bases reguladoras con sus modificaciones. <strong>Cuesta unos 0,20 $ por resumen en
+      vez de 0,02 $</strong>, porque se analizan hasta veinte veces mas paginas; desactivado, el
+      resumen se hace solo con lo publicado.</span>
+    </div>
+    <div class="campo-linea">
+      <div class="campo"><label for="normativa_barrido">Buscar bases sin referencia</label>
+        <select id="normativa_barrido" name="normativa_barrido">
+          <option value="1" {% if ajustes.normativa_barrido == '1' %}selected{% endif %}>Activado</option>
+          <option value="0" {% if ajustes.normativa_barrido != '1' %}selected{% endif %}>Desactivado</option>
+        </select>
+        <span class="apoyo">Cuando la cita no dice boletin ni dia, se barren los sumarios desde la
+        fecha de la norma. No gasta API, pero consulta el boletin varias veces.</span></div>
+      <div class="campo" style="flex:0 1 160px;"><label for="dias_barrido_normas">Dias que se barren</label>
+        <input type="number" id="dias_barrido_normas" name="dias_barrido_normas" value="{{ ajustes.dias_barrido_normas }}" min="1" max="120" step="1">
+        <span class="apoyo">Desde la firma de la norma.</span></div>
+    </div>
     <div class="campo-linea">
       <div class="campo"><label for="max_tokens_extraccion">Tokens fase 3</label>
         <input type="number" id="max_tokens_extraccion" name="max_tokens_extraccion" value="{{ ajustes.max_tokens_extraccion }}"></div>

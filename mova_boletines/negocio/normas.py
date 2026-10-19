@@ -26,14 +26,18 @@ from __future__ import annotations
 import logging
 import math
 import re
+import time
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 from typing import NamedTuple
 
 from negocio import boletines
 from negocio.boletines.base import ErrorBoletin, PublicacionCruda, descargar_de_boletin
 from negocio.extraccion import normalizar
 from negocio.plazos import MESES
+
+_MES_EN_LETRA = {numero: nombre for nombre, numero in MESES.items()
+                 if nombre != "setiembre"}
 
 registro = logging.getLogger(__name__)
 
@@ -101,6 +105,20 @@ _ALCANCE_ATRAS = 400
 ACIERTO_MINIMO = 0.50      # por debajo, no se da por encontrada
 VENTAJA_MINIMA = 0.15      # y tiene que destacar sobre la siguiente candidata
 
+# Buscando a ciegas por los sumarios de varios dias hay muchas mas candidatas,
+# asi que no basta la nota: el titulo tiene que llevar el ANCLA de la norma (su
+# numero, "150/2018", o el dia en que se firmo, "10 de octubre").
+ACIERTO_BARRIDO = 0.55
+DIAS_BARRIDO = 30          # una norma se publica a los pocos dias de firmarse
+LIMITE_BARRIDO_SEGUNDOS = 60   # ningun barrido deja colgada una generacion
+
+# "Orden 150/2018, de 10 de octubre", "Orden de 2 de junio de 2025"
+_NORMA_CON_FECHA = re.compile(
+    r"(" + _TIPOS + r")\s+(?:(\d{1,4}/\d{4})\s*,?\s*)?"
+    r"de\s+(\d{1,2})\s+de\s+(" + "|".join(MESES) + r")"
+    r"(?:\s*(?:de|del)?\s*(\d{4}))?",
+    re.IGNORECASE)
+
 _VACIAS = {"de", "del", "la", "las", "el", "los", "por", "que", "para", "con", "una", "uno",
            "en", "se", "al", "lo", "como", "mediante", "sobre", "cual", "esta", "este",
            "anuncio", "extracto", "num", "numero"}
@@ -114,14 +132,18 @@ _PRIORIDAD = {"modificacion": 0, "ampliacion": 1, "bases reguladoras": 2}
 class Referencia(NamedTuple):
     """Una norma citada en el texto, con donde se publico."""
 
-    papel: str           # modificacion | ampliacion | bases reguladoras | convocatoria
-    cita: str            # el texto de la cita, tal como aparece
-    boletin: str         # codigo del adaptador (BORM, BOE...)
-    fecha: date          # dia en que se publico en ese boletin
-    numero: str = ""
+    papel: str                  # modificacion | ampliacion | bases reguladoras
+    cita: str                   # el texto de la cita, tal como aparece
+    boletin: str                # codigo del adaptador (BORM, BOE...)
+    fecha: date | None          # dia en que se publico, si la cita lo dice
+    numero: str = ""            # numero del boletin
+    identificador: str = ""     # "150/2018", cuando la norma lo lleva
+    fecha_norma: date | None = None   # dia en que se firmo: por donde empieza el barrido
 
     @property
     def descripcion(self) -> str:
+        if not self.fecha:
+            return f"{self.papel.capitalize()} ({self.boletin}, sin dia de publicacion)"
         numero = f" n.º {self.numero}" if self.numero else ""
         return f"{self.papel.capitalize()} ({self.boletin}{numero} de {self.fecha:%d/%m/%Y})"
 
@@ -160,11 +182,71 @@ def referencias(texto: str) -> list[Referencia]:
         if huella in vistas:
             continue
         vistas.add(huella)
+        identificador, fecha_norma = _de_la_norma(citada)
         encontradas.append(Referencia(papel, " ".join(citada.split())[:300],
-                                      boletin, publicada, numero or ""))
+                                      boletin, publicada, numero or "",
+                                      identificador, fecha_norma))
 
     encontradas.sort(key=lambda r: _PRIORIDAD.get(r.papel, 9))
     return encontradas
+
+
+def sin_publicacion(texto: str, boletin: str, ya_citadas=()) -> list[Referencia]:
+    """Normas citadas sin decir donde se publicaron.
+
+    "las bases reguladoras aprobadas por Orden 50/2021, de 6 de abril" no dice
+    boletin ni dia: solo la fecha en que se firmo. Se supone que se publico en
+    el MISMO boletin que la ayuda que la cita (una convocatoria de la Region de
+    Murcia remite a unas bases del BORM) y se buscara en los sumarios de los
+    dias siguientes a esa firma, que es cuando sale publicada.
+
+    Devuelve las referencias con `fecha` a None: `localizar` sabe que esas hay
+    que barrerlas. Es mas caro en peticiones que una cita completa, asi que solo
+    se usa cuando no hay otra via.
+    """
+    if boletin not in boletines.ADAPTADORES:
+        return []
+    texto = " ".join((texto or "").split())
+    resueltas = {(r.identificador or "", r.fecha_norma) for r in ya_citadas}
+    encontradas: list[Referencia] = []
+    vistas: set[tuple] = set()
+    for hallada in _NORMA_CON_FECHA.finditer(texto):
+        citada = hallada.group(0)
+        if _GENERALES.search(citada):
+            continue
+        contexto = texto[max(0, hallada.start() - 250):hallada.start()]
+        papel = _papel_de(contexto, texto[hallada.start():hallada.end() + 150])
+        if not papel:
+            continue
+        identificador, fecha_norma = _de_la_norma(citada)
+        if not fecha_norma or (identificador, fecha_norma) in resueltas:
+            continue  # ya se sabe donde se publico: se busca por la via buena
+        huella = (identificador, fecha_norma)
+        if huella in vistas:
+            continue
+        vistas.add(huella)
+        encontradas.append(Referencia(papel, " ".join(citada.split())[:300],
+                                      boletin, None, "", identificador, fecha_norma))
+
+    encontradas.sort(key=lambda r: _PRIORIDAD.get(r.papel, 9))
+    return encontradas
+
+
+def _de_la_norma(citada: str) -> tuple[str, date | None]:
+    """Identificador ("150/2018") y fecha de firma de la norma citada."""
+    hallada = _NORMA_CON_FECHA.search(citada)
+    if not hallada:
+        return "", None
+    _, identificador, dia, mes, ano = hallada.groups()
+    anos = [int(ano)] if ano else []
+    if not anos and identificador:
+        anos = [int(identificador.split("/")[1])]
+    for candidato in anos:
+        try:
+            return identificador or "", date(candidato, MESES[mes.lower()], int(dia))
+        except (ValueError, KeyError):
+            break
+    return identificador or "", None
 
 
 def _codigo_de(nombre: str) -> str:
@@ -202,21 +284,22 @@ def _fecha(dia: str, mes: str, ano: str | None, citada: str) -> date | None:
     return None
 
 
-def localizar(referencia: Referencia) -> PublicacionCruda | None:
-    """El anuncio del sumario que corresponde a la norma citada, si se acierta."""
-    try:
-        anuncios = _sumario(referencia.boletin, referencia.fecha)
-    except ErrorBoletin as error:
-        registro.warning("No se pudo leer el %s del %s: %s",
-                         referencia.boletin, referencia.fecha, error)
-        return None
-    except Exception as error:  # noqa: BLE001 - un sumario de 2018 puede venir de otra forma
-        registro.warning("El %s del %s no se ha podido interpretar (%s: %s)",
-                         referencia.boletin, referencia.fecha, type(error).__name__, error)
-        return None
+def localizar(referencia: Referencia, dias_barrido: int = DIAS_BARRIDO) -> PublicacionCruda | None:
+    """El anuncio que corresponde a la norma citada, si se acierta.
+
+    Si la cita dice el dia, se mira ese sumario y punto. Si no lo dice, se
+    barren los sumarios desde el dia en que se firmo la norma.
+    """
+    if referencia.fecha:
+        return _en_el_sumario(referencia, referencia.fecha)
+    return _barriendo(referencia, dias_barrido)
+
+
+def _en_el_sumario(referencia: Referencia, dia: date) -> PublicacionCruda | None:
+    anuncios = _sumario_o_nada(referencia.boletin, dia)
     if not anuncios:
         registro.info("El %s del %s no trae anuncios: no se localiza %s",
-                      referencia.boletin, referencia.fecha, referencia.papel)
+                      referencia.boletin, dia, referencia.papel)
         return None
 
     notas = sorted(_notas(referencia.cita, _sin_repetidos(anuncios)),
@@ -225,12 +308,61 @@ def localizar(referencia: Referencia) -> PublicacionCruda | None:
     segunda = notas[1][0] if len(notas) > 1 else 0.0
     if mejor < ACIERTO_MINIMO or mejor - segunda < VENTAJA_MINIMA:
         registro.info("Ninguna candidata clara para %s en el %s del %s (%.2f frente a %.2f)",
-                      referencia.papel, referencia.boletin, referencia.fecha, mejor, segunda)
+                      referencia.papel, referencia.boletin, dia, mejor, segunda)
         return None
     registro.info("%s localizada en el %s del %s con nota %.2f: %s",
-                  referencia.papel, referencia.boletin, referencia.fecha, mejor,
-                  candidata.titulo[:100])
+                  referencia.papel, referencia.boletin, dia, mejor, candidata.titulo[:100])
     return candidata
+
+
+def _barriendo(referencia: Referencia, dias: int) -> PublicacionCruda | None:
+    """Busca la norma en los sumarios posteriores al dia en que se firmo.
+
+    Se para en la primera candidata que lleve el ancla de la norma y pase el
+    corte, porque una norma se publica en el primer boletin que sale tras
+    firmarse: lo que venga despues con el mismo titulo ya seria otra cosa.
+    """
+    if not referencia.fecha_norma:
+        return None
+    arranque = time.monotonic()
+    consultados = 0
+    for salto in range(dias + 1):
+        if time.monotonic() - arranque > LIMITE_BARRIDO_SEGUNDOS:
+            registro.info("Barrido de %s en el %s abandonado por tiempo tras %d sumarios",
+                          referencia.papel, referencia.boletin, consultados)
+            return None
+        dia = referencia.fecha_norma + timedelta(days=salto)
+        if dia.weekday() == 6:      # los boletines no salen en domingo
+            continue
+        anuncios = _sumario_o_nada(referencia.boletin, dia)
+        if not anuncios:
+            continue
+        consultados += 1
+        for nota, candidata in sorted(_notas(referencia.cita, _sin_repetidos(anuncios)),
+                                      key=lambda par: par[0], reverse=True):
+            if nota < ACIERTO_BARRIDO:
+                break                # van ordenadas: las siguientes son peores
+            if not _lleva_el_ancla(referencia, candidata):
+                continue
+            registro.info("%s localizada barriendo el %s: %s del %s, nota %.2f (%s)",
+                           referencia.papel, referencia.boletin, referencia.identificador
+                           or referencia.fecha_norma, dia, nota, candidata.titulo[:80])
+            return candidata
+    registro.info("No se ha localizado %s en los %d dias siguientes al %s en el %s",
+                  referencia.papel, dias, referencia.fecha_norma, referencia.boletin)
+    return None
+
+
+def _lleva_el_ancla(referencia: Referencia, anuncio: PublicacionCruda) -> bool:
+    """El titulo nombra la norma: su numero, o el dia en que se firmo."""
+    titulo = normalizar(anuncio.titulo)
+    if referencia.identificador and referencia.identificador in titulo:
+        return True
+    firma = referencia.fecha_norma
+    if not firma:
+        return False
+    en_letra = f"{firma.day} de {_MES_EN_LETRA[firma.month]}"
+    return en_letra in titulo or firma.strftime("%d/%m/%Y") in titulo
 
 
 def _sin_repetidos(anuncios: list[PublicacionCruda]) -> list[PublicacionCruda]:
@@ -269,6 +401,22 @@ def _palabras(texto: str) -> set[str]:
     """
     sueltas = re.findall(r"[a-z0-9]+", normalizar(texto or ""))
     return {p[:6] for p in sueltas if len(p) >= 4 and p not in _VACIAS}
+
+
+def _sumario_o_nada(codigo: str, dia: date) -> list[PublicacionCruda]:
+    """Sumario de un dia; lista vacia si el boletin falla o no se entiende.
+
+    Buscar una norma no puede tumbar el resumen de la ayuda: ni un boletin
+    caido, ni un sumario de hace anos con otro formato.
+    """
+    try:
+        return _sumario(codigo, dia)
+    except ErrorBoletin as error:
+        registro.warning("No se pudo leer el %s del %s: %s", codigo, dia, error)
+    except Exception as error:  # noqa: BLE001 - un sumario de 2018 puede venir de otra forma
+        registro.warning("El %s del %s no se ha podido interpretar (%s: %s)",
+                         codigo, dia, type(error).__name__, error)
+    return []
 
 
 def _sumario(codigo: str, dia: date) -> list[PublicacionCruda]:

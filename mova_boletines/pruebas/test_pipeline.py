@@ -1533,6 +1533,35 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(acertada is not None and acertada.url_pdf.endswith("836715/pdf"),
               "entre varias ordenes de bases del mismo dia se elige la de la ayuda")
 
+    print("\n37) Las bases que no dicen donde se publicaron se buscan por los sumarios")
+    sueltas = _normas.sin_publicacion(
+        "en cumplimiento del articulo 14 de la Orden 50/2021, de 6 de abril, de la "
+        "Vicepresidencia, por la que se establecen las bases reguladoras de los Premios Gabilex",
+        "DOCM")
+    comprobar(len(sueltas) == 1 and sueltas[0].identificador == "50/2021"
+              and sueltas[0].fecha_norma == _date(2021, 4, 6) and sueltas[0].fecha is None,
+              "se saca el numero de la norma y el dia en que se firmo, no donde salio")
+    comprobar(not _normas.sin_publicacion(
+        "conforme a las bases reguladoras previstas en la Orden de 2 de junio de 2025, de la "
+        "Consejeria de Turismo (BORM n. 130 de 7 de junio 2025)", "BORM", citas),
+        "y no se barre lo que ya se sabe donde esta")
+
+    # Los sumarios se dejan preparados: el 8 de abril no esta, el 14 si.
+    _normas._SUMARIOS[("DOCM", _date(2021, 4, 8))] = [  # noqa: SLF001
+        _Pub(codigo_boletin="DOCM", titulo="Premios. Orden 49/2021, de 5 de abril, de la "
+             "Vicepresidencia, por la que se establecen las bases reguladoras de otros premios")]
+    _normas._SUMARIOS[("DOCM", _date(2021, 4, 14))] = [  # noqa: SLF001
+        _Pub(codigo_boletin="DOCM", titulo="Premios. Orden 50/2021, de 6 de abril, de la "
+             "Vicepresidencia, por la que se establecen las bases reguladoras de los Premios "
+             "Gabilex", url_pdf="https://docm/2021_4048.pdf", fecha="2021-04-14")]
+    hallada = _normas.localizar(sueltas[0], 10)
+    comprobar(hallada is not None and hallada.url_pdf.endswith("2021_4048.pdf"),
+              "se encuentra en el boletin de ocho dias despues, no en el del dia anterior")
+
+    otra = sueltas[0]._replace(identificador="77/2021", fecha_norma=_date(2021, 4, 7))
+    comprobar(_normas.localizar(otra, 10) is None,
+              "sin el numero ni la fecha de la norma en el titulo no vale, aunque se parezca")
+
     analizada = documentos._normativa_analizada({"fuentes_consultadas": [  # noqa: SLF001
         {"titulo": "Bases reguladoras (BORM n.º 130 de 07/06/2025)", "url": "https://x/pdf"},
         "Publicación en el boletín: https://www.borm.es/services/anuncio/1/pdf"]})
@@ -1540,6 +1569,12 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               == ["Bases reguladoras (BORM n.º 130 de 07/06/2025)", "Publicación en el boletín"]
               and analizada[1]["url"].endswith("/1/pdf"),
               "el resumen lista la normativa leida, tambien en documentos ya guardados")
+
+    repositorio.guardar_ajuste("normativa_activa", "0")
+    apagada = _norm.reunir({"codigo_boletin": "BORM", "titulo": "x"}, extracto)
+    repositorio.guardar_ajuste("normativa_activa", "1")
+    comprobar(not apagada.hay and not apagada.fuentes,
+              "el interruptor de Ajustes apaga la normativa sin tocar la red")
 
     ajena = citas[0]._replace(
         cita="Orden de 2 de junio de 2025 de la Consejeria de Agua y Agricultura sobre sanidad "

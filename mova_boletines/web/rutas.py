@@ -665,6 +665,7 @@ _AJUSTES_TEXTO = ("modelo_extraccion", "modelo_relevancia", "max_tokens_extracci
                   "dias_seguimiento_sin_plazo",
                   "esfuerzo_modelo", "tope_mensual_usd", "cambio_usd_eur",
                   "modelo_documentos", "max_tokens_documentos",
+                  "normativa_activa", "normativa_barrido", "dias_barrido_normas",
                   "crm_activo", "crm_url", "crm_correos")
 
 

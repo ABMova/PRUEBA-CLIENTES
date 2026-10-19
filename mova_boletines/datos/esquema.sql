@@ -410,6 +410,9 @@ INSERT OR IGNORE INTO ajustes (clave, valor, descripcion) VALUES
  ('dias_seguimiento',      'mon,wed,fri', 'Dias del correo de seguimiento (formato APScheduler)'),
  ('hora_seguimiento',      '08:15',   'Hora del correo de seguimiento (HH:MM)'),
  ('dias_seguimiento_sin_plazo', '60', 'Dias que aguanta en seguimiento lo que no tiene fin de plazo'),
+ ('normativa_activa',      '1',       'Antes de resumir, reunir la convocatoria completa y las bases reguladoras'),
+ ('normativa_barrido',     '1',       'Buscar las bases por los sumarios cuando la cita no dice boletin ni dia'),
+ ('dias_barrido_normas',   '30',      'Dias que se barren desde la firma de la norma para encontrarla'),
  ('crm_activo',            '0',       'Botones del correo para dar de alta la ayuda en el CRM de MOVA'),
  ('crm_url',               'https://crm.movaia.es', 'Direccion del CRM que recibe las ayudas'),
  ('crm_correos',           '',        'Correos que ven los botones del CRM, separados por comas (vacio = todos)');
