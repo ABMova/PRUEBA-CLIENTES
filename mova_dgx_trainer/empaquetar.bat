@@ -12,7 +12,7 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo [2/4] Comprobando PyInstaller
-"%PYTHON%" -m PyInstaller --version >/dev/null 2>&1
+"%PYTHON%" -m PyInstaller --version >NUL 2>&1
 if errorlevel 1 (
     echo PyInstaller no esta instalado. Ejecute: "%PYTHON%" -m pip install -r requirements-empaquetado.txt
     exit /b 1
