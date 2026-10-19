@@ -57,6 +57,16 @@ _DESDE_PUBLICACION = re.compile(
     r"(publicacion|publicado|publique|entrada en vigor|a partir del dia siguiente)")
 _OTRO_ORIGEN = re.compile(r"desde (la|su) (notificacion|solicitud|resolucion|recepcion)")
 
+# Unas bases reguladoras no abren plazo: dicen cuanto durara el que abra algun
+# dia la convocatoria ("se establecera en la convocatoria y sera como minimo de
+# quince dias"). Calcular una fecha con eso es inventarse un plazo abierto, que
+# es peor que no decir nada. Lo mismo con los topes: un minimo no es un plazo.
+_SIN_PLAZO_CIERTO = re.compile(
+    r"se\s+(establecer|determinar|fijar|concretar|senalar|indicar)[a-z]*"
+    r"[^.]{0,60}?convocatoria"
+    r"|en\s+(cada|la\s+respectiva|la\s+correspondiente)\s+convocatoria"
+    r"|como\s+minimo|minimo\s+de|no\s+(sera|podra\s+ser)\s+inferior")
+
 AVISO_LOCALES = "No incluye festivos locales."
 
 
@@ -169,7 +179,10 @@ def fin_de_plazo(plazo: str, fecha_publicacion: str, comunidad: str = "") -> Pla
         return Plazo(fin.isoformat(), "fecha_literal",
                      f"Finaliza el {en_letra(fin)}. La fecha figura escrita en la convocatoria.")
 
-    # 2) Duraciones contadas desde la publicacion.
+    # 2) Duraciones contadas desde la publicacion, salvo que la frase sea la de
+    #    unas bases y no la de una convocatoria con plazo abierto.
+    if _SIN_PLAZO_CIERTO.search(texto):
+        return Plazo(None, "")
     if _OTRO_ORIGEN.search(texto) or not _DESDE_PUBLICACION.search(texto):
         return Plazo(None, "")
 
