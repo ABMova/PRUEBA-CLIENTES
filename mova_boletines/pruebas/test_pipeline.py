@@ -1499,6 +1499,14 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar([c.papel for c in doble] == ["modificacion", "bases reguladoras"],
               "una modificacion posterior se reconoce como tal y se lee antes que las bases")
 
+    entera = _normas.referencias(
+        "La Orden 150/2018, de 10 de octubre, de la Consejeria de Bienestar Social, por la que se "
+        "establecen las bases reguladoras de las subvenciones para la infancia y las familias fue "
+        "publicada en el Diario Oficial de Castilla-La Mancha numero 203, de 17 de octubre de 2018")
+    comprobar(len(entera) == 1 and entera[0].boletin == "DOCM"
+              and entera[0].fecha == _date(2018, 10, 17),
+              "el boletin tambien se reconoce cuando se le cita por su nombre entero")
+
     comprobar(not _normas.referencias(
         "de conformidad con la Ley 38/2003, de 17 de noviembre, General de Subvenciones "
         "(BOE num. 276, de 18 de noviembre de 2003)"),

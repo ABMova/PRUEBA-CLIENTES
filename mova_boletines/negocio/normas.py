@@ -42,13 +42,31 @@ registro = logging.getLogger(__name__)
 BOLETINES = {"BOE": "BOE", "BORM": "BORM", "BOJA": "BOJA", "BOCM": "BOCM",
              "DOGC": "DOGC", "DOGV": "DOGV", "DOCV": "DOGV", "DOCM": "DOCM"}
 
+# Y por su nombre entero, que es como citan los boletines mas formales: "fue
+# publicada en el Diario Oficial de Castilla-La Mancha numero 203, de 17 de
+# octubre de 2018". Sin esto se escapaba justo el caso mas valioso, el de una
+# modificacion publicada hoy que remite a las bases de hace anos.
+_NOMBRES = (
+    (r"Bolet[ií]n\s+Oficial\s+del\s+Estado", "BOE"),
+    (r"Diario\s+Oficial\s+de\s+Castilla[\s-]+La\s+Mancha", "DOCM"),
+    (r"Diari[o]?\s+Oficial\s+de\s+la\s+Generalitat\s+Valenciana", "DOGV"),
+    (r"Diari[o]?\s+Oficial\s+de\s+la\s+Comunitat\s+Valenciana", "DOGV"),
+    (r"Diari[o]?\s+Oficial\s+de\s+la\s+Generalitat\s+de\s+Catalunya", "DOGC"),
+    (r"Diario\s+Oficial\s+de\s+la\s+Generalidad\s+de\s+Catalu[nñ]a", "DOGC"),
+    (r"Bolet[ií]n\s+Oficial\s+de\s+la\s+Regi[oó]n\s+de\s+Murcia", "BORM"),
+    (r"Bolet[ií]n\s+Oficial\s+de\s+la\s+Junta\s+de\s+Andaluc[ií]a", "BOJA"),
+    (r"Bolet[ií]n\s+Oficial\s+de\s+la\s+Comunidad\s+de\s+Madrid", "BOCM"),
+)
+_CUALQUIERA = "|".join([patron for patron, _ in _NOMBRES]
+                       + [r"\b(?:" + "|".join(BOLETINES) + r")\b"])
+
 # Tipos de norma que aprueban o cambian unas bases.
 _TIPOS = r"(?:Orden|Resoluci[oó]n|Real\s+Decreto|Decreto(?:\s+Ley)?|Acuerdo|Ley|Instrucci[oó]n)"
 _INICIO_NORMA = re.compile(_TIPOS + r"\b", re.IGNORECASE)
 
 # "(BORM N.130 de 7 de junio 2025)", "(DOGV num. 9876, de 3 de marzo de 2025)"
 _CITA = re.compile(
-    r"\b(" + "|".join(BOLETINES) + r")\b"
+    r"(" + _CUALQUIERA + r")"
     r"[^)\n0-9]{0,20}"                   # " n.", " num. ", ", de "
     r"(?:(\d{1,4})[^)\n0-9]{1,15})?"     # numero del boletin, cuando lo dice
     r"(\d{1,2})\s+de\s+(" + "|".join(MESES) + r")"
@@ -117,9 +135,9 @@ def referencias(texto: str) -> list[Referencia]:
     vistas: set[tuple] = set()
     for cita in _CITA.finditer(texto):
         nombre, numero, dia, mes, ano = cita.groups()
-        boletin = BOLETINES[nombre.upper()]
+        boletin = _codigo_de(nombre)
         if boletin not in boletines.ADAPTADORES:
-            continue  # boletin que ya no se vigila
+            continue  # boletin que no se vigila, o nombre que no se reconoce
 
         contexto = texto[max(0, cita.start() - _ALCANCE_ATRAS):cita.start()]
         inicios = list(_INICIO_NORMA.finditer(contexto))
@@ -147,6 +165,14 @@ def referencias(texto: str) -> list[Referencia]:
 
     encontradas.sort(key=lambda r: _PRIORIDAD.get(r.papel, 9))
     return encontradas
+
+
+def _codigo_de(nombre: str) -> str:
+    """Codigo del adaptador para el boletin que se cita, por sigla o por nombre."""
+    for patron, codigo in _NOMBRES:
+        if re.fullmatch(patron, nombre, re.IGNORECASE):
+            return codigo
+    return BOLETINES.get(nombre.strip().upper(), "")
 
 
 def _papel_de(contexto: str, citada: str) -> str:
