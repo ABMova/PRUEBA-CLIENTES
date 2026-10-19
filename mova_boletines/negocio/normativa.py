@@ -120,7 +120,10 @@ def _convocatoria(datos: dict) -> list[Fuente]:
     codigo = datos.get("codigoBDNS", "")
     fuentes: list[Fuente] = []
     anadido = 0
-    for documento in bdns.documentos(datos)[:2]:
+    # Tres y no uno: a la convocatoria la BDNS le cuelga despues las
+    # ampliaciones de plazo y de dotacion, que son cortas y cambian el dato
+    # mas importante del resumen.
+    for documento in bdns.documentos(datos)[:3]:
         contenido = bdns.descargar(documento["id"])
         if not contenido:
             continue

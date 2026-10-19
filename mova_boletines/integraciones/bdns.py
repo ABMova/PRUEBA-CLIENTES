@@ -62,10 +62,20 @@ def ficha(codigo: str) -> dict | None:
     return datos if isinstance(datos, dict) and datos.get("codigoBDNS") else None
 
 
+# Las comunidades con lengua propia suben la convocatoria dos veces, una en
+# cada lengua ("Texto en castellano de la convocatoria" / "Texto en otra lengua
+# de la convocatoria"). Analizar las dos es pagar dos veces lo mismo, y ademas
+# aqui todo se redacta en castellano.
+_OTRA_LENGUA = re.compile(r"otra\s+lengua|valencia|catal|gallego|galego|euskera|vasco|ingles",
+                          re.IGNORECASE)
+
+
 def documentos(datos: dict) -> list[dict]:
     """Documentos adjuntos de la convocatoria, el mas reciente primero."""
     lista = [d for d in (datos.get("documentos") or []) if d.get("id")]
-    return sorted(lista, key=lambda d: str(d.get("datPublicacion") or ""), reverse=True)
+    lista.sort(key=lambda d: str(d.get("datPublicacion") or ""), reverse=True)
+    en_castellano = [d for d in lista if not _OTRA_LENGUA.search(d.get("descripcion") or "")]
+    return en_castellano or lista  # si solo esta en la otra lengua, mejor eso que nada
 
 
 def descargar(id_documento: int | str) -> bytes | None:
