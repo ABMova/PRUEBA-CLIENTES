@@ -132,7 +132,7 @@ def _normas_citadas(texto: str) -> tuple[list[Fuente], list[str]]:
             continue
         anadido += len(cuerpo)
         fuentes.append(Fuente(
-            titulo=f"{referencia.descripcion} — {anuncio.titulo[:160]}",
+            titulo=f"{referencia.descripcion} — {anuncio.titulo[:110]}",
             texto=cuerpo,
             url=anuncio.url_oficial or anuncio.url_pdf,
             paginas=paginas))
