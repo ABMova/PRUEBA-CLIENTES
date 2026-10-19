@@ -23,7 +23,12 @@ def datos_clasificacion(n: int = 400, semilla: int = 42) -> pd.DataFrame:
                          "antiguedad": antiguedad, "compra": clase})
 
 
-def generar(carpeta: Path = CARPETA) -> dict[str, Path]:
+def generar(carpeta: Path = CARPETA, forzar: bool = False) -> dict[str, Path]:
+    """Escribe los ficheros que falten (o todos con forzar=True).
+
+    No se reescriben en cada ejecución: el .xlsx guarda la fecha de creación y
+    cambiaría en el repositorio sin motivo.
+    """
     carpeta.mkdir(parents=True, exist_ok=True)
     df = datos_clasificacion(60)
     rutas = {
@@ -37,6 +42,8 @@ def generar(carpeta: Path = CARPETA) -> dict[str, Path]:
         "json_no_tabulable": carpeta / "no_tabulable.json",
         "csv_latin1": carpeta / "latin1.csv",
     }
+    if not forzar and all(r.exists() for r in rutas.values()):
+        return rutas
     df.to_csv(rutas["csv"], index=False, sep=";", encoding="utf-8")
     with pd.ExcelWriter(rutas["xlsx"]) as w:
         df.to_excel(w, sheet_name="Datos", index=False)
@@ -63,5 +70,5 @@ def generar(carpeta: Path = CARPETA) -> dict[str, Path]:
 
 
 if __name__ == "__main__":
-    for k, v in generar().items():
+    for k, v in generar(forzar=True).items():
         print(f"{k}: {v}")

@@ -36,7 +36,9 @@ def comparacion_ejecuciones(ejecuciones: list[dict], valor_base: float | None,
     fig, ax = _figura()
     etiquetas = [e["etiqueta"] for e in ejecuciones]
     valores = [e["valor"] if e["valor"] is not None else 0 for e in ejecuciones]
-    ax.bar(etiquetas, valores, color=SERIE, width=0.6)
+    ax.bar(etiquetas, valores, color=SERIE, width=0.5)
+    ax.set_xlim(-0.75 if len(etiquetas) > 1 else -1.5,
+                len(etiquetas) - 0.25 if len(etiquetas) > 1 else 1.5)
     if valor_base is not None:
         ax.axhline(valor_base, color=BASE, linestyle="--", linewidth=1.5,
                    label=f"baseline {valor_base:.3f}")

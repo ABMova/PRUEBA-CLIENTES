@@ -17,7 +17,7 @@ from datos.esquema import TABLAS
 
 COLUMNAS_EJECUCION_EDITABLES = {
     "estado", "comando", "hiperparametros_json", "versiones_json", "curva_json",
-    "ruta_modelo", "ruta_log", "duracion_s", "veredicto", "veredicto_json", "error",
+    "ruta_modelo", "ruta_log", "duracion_s", "veredicto", "detalle_veredicto_json", "error",
     "terminada", "modo",
 }
 

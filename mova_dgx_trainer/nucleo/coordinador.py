@@ -214,6 +214,9 @@ class Coordinador:
         return {"dataset_id": dataset_id, "filas": len(df), "columnas": df.shape[1], "hash": h,
                 "validacion": importador.resumen_columnas(df)}
 
+    def dataset_bruto(self, proyecto_id: int) -> dict | None:
+        return self.repo.ultimo_dataset(proyecto_id, "bruto")
+
     def datos_brutos(self, proyecto_id: int) -> pd.DataFrame | None:
         if proyecto_id in self._brutos:
             return self._brutos[proyecto_id]
@@ -381,7 +384,7 @@ class Coordinador:
                     comando=r.comando, versiones_json=r.versiones, curva_json=r.curva,
                     ruta_modelo=str(carpeta / r.ruta_modelo) if r.ruta_modelo else None,
                     ruta_log=str(ruta_log), duracion_s=r.duracion_s, veredicto=ver["veredicto"],
-                    veredicto_json=ver, error=r.error,
+                    detalle_veredicto_json=ver, error=r.error,
                     terminada=datetime.now().isoformat(timespec="seconds"))
                 ctx.log(f"Veredicto #{ej_id}: {ver['veredicto']}"
                         + (f" · {'; '.join(ver['motivos'])}" if ver["motivos"] else ""))

@@ -81,7 +81,7 @@ MIGRACION_1 = [
         ruta_log TEXT,
         duracion_s REAL,
         veredicto TEXT,
-        veredicto_json TEXT DEFAULT '{}',
+        detalle_veredicto_json TEXT DEFAULT '{}',
         error TEXT,
         iniciada TEXT NOT NULL,
         terminada TEXT

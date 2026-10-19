@@ -46,8 +46,12 @@ class TrabajoBase(QThread):
             self.error.emit(f"CANCELADO|{e}")
         except Exception as e:  # noqa: BLE001
             log.error("Error en %s:\n%s", type(self).__name__, traceback.format_exc())
-            self.log.emit(traceback.format_exc())
-            self.error.emit(str(e) or type(e).__name__)
+            self.log.emit(f"ERROR: {type(e).__name__}: {e}")
+            # «qué ha pasado|qué hacer»: la UI lo muestra en dos frases
+            que_paso = getattr(e, "que_paso", None) or f"{type(e).__name__}: {e}"
+            que_hacer = getattr(e, "que_hacer", None) or (
+                "Revise el registro de la aplicación y vuelva a intentarlo")
+            self.error.emit(f"{que_paso}|{que_hacer}")
 
 
 class TrabajoFuncion(TrabajoBase):
