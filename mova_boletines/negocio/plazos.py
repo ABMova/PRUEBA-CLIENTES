@@ -65,7 +65,8 @@ _SIN_PLAZO_CIERTO = re.compile(
     r"se\s+(establecer|determinar|fijar|concretar|senalar|indicar)[a-z]*"
     r"[^.]{0,60}?convocatoria"
     r"|en\s+(cada|la\s+respectiva|la\s+correspondiente)\s+convocatoria"
-    r"|como\s+minimo|minimo\s+de|no\s+(sera|podra\s+ser)\s+inferior")
+    r"|como\s+(minimo|maximo)|(minimo|maximo)\s+de"
+    r"|no\s+(sera|podra\s+ser)\s+(inferior|superior)")
 
 AVISO_LOCALES = "No incluye festivos locales."
 
@@ -146,8 +147,14 @@ def _prorrogar(vencimiento: date, comunidad: str, motivo: str) -> tuple[date, st
                    f"siguiente dia habil.")
 
 
-def fin_de_plazo(plazo: str, fecha_publicacion: str, comunidad: str = "") -> Plazo:
-    """Fecha de fin del plazo a partir de su texto y de la fecha de publicacion."""
+def fin_de_plazo(plazo: str, fecha_publicacion: str, comunidad: str = "",
+                 solo_escritas: bool = False) -> Plazo:
+    """Fecha de fin del plazo a partir de su texto y de la fecha de publicacion.
+
+    solo_escritas: la publicacion no es una convocatoria (es una modificacion
+    de bases, una adjudicacion, una lista de reserva...), asi que contar dias
+    desde SU fecha daria un plazo que no existe. Solo vale una fecha escrita.
+    """
     if not plazo or "[pendiente" in plazo.lower():
         return Plazo(None, "")
     try:
@@ -181,7 +188,7 @@ def fin_de_plazo(plazo: str, fecha_publicacion: str, comunidad: str = "") -> Pla
 
     # 2) Duraciones contadas desde la publicacion, salvo que la frase sea la de
     #    unas bases y no la de una convocatoria con plazo abierto.
-    if _SIN_PLAZO_CIERTO.search(texto):
+    if solo_escritas or _SIN_PLAZO_CIERTO.search(texto):
         return Plazo(None, "")
     if _OTRO_ORIGEN.search(texto) or not _DESDE_PUBLICACION.search(texto):
         return Plazo(None, "")

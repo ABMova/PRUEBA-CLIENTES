@@ -384,7 +384,8 @@ def _plazo_de_solicitud(datos: dict, publicacion: dict) -> tuple[str, str]:
                                  del_bdns.get("texto_fin")])
     if frase:
         calculado = plazos.fin_de_plazo(frase, str(publicacion.get("fecha_publicacion") or ""),
-                                        str(publicacion.get("comunidad") or ""))
+                                        str(publicacion.get("comunidad") or ""),
+                                        bool(publicacion.get("es_seguimiento")))
         if calculado.hay:
             return (f"Finaliza el {plazos.en_letra(date.fromisoformat(calculado.fin))}.",
                     calculado.explicacion)

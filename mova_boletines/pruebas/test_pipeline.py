@@ -1591,6 +1591,12 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
     comprobar(plazos.fin_de_plazo("Las solicitudes se presentaran del 1 al 30 de octubre de 2026, "
                                   "con un minimo de 15 dias", "2026-10-19").fin == "2026-10-30",
               "pero una fecha escrita manda aunque la frase hable de minimos")
+    comprobar(not plazos.fin_de_plazo("20 dias habiles desde el dia siguiente a la publicacion",
+                                      "2026-10-19", solo_escritas=True).hay,
+              "una adjudicacion o una modificacion de bases no abren plazo: no se cuentan dias")
+    comprobar(plazos.fin_de_plazo("El plazo termina el 30 de noviembre de 2026", "2026-10-19",
+                                  solo_escritas=True).fin == "2026-11-30",
+              "y si esas dicen una fecha (una ampliacion de plazo), esa si vale")
 
     # El plazo: gana la frase que precisa habiles o naturales.
     comprobar(plazos.mas_concreta(["20 dias a partir del dia siguiente",

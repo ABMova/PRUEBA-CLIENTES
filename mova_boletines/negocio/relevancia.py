@@ -341,8 +341,10 @@ def fin_de_plazo(datos: dict, fecha_publicacion: str, comunidad: str = "") -> pl
     una ventana razonable (desde la publicacion hasta dos anos despues): una
     fecha fuera de ahi es con toda probabilidad un error y no se usa.
     """
+    # Una modificacion de bases, una adjudicacion o una lista de reserva no
+    # abren plazo: contar dias desde SU fecha daria un plazo que no existe.
     calculado = plazos.fin_de_plazo(str(datos.get("plazo_solicitud", "")), fecha_publicacion,
-                                    comunidad)
+                                    comunidad, bool(datos.get("es_seguimiento")))
     if calculado.hay:
         return calculado
 
