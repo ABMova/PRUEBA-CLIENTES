@@ -63,6 +63,19 @@ def test_json_anidado_se_normaliza(recursos):
     assert any("$.datos" in a for a in r.avisos)
 
 
+def test_json_con_campos_lista_se_importa(tmp_path):
+    """Regresión: una lista en una celda descartaba el fichero (unhashable type: 'list')."""
+    import json
+    ruta = tmp_path / "listas.json"
+    ruta.write_text(json.dumps([{"id": i, "etiquetas": ["a", "b"], "meta": {"k": [i]}}
+                                for i in range(10)]), encoding="utf-8")
+    r = importador.importar_fichero(ruta)
+    assert r.estado != "descartado", r.error
+    assert r.df["etiquetas"].iloc[0] == '["a", "b"]'
+    assert importador.hash_dataframe(r.df)
+    assert importador.resumen_columnas(r.df)
+
+
 def test_json_no_tabulable_indica_nodo_y_admite_texto(recursos):
     r = importador.importar_fichero(recursos["json_no_tabulable"])
     assert r.estado == "descartado"

@@ -233,8 +233,16 @@ def estimar_filas(ruta: Path, codificacion: str) -> int:
 
 
 def normalizar(df: pd.DataFrame) -> pd.DataFrame:
-    """Nombres de columna como texto limpio y únicos; filas totalmente vacías fuera."""
+    """Nombres de columna como texto limpio y únicos; filas totalmente vacías fuera.
+
+    Las celdas con listas u objetos (JSON con campos anidados que json_normalize no
+    aplana) se guardan como texto JSON: si no, no se pueden contar ni comparar.
+    """
     df = df.copy()
+    for c in df.columns:
+        if df[c].dtype == object and df[c].map(lambda v: isinstance(v, (list, dict))).any():
+            df[c] = df[c].map(lambda v: json.dumps(v, ensure_ascii=False)
+                              if isinstance(v, (list, dict)) else v)
     nombres, vistos = [], {}
     for i, c in enumerate(df.columns):
         n = str(c).strip() if c is not None and str(c).strip() else f"columna_{i + 1}"

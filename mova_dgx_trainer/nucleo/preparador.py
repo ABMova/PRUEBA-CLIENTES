@@ -6,6 +6,7 @@ genera este módulo. Aquí se limpia, se tipan las columnas y se divide.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 
 import pandas as pd
@@ -57,25 +58,44 @@ def validar_proporciones(proporciones) -> tuple[float, float, float]:
     return tr, va, te
 
 
-def dividir(df: pd.DataFrame, objetivo: str, proporciones=(0.70, 0.15, 0.15),
+def _partir(df: pd.DataFrame, objetivo: str, fraccion_val: float, fraccion_test: float,
+            semilla: int, estratificar: bool):
+    resto, test = train_test_split(df, test_size=fraccion_test, random_state=semilla,
+                                   stratify=df[objetivo] if estratificar else None)
+    train, val = train_test_split(resto, test_size=fraccion_val, random_state=semilla,
+                                  stratify=resto[objetivo] if estratificar else None)
+    return train, val, test
+
+
+def dividir(df: pd.DataFrame,objetivo: str, proporciones=(0.70, 0.15, 0.15),
             semilla: int = 42, estratificar: bool = True) -> tuple[pd.DataFrame, pd.DataFrame,
                                                                   pd.DataFrame, dict]:
     """División train/val/test reproducible; estratificada si se pide y es posible."""
     tr, va, te = validar_proporciones(proporciones)
     info = {"proporciones": [tr, va, te], "semilla": semilla, "estratificada": False}
-    estrato = None
+    estratificada = False
     if estratificar:
         conteo = df[objetivo].value_counts()
-        # cada clase necesita al menos un ejemplo por partición
-        if len(conteo) >= 2 and conteo.min() >= 3:
-            estrato = df[objetivo]
-            info["estratificada"] = True
-        else:
+        # cada clase necesita al menos un ejemplo por partición, y cada partición
+        # tantas filas como clases (scikit-learn lo exige)
+        n_test = math.ceil(te * len(df))
+        n_val = math.ceil(va / (tr + va) * (len(df) - n_test))
+        if len(conteo) < 2 or conteo.min() < 3:
             info["aviso"] = "No se puede estratificar: hay clases con menos de 3 ejemplos."
-    resto, test = train_test_split(df, test_size=te, random_state=semilla, stratify=estrato)
-    estrato_resto = resto[objetivo] if estrato is not None else None
-    train, val = train_test_split(resto, test_size=va / (tr + va), random_state=semilla,
-                                  stratify=estrato_resto)
+        elif min(n_test, n_val) < len(conteo):
+            info["aviso"] = (f"No se puede estratificar: hay {len(conteo)} clases y validación "
+                             f"o test solo tienen {min(n_test, n_val)} filas.")
+        else:
+            estratificada = True
+    try:
+        train, val, test = _partir(df, objetivo, va / (tr + va), te, semilla, estratificada)
+    except ValueError as e:
+        if not estratificada:
+            raise ErrorPreparacion(f"No se puede dividir el dataset ({e}).") from e
+        estratificada = False
+        info["aviso"] = "No se puede estratificar con estas proporciones; se divide sin estratificar."
+        train, val, test = _partir(df, objetivo, va / (tr + va), te, semilla, False)
+    info["estratificada"] = estratificada
     info["filas"] = {"train": len(train), "val": len(val), "test": len(test)}
     return (train.reset_index(drop=True), val.reset_index(drop=True),
             test.reset_index(drop=True), info)

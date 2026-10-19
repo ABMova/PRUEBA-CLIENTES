@@ -23,6 +23,17 @@ def test_division_reproducible_con_semilla():
         assert abs(prop["si"] - total["si"]) < 0.05
 
 
+def test_muchas_clases_y_pocas_filas_no_estratifica_y_avisa():
+    """Regresión: 15 clases y 60 filas daban ValueError de scikit-learn en inglés."""
+    df = pd.DataFrame({"x": range(60), "y": [f"c{i % 15}" for i in range(60)]})
+    train, val, test, info = preparador.dividir(df, "y", (0.7, 0.15, 0.15), 42, True)
+    assert info["estratificada"] is False
+    assert "No se puede estratificar" in info["aviso"]
+    assert len(train) + len(val) + len(test) == 60
+    r = preparador.preparar(df, "clasificacion_tabular", ConfigPreparacion(objetivo="y"))
+    assert any("estratificar" in a for a in r.avisos)
+
+
 def test_proporciones_invalidas():
     with pytest.raises(preparador.ErrorPreparacion):
         preparador.validar_proporciones((0.8, 0.15, 0.15))
