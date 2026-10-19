@@ -17,7 +17,7 @@ from typing import Any
 
 import pandas as pd
 
-from nucleo.contexto import Contexto
+from nucleo.contexto import Cancelado, Contexto
 
 EXTENSIONES = {".csv": "csv", ".tsv": "csv", ".xlsx": "excel", ".xlsm": "excel",
                ".xls": "excel", ".txt": "txt", ".json": "json", ".jsonl": "json",
@@ -502,9 +502,9 @@ def importar_lote(rutas: list[str | Path], opciones: OpcionesImportacion | None 
         ctx.log(f"Importando {ruta.name} ({i + 1}/{len(ficheros)})")
         try:
             res = importar_fichero(ruta, opciones, ctx)
+        except Cancelado:
+            raise
         except Exception as e:  # noqa: BLE001 - un fichero nunca aborta el lote
-            if type(e).__name__ == "Cancelado":
-                raise
             res = ResultadoFichero(ruta=str(ruta), error=f"Error inesperado: {e}")
         resumen.resultados.append(res)
         if res.estado == "descartado":

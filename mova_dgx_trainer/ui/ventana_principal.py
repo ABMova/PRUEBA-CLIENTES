@@ -153,7 +153,18 @@ class VentanaPrincipal(QMainWindow):
         self.estado.datos_cambiados.connect(self._al_cambiar_datos)
         self._actual = ""
         self._actualizar_navegacion()
-        self.ir_a("proyecto")
+        self._reanudar()
+
+    def _reanudar(self) -> None:
+        """Reabre el último proyecto en el paso donde quedó."""
+        proyectos = self.coord.listar_proyectos()
+        if not proyectos:
+            self.ir_a("proyecto")
+            return
+        p = proyectos[0]
+        self.estado.abrir(p["id"])
+        paso = (p.get("estado_pipeline") or {}).get("paso_actual") or "importacion"
+        self.ir_a(paso if paso in self.pantallas else "importacion")
 
     @staticmethod
     def _envolver(pantalla: QWidget) -> QScrollArea:
