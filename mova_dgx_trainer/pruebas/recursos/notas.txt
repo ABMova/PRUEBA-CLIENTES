@@ -1,0 +1,5 @@
+Primera nota sobre el cliente, con comas, y puntos.
+Segunda nota: sin estructura fija
+
+Tercera; con un punto y coma suelto
+Cuarta nota más larga que las demás para romper cualquier patrón

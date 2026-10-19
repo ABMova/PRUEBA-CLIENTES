@@ -1,0 +1,11 @@
+# Datos de usuario (NUNCA al repositorio). OJO: datos/ es código y SÍ se versiona.
+almacen/
+*.enc
+*.db
+.env
+__pycache__/
+*.pyc
+build/
+dist/
+.pytest_cache/
+.venv/
