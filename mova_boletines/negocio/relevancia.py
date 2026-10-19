@@ -58,6 +58,7 @@ Reglas:
   En "titulo_resumido" di en pocas palabras que cambia y de que convocatoria. "es_convocatoria_ayuda" sigue siendo false en estos casos: no se abre un plazo nuevo.
 - "es_estrategia" es true cuando la publicacion aprueba, publica o somete a informacion publica un plan estrategico, una estrategia, un plan director, una hoja de ruta o un plan de accion de una administracion (por ejemplo "Estrategia Valenciana de Industria 2030" o "Plan Estrategico de Innovacion"). Interesan porque anuncian por donde iran las ayudas, aunque no convoquen ninguna todavia. En ese caso el resumen explica que ambitos cubre el plan y a que sector afecta. Un plan estrategico NO es una convocatoria de ayudas: "es_convocatoria_ayuda" seguira siendo false salvo que ademas convoque ayudas.
 - Los premios, certamenes y concursos convocados por universidades no interesan: "es_convocatoria_ayuda" es false.
+- ESCRIBE SIEMPRE EN CASTELLANO, aunque la publicacion venga en catalan, valenciano, gallego o euskera: el resumen, el titulo resumido, los beneficiarios, el plazo y el importe. La unica excepcion es "titulo", que se copia literal del boletin.
 - El resumen no supera 5 lineas ni incluye valoraciones propias.
 - El titulo se copia literal de la publicacion.
 - "titulo_resumido" es una sola linea de 15 palabras como maximo que diga que se financia y para quien, sin la referencia normativa (nada de "Orden 12/2026, de 15 de septiembre, de la Conselleria..."). Usa solo informacion del titulo o del texto. Ejemplo: "Subvenciones para la digitalizacion de pymes industriales".

@@ -3,16 +3,18 @@
 VIA DE ACCESO: API REST JSON del EADOP. Ojo: el servicio esta en el dominio
   portaldogc.gencat.cat, NO en dogc.gencat.cat (ahi devuelve 404).
   Numero por fecha: POST https://portaldogc.gencat.cat/eadop-rest/api/dogc/calendarDOGC
-                    (month=MM&year=AAAA&language=ca)  -> linkDOGC con numDOGC
+                    (month=MM&year=AAAA&language=es)  -> linkDOGC con numDOGC
   Sumario:          POST https://portaldogc.gencat.cat/eadop-rest/api/dogc/summaryDOGC
-                    (numDOGC=NNNN&language=ca)
+                    (numDOGC=NNNN&language=es)
 COMPROBADO: 17/09/2026 (calendario de septiembre y sumario 9500 correctos).
 AVISO TLS: este servidor negocia cifrados antiguos y OpenSSL 3 los rechaza por
   defecto; por eso se pide con tls_legado=True (ver base._AdaptadorTLSLegado).
-SI CAMBIA: abrir https://dogc.gencat.cat/ca/sumari-del-dogc/ y revisar el
+SI CAMBIA: abrir https://dogc.gencat.cat/es/sumari-del-dogc/ y revisar el
   fichero fpca_sumari_DOGC.js; ahi estan la URI del servicio y sus parametros.
-NOTA: se pide en catalan porque es el idioma en el que el servicio sirve
-  siempre el sumario completo; el titulo se guarda tal cual se publica.
+IDIOMA: se pide en CASTELLANO (language=es). El DOGC publica las dos versiones
+  y el servicio devuelve el mismo numero de documentos en ambas, con el mismo
+  documentId; cambia el titulo y el PDF, que viene con language=es_ES.
+  Comprobado el 19/10/2026 con el DOGC 9774: 18 documentos en las dos lenguas.
 """
 from __future__ import annotations
 
@@ -27,7 +29,7 @@ URL_COMPROBADA = "https://portaldogc.gencat.cat/eadop-rest/api/dogc/summaryDOGC"
 FECHA_COMPROBACION = "2026-09-17"
 
 _BASE = "https://portaldogc.gencat.cat/eadop-rest/api/dogc"
-_IDIOMA = "ca"
+_IDIOMA = "es"
 
 
 def _numero_de(fecha: date) -> str | None:
@@ -81,9 +83,9 @@ def obtener_publicaciones(fecha: date) -> list[PublicacionCruda]:
                         titulo=titulo,
                         organismo=organismo,
                         seccion=nombre_seccion,
-                        url_oficial=(f"https://dogc.gencat.cat/ca/document-del-dogc/"
+                        url_oficial=(f"https://dogc.gencat.cat/es/document-del-dogc/"
                                      f"?documentId={identificador}" if identificador
-                                     else f"https://dogc.gencat.cat/ca/sumari-del-dogc/?numDOGC={numero}"),
+                                     else f"https://dogc.gencat.cat/es/sumari-del-dogc/?numDOGC={numero}"),
                         url_pdf=url_pdf,
                         fecha=fecha_sumario,
                         texto=titulo,

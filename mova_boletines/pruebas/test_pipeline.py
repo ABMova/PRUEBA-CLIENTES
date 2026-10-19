@@ -9,6 +9,7 @@ descartados, generacion del HTML del correo y el mensaje de "sin novedades".
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 import tempfile
 from datetime import date, timedelta
@@ -1394,6 +1395,17 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
               f"y se sabe a quien no le llego ({', '.join(resultado.sin_correo)})")
     comprobar("no les llego a:" in resultado.detalle and "paola@mova.es" in resultado.detalle,
               "el detalle lo dice con nombres y apellidos")
+
+    print("\n33) El DOGC se recoge en castellano")
+    from negocio.boletines import dogc as _dogc
+
+    comprobar(_dogc._IDIOMA == "es",  # noqa: SLF001 - se comprueba la configuracion
+              "el sumario se pide en castellano, no en catalan")
+    fuente = pathlib.Path("negocio/boletines/dogc.py").read_text(encoding="utf-8")
+    comprobar("dogc.gencat.cat/es/" in fuente and "dogc.gencat.cat/ca/" not in fuente,
+              "y los enlaces oficiales apuntan a la version castellana")
+    comprobar("ESCRIBE SIEMPRE EN CASTELLANO" in relevancia.SISTEMA_EXTRACCION,
+              "el modelo tiene orden de redactar en castellano")
 
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:
