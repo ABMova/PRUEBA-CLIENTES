@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from nucleo import importador
+from nucleo.contexto import Contexto
 from nucleo.importador import OpcionesImportacion
 
 
@@ -107,6 +108,19 @@ def test_carpeta_y_esquemas(recursos, tmp_path):
         importador.combinar(resumen.resultados, "compatible")
     assert list(importador.combinar(resumen.resultados, "interseccion").columns) == ["x"]
     assert importador.combinar(resumen.resultados, "union").shape == (5, 3)
+
+
+def test_carpeta_sin_ficheros_admitidos_lo_explica(tmp_path):
+    """Regresión: una carpeta de PDF y Word terminaba en «Importados: 0» sin explicación."""
+    (tmp_path / "memoria.pdf").write_bytes(b"%PDF")
+    (tmp_path / "anexo.docx").write_bytes(b"PK")
+    (tmp_path / "otro.pdf").write_bytes(b"%PDF")
+    mensajes = []
+    resumen = importador.importar_lote([tmp_path], ctx=Contexto(al_log=mensajes.append))
+    assert resumen.resultados == []
+    assert "se omiten 3 de otros tipos (2 .pdf, 1 .docx)" in resumen.avisos[0]
+    assert "No hay ningún fichero que importar" in resumen.avisos[-1]
+    assert any("se omiten 3" in m for m in mensajes)
 
 
 def test_validacion_marca_problemas():

@@ -112,6 +112,7 @@ class ResultadoFichero:
 @dataclass
 class ResumenLote:
     resultados: list[ResultadoFichero] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)   # carpetas con ficheros omitidos
 
     def _contar(self, estado: str) -> int:
         return sum(1 for r in self.resultados if r.estado == estado)
@@ -154,16 +155,32 @@ def hash_dataframe(df: pd.DataFrame) -> str:
     return h.hexdigest()
 
 
-def expandir_rutas(rutas: list[str | Path]) -> list[Path]:
-    """Ficheros sueltos y carpetas (recorridas) con extensión admitida."""
+def expandir_rutas(rutas: list[str | Path], avisos: list[str] | None = None) -> list[Path]:
+    """Ficheros sueltos y carpetas (recorridas) con extensión admitida.
+
+    En `avisos` se anota, por carpeta, lo que no se ha podido leer, para que una
+    carpeta sin ficheros admitidos no termine en silencio con «0 importados».
+    """
     salida: list[Path] = []
     for r in rutas:
         p = Path(r)
         if p.is_dir():
+            admitidos, omitidos = 0, {}
             for raiz, _, ficheros in os.walk(p):
                 for f in sorted(ficheros):
-                    if Path(f).suffix.lower() in EXTENSIONES:
+                    ext = Path(f).suffix.lower()
+                    if ext in EXTENSIONES:
                         salida.append(Path(raiz) / f)
+                        admitidos += 1
+                    elif not f.startswith((".", "~$")):
+                        omitidos[ext or "sin extensión"] = omitidos.get(ext or "sin extensión", 0) + 1
+            if avisos is not None and omitidos:
+                detalle = ", ".join(f"{n} {e}" for e, n in sorted(omitidos.items(),
+                                                                  key=lambda x: -x[1]))
+                avisos.append(f"Carpeta «{p.name}»: {admitidos} fichero(s) admitido(s); "
+                              f"se omiten {sum(omitidos.values())} de otros tipos ({detalle}).")
+            elif avisos is not None and not admitidos:
+                avisos.append(f"Carpeta «{p.name}»: está vacía.")
         elif p.suffix.lower() in EXTENSIONES:
             salida.append(p)
         else:
@@ -502,8 +519,14 @@ def importar_fichero(ruta: str | Path, opciones: OpcionesImportacion | None = No
 def importar_lote(rutas: list[str | Path], opciones: OpcionesImportacion | None = None,
                   ctx: Contexto | None = None) -> ResumenLote:
     ctx = ctx or Contexto()
-    ficheros = expandir_rutas(rutas)
     resumen = ResumenLote()
+    ficheros = expandir_rutas(rutas, resumen.avisos)
+    for a in resumen.avisos:
+        ctx.log(a)
+    if not ficheros:
+        resumen.avisos.append("No hay ningún fichero que importar. Formatos admitidos: "
+                              + ", ".join(sorted(EXTENSIONES)) + ".")
+        ctx.log(resumen.avisos[-1])
     total = max(1, len(ficheros))
     for i, ruta in enumerate(ficheros):
         ctx.comprobar()

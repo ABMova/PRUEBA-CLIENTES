@@ -203,7 +203,11 @@ class PasoImportacion(PasoBase):
     def _al_importar(self, resultado: dict) -> None:
         self._pintar_lote()
         resumen = resultado["resumen"]
-        self.estado_ui.avisar(resumen.texto(), "warn" if resumen.descartados else "ok")
+        if not resumen.resultados:
+            self.estado_ui.avisar(" ".join(resumen.avisos), "warn")
+            return
+        aviso = "warn" if resumen.descartados or resumen.avisos else "ok"
+        self.estado_ui.avisar(" ".join([resumen.texto()] + resumen.avisos), aviso)
 
     def _pintar_lote(self) -> None:
         lote = self.coord.lote_actual(self.pid) if self.pid else None
