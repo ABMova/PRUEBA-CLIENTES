@@ -17,7 +17,7 @@ enviado y sin mostrar lo descartado.
 | Castilla-La Mancha | Diario Oficial de Castilla-La Mancha | DOCM |
 | Castilla y León | Boletín Oficial de Castilla y León | BOCYL |
 
-### Novedades de las versiones 1.21 y 1.22: el resumen se hace con toda la normativa
+### Novedades de las versiones 1.21 a 1.23: el resumen se hace con toda la normativa
 
 Lo que publica un boletín suele ser un **extracto** de media página que remite al
 texto completo. Resumiendo solo eso, el resultado se llenaba de «se establece en
@@ -28,6 +28,7 @@ la normativa que falta:
 |---|---|
 | **La convocatoria completa** | El extracto cita su código BDNS. Con él se piden a la Base de Datos Nacional de Subvenciones la ficha oficial (plazo, presupuesto, beneficiarios, régimen de minimis) y el PDF íntegro |
 | **Las bases reguladoras** | La cita trae el boletín y el día exacto («BORM n.º 130 de 7 de junio 2025»), así que se pide el sumario de ese día al adaptador que ya existe y se localiza el anuncio dentro |
+| **Las bases citadas sin decir dónde** | «Orden 50/2021, de 6 de abril» no dice boletín ni día: se barren los sumarios del mismo boletín desde que se firmó la norma, hasta encontrar un título que lleve su número o su fecha |
 | **Las modificaciones y ampliaciones** | Igual que las bases, y se leen antes: son dos páginas que pueden haber cambiado el plazo o la cuantía |
 
 Para elegir el anuncio correcto dentro de un sumario se pesan las palabras por
@@ -43,9 +44,21 @@ intensidad, crédito y gastos subvencionables en vez de remitir a la
 convocatoria. El resumen ampliado termina con la lista de **normativa
 analizada**, enlazada, para poder comprobar de dónde sale cada dato.
 
-**Lo que cuesta**: un resumen con toda la normativa son unos 0,24 $ frente a los
-0,02 $ de antes, porque se analiza unas veinte veces más texto. Solo se paga al
-pulsar el botón, y el tope mensual de gasto sigue cortando igual.
+Medido sobre 10 publicaciones reales: 7 se resumen con la convocatoria completa
+de la BDNS, 2 con las bases localizadas y 1 con lo publicado (el BOE ya
+publicaba las bases enteras: ahí no hay nada que buscar).
+
+**Lo que cuesta**: un resumen con toda la normativa son entre 0,06 y 0,22 $
+frente a los 0,02 $ de antes, porque se analiza mucho más texto. Solo se paga al
+pulsar el botón, el tope mensual sigue cortando igual, y en **Ajustes** hay un
+interruptor para apagarlo (con el coste a la vista), otro para el barrido de
+sumarios y los días que se barren.
+
+**Plazos que no existen**: una modificación de bases o una adjudicación no abren
+plazo. Antes se les calculaba uno contando días desde su fecha («Finaliza el 9 de
+noviembre»), que es peor que no decir nada. Ahora, en lo marcado como
+seguimiento, solo vale una fecha escrita; las frases que remiten a la futura
+convocatoria o que fijan un mínimo o un máximo tampoco se calculan.
 
 ### Novedades de la versión 1.16: que no se escape ninguna ayuda
 
