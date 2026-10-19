@@ -72,6 +72,28 @@ class Plazo(NamedTuple):
         return bool(self.fin)
 
 
+def mas_concreta(frases) -> str:
+    """De varias frases de plazo, la que mas dice.
+
+    Una que precisa "dias habiles" o "dias naturales" vale mas que un "20 dias"
+    a secas, aunque esta ultima venga de una fuente oficial: la ley manda estar
+    al texto literal de la convocatoria.
+    """
+    candidatas = [f.strip() for f in frases if f and "[pendiente" not in f.lower()]
+    if not candidatas:
+        return ""
+    precisas = [f for f in candidatas if re.search(r"dias?\s+(habiles|naturales)", normalizar(f))]
+    return (precisas or candidatas)[0]
+
+
+def fecha_iso(texto: str) -> date | None:
+    """Convierte 'AAAA-MM-DD' en fecha; None si no lo es."""
+    try:
+        return datetime.strptime(texto[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
 def en_letra(dia: date) -> str:
     return f"{dia.day} de {_NOMBRE_MES[dia.month]} de {dia.year}"
 

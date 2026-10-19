@@ -27,7 +27,7 @@ os.environ["MOVA_RECUPERACION"] = "0"  # se prueba llamando a mano, no con el re
 import config  # noqa: E402
 from datos import repositorio  # noqa: E402
 from integraciones import anthropic_cliente  # noqa: E402
-from negocio import correo, deduplicador, orquestador, palabras, relevancia  # noqa: E402
+from negocio import correo, deduplicador, orquestador, palabras, plazos, relevancia  # noqa: E402
 from negocio.boletines import ADAPTADORES  # noqa: E402
 from negocio.boletines.base import ErrorBoletin, PublicacionCruda  # noqa: E402
 
@@ -1448,6 +1448,48 @@ def main() -> int:  # noqa: PLR0915 - es una prueba lineal, se lee mejor seguida
                                             "fecha_publicacion": "2026-10-19"})[0]
               == _doc.NO_DISPONIBLE,
               "y solo cuando no hay nada se remite a la convocatoria")
+
+    print("\n35) Antes de resumir se reune la normativa de la ayuda")
+    from integraciones import bdns as _bdns
+    from negocio import normativa as _norm
+
+    extracto = ("Extracto de la Orden de 14 de octubre de 2026 ... BDNS (Identif.): 934908 "
+                "De conformidad con lo previsto en los articulos 17.3.b y 20.8.a de la Ley "
+                "38/2003 ... conforme a las bases reguladoras previstas en la Orden de 2 de junio "
+                "de 2025, de la Consejeria de Turismo (BORM n. 130 de 7 de junio 2025).")
+    comprobar(_bdns.codigo_en(extracto) == "934908",
+              "se reconoce el codigo BDNS que cita el extracto")
+    comprobar(_bdns.codigo_en("sin codigo alguno") is None,
+              "y no se inventa uno donde no lo hay")
+
+    # La BDNS se simula: la prueba no sale a internet.
+    ficha_falsa = {
+        "codigoBDNS": "934908",
+        "organo": {"nivel1": "AUTONOMICA", "nivel2": "REGION DE MURCIA"},
+        "presupuestoTotal": 500000,
+        "tiposBeneficiarios": [{"descripcion": "PYME"}],
+        "reglamento": {"descripcion": "REG (UE) 2023/2831 de minimis"},
+        "descripcionBasesReguladoras": "Orden de 2 de junio de 2025",
+        "textFin": "20 dias a partir del dia siguiente a la publicacion",
+        "fechaFinSolicitud": None,
+        "documentos": [],
+    }
+    oficial = _norm.resumen_oficial(ficha_falsa)
+    comprobar("Codigo BDNS: 934908" in oficial and "minimis" in oficial
+              and "20 dias" in oficial,
+              "la ficha oficial de la BDNS se le resume al modelo")
+
+    comprobar(_norm._referencias_a_bases(extracto),  # noqa: SLF001
+              "se detecta la norma de las bases reguladoras que cita el extracto")
+
+    # El plazo: gana la frase que precisa habiles o naturales.
+    comprobar(plazos.mas_concreta(["20 dias a partir del dia siguiente",
+                                   "veinte dias habiles desde el dia siguiente"])
+              == "veinte dias habiles desde el dia siguiente",
+              "entre dos frases de plazo manda la que dice si son habiles o naturales")
+    comprobar(plazos.mas_concreta(["[PENDIENTE: dato]", "un mes desde la publicacion"])
+              == "un mes desde la publicacion",
+              "y los comodines no cuentan como frase")
 
     aplicacion_mova_planificador = web.config.get("planificador")
     if aplicacion_mova_planificador:

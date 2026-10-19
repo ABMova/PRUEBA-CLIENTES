@@ -29,7 +29,8 @@ import config
 from datos import repositorio
 from integraciones import anthropic_cliente
 from negocio.boletines.base import ErrorBoletin, pedir
-from negocio import pdf, plazos
+from integraciones.bdns import plazo_de as bdns_plazo
+from negocio import normativa, pdf, plazos
 from negocio.extraccion import texto_con_paginas
 
 registro = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ REGLAS DE EXTRACCIÓN OBLIGATORIAS:
 11. TIPO DE AYUDA: en "tipo_ayuda" escribe "financiacion" cuando lo que se concede sea un prestamo, credito, aval, garantia, linea de financiacion bonificada, bonificacion de intereses o participacion en capital (aunque lleve un tramo no reembolsable); "empleo" cuando lo subvencionado sea contratar personas, mantener el empleo, bonificar cuotas de la Seguridad Social, fomentar el autoempleo o formar trabajadores; y "general" en los demas casos. Si encajan las dos, elige la que sea el grueso de la ayuda.
 12. CONDICIONES DE FINANCIACION: rellena el objeto "financiacion" SOLO si "tipo_ayuda" es "financiacion". Cada campo con el dato tal como figura en el texto, o null: "inicio_proyecto" (cuanto antes de la solicitud puede haber empezado el proyecto), "financiacion_max" (porcentaje financiable, distinguiendo inversion y circulante si el texto lo distingue), "intereses" (indice y diferencial, p. ej. "Euribor a un ano + un diferencial entre el 0,50 y el 0,75%"), "amortizacion" (plazo de devolucion), "carencia", "tramo_no_reembolsable" (porcentaje, cuantia maxima y regimen si lo indica), "garantias", "comision_apertura". La inversion minima y maxima van, como siempre, en "inversion_min" e "inversion_max".
 13. AYUDAS DE EMPLEO: rellena el objeto "empleo" SOLO si "tipo_ayuda" es "empleo". "personas_destinatarias" describe a QUIEN hay que contratar (edad, titulacion, situacion de desempleo, inscripcion en registros), que no es lo mismo que "beneficiarios" (quien cobra la ayuda: la empresa). "requisitos_contratacion" son las condiciones que debe cumplir el contrato o la empresa (incremento de plantilla, numero maximo de contratos, limites de otras ayudas). "requisitos_trabajadores" son los que debe acreditar la persona contratada. "obligaciones_empresario" son los compromisos posteriores (mantenimiento del empleo y de la plantilla, sustituciones, devolucion si se incumple). "condiciones_contrato" son la modalidad, jornada y duracion exigidas. "cuantias" es una lista con un objeto {"colectivo","importe"} por cada importe distinto segun a quien se contrate (por ejemplo hombres, mujeres, personas con discapacidad, victimas de violencia de genero). Las exclusiones van, como siempre, en "exclusiones".
-14. PLAZO DE PRESENTACION: si el documento dice cuando se puede solicitar, RELLENA "plazo_inicio" y "plazo_fin"; no remitas a "la correspondiente convocatoria" cuando el dato esta en el texto. Si el plazo se expresa como una duracion ("20 dias naturales a contar desde el dia siguiente al de la publicacion"), copia esa frase literal en "plazo_solicitud" aunque no puedas fechar el final: la fecha exacta la calcula despues la herramienta. Solo se deja a null lo que de verdad no aparece.
+14. PLAZO DE PRESENTACION: si la documentacion dice cuando se puede solicitar, RELLENA "plazo_inicio" y "plazo_fin"; no remitas a "la correspondiente convocatoria" cuando el dato este en alguno de los documentos. Copia SIEMPRE en "plazo_frase" la frase literal del plazo tal como figura ("veinte dias habiles a contar desde el dia siguiente al de la publicacion del extracto"), aunque no puedas fechar el final: la fecha exacta la calcula despues la herramienta, que sabe contar habiles y festivos. Si dos documentos dicen cosas distintas, copia la del mas concreto.
 15. IDIOMA: redacta SIEMPRE en castellano, aunque el documento original esté en catalán, valenciano, gallego o euskera. Traduce los textos que extraigas (objeto, actuaciones, gastos, requisitos, obligaciones); solo se conservan en su lengua los nombres propios de programas, organismos y normas.
 16. FUENTES: en "fuentes" indica, para cada campo que hayas rellenado, de dónde sale el dato con el formato "Art. 5.2, pág. 3" (usa las marcas [Página N] del texto y la numeración de artículos, bases o anexos; si el dato aparece en varios sitios, cítalos separados por "; "). Si no puedes localizarlo con seguridad, escribe "sin localizar". No incluyas en "fuentes" los campos que queden a null.
 
@@ -93,7 +94,7 @@ Estructura JSON requerida:
 "financiacion":{"inicio_proyecto":null,"financiacion_max":null,"intereses":null,"amortizacion":null,"carencia":null,"tramo_no_reembolsable":null,"garantias":null,"comision_apertura":null},
 "empleo":{"personas_destinatarias":null,"requisitos_contratacion":[],"requisitos_trabajadores":[],"obligaciones_empresario":[],"condiciones_contrato":[],"cuantias":[]},
 "credito":null,"criterios":[],"doc_solicitud":[],"doc_justificacion":[],
-"plazo_inicio":null,"plazo_fin":null,"plazo_ejecucion":null,"plazo_justificacion":null,"ejecucion_pago":null,
+"plazo_inicio":null,"plazo_fin":null,"plazo_frase":null,"plazo_ejecucion":null,"plazo_justificacion":null,"ejecucion_pago":null,
 "compatibilidades":null,"incompatibilidades":null,
 "referencias":[],"enlaces":[],"cierre":null,"alertas":[],
 "fuentes":{"nombre_del_campo":"Art. X, pág. N"}}
@@ -162,12 +163,28 @@ def extraer_datos(publicacion: dict, llamar=None) -> tuple[dict, dict]:
     llamar = llamar or anthropic_cliente.llamar_json
     texto, fuente, paginas, incompleto = texto_de_publicacion(publicacion)
 
-    recortado = len(texto) > LIMITE_CARACTERES
-    if recortado:
-        texto = texto[:LIMITE_CARACTERES] + "\n[...texto recortado por longitud máxima...]"
+    # Lo publicado suele ser un extracto: se busca la convocatoria completa y la
+    # ficha oficial antes de resumir, que es donde estan el plazo y las cuantias.
+    reunida = normativa.reunir(publicacion, texto)
+    bloques = [f"=== DOCUMENTO 1: lo publicado en el boletín ===\n{texto}"]
+    for numero, extra in enumerate(reunida.fuentes, start=2):
+        bloques.append(f"=== DOCUMENTO {numero}: {extra.titulo} ({extra.paginas} págs.) ===\n"
+                       f"{extra.texto}")
+    documentacion = "\n\n".join(bloques)
 
-    sistema = (SISTEMA_EXTRACCION + "\n\nDOCUMENTACIÓN OFICIAL APORTADA (texto íntegro con marcas "
-               "[Página N]):\n\n" + texto)
+    recortado = len(documentacion) > LIMITE_CARACTERES
+    if recortado:
+        documentacion = (documentacion[:LIMITE_CARACTERES]
+                         + "\n[...texto recortado por longitud máxima...]")
+
+    ficha_oficial = normativa.resumen_oficial(reunida.datos_bdns)
+    sistema = (SISTEMA_EXTRACCION
+               + ("\n\nFICHA OFICIAL DE LA BASE DE DATOS NACIONAL DE SUBVENCIONES (datos "
+                  "verificados; si contradicen al texto, mandan estos):\n" + ficha_oficial
+                  if ficha_oficial else "")
+               + "\n\nDOCUMENTACIÓN OFICIAL APORTADA (texto íntegro con marcas [Página N]). "
+                 "Cuando un dato aparezca en varios documentos, quédate con el más concreto:\n\n"
+               + documentacion)
     mensaje = PROMPT_EXTRACCION.replace("{PUBLICACION}", _ficha(publicacion))
     modelo = repositorio.ajuste("modelo_documentos", "claude-sonnet-5")
     max_tokens = repositorio.ajuste_int("max_tokens_documentos", 16000)
@@ -198,6 +215,16 @@ def extraer_datos(publicacion: dict, llamar=None) -> tuple[dict, dict]:
             enlaces.append(enlace)
     datos["enlaces"] = enlaces
 
+    # Queda escrito que se ha leido, y el plazo que da la BDNS, para el calculo.
+    datos["fuentes_consultadas"] = ([f"Publicación en el boletín ({fuente})"]
+                                    + [f"{f.titulo}: {f.url}" for f in reunida.fuentes])
+    if reunida.datos_bdns:
+        frase, fecha = bdns_plazo(reunida.datos_bdns)
+        datos["plazo_bdns"] = {"codigo": reunida.datos_bdns.get("codigoBDNS", ""),
+                               "texto_fin": frase, "fecha_fin": fecha}
+    if reunida.referencias:
+        datos["bases_citadas"] = reunida.referencias
+
     alertas = list(datos.get("alertas") or [])
     if recortado:
         alertas.append(f"La publicación es muy extensa: solo se han analizado los primeros "
@@ -207,8 +234,9 @@ def extraer_datos(publicacion: dict, llamar=None) -> tuple[dict, dict]:
                        "revisa el documento original.")
     datos["alertas"] = alertas
 
-    return datos, {"modelo": modelo, "fuente": fuente, "paginas": paginas,
-                   "caracteres": len(texto), "recortado": recortado}
+    return datos, {"modelo": modelo, "fuente": fuente,
+                   "paginas": paginas + sum(f.paginas for f in reunida.fuentes),
+                   "caracteres": len(documentacion), "recortado": recortado}
 
 
 # ------------------------------------------------------- generacion en fondo --
@@ -323,14 +351,27 @@ def _plazo_de_solicitud(datos: dict, publicacion: dict) -> tuple[str, str]:
     if fin:
         return f"Finaliza el {fecha_larga(fin)}.", ""
 
-    # La publicacion ya trae la fecha calculada y se puede rehacer el calculo
-    # para explicarlo, que es lo que se quiere leer en el resumen.
+    # La BDNS es fuente oficial: si da la fecha ya hecha, manda.
+    del_bdns = datos.get("plazo_bdns") or {}
+    if del_bdns.get("fecha_fin"):
+        dia = plazos.fecha_iso(str(del_bdns["fecha_fin"]))
+        if dia:
+            return (f"Finaliza el {plazos.en_letra(dia)}.",
+                    f"Fecha publicada en la Base de Datos Nacional de Subvenciones "
+                    f"(convocatoria {del_bdns.get('codigo', '')}).")
+
+    # Si no, se calcula con la frase que mas precise: la convocatoria puede decir
+    # "veinte dias habiles" donde la ficha de la BDNS dice solo "20 dias".
     texto_plazo = str(publicacion.get("plazo") or "")
-    calculado = plazos.fin_de_plazo(texto_plazo, str(publicacion.get("fecha_publicacion") or ""),
-                                    str(publicacion.get("comunidad") or ""))
-    if calculado.hay:
-        return f"Finaliza el {plazos.en_letra(date.fromisoformat(calculado.fin))}.", \
-            calculado.explicacion
+    frase = plazos.mas_concreta([datos.get("plazo_frase"), texto_plazo,
+                                 del_bdns.get("texto_fin")])
+    if frase:
+        calculado = plazos.fin_de_plazo(frase, str(publicacion.get("fecha_publicacion") or ""),
+                                        str(publicacion.get("comunidad") or ""))
+        if calculado.hay:
+            return (f"Finaliza el {plazos.en_letra(date.fromisoformat(calculado.fin))}.",
+                    calculado.explicacion)
+
     if publicacion.get("plazo_fin"):
         return f"Finaliza el {plazos.en_letra(date.fromisoformat(publicacion['plazo_fin']))}.", ""
     if inicio:
