@@ -210,6 +210,10 @@ def localizar(referencia: Referencia) -> PublicacionCruda | None:
         registro.warning("No se pudo leer el %s del %s: %s",
                          referencia.boletin, referencia.fecha, error)
         return None
+    except Exception as error:  # noqa: BLE001 - un sumario de 2018 puede venir de otra forma
+        registro.warning("El %s del %s no se ha podido interpretar (%s: %s)",
+                         referencia.boletin, referencia.fecha, type(error).__name__, error)
+        return None
     if not anuncios:
         registro.info("El %s del %s no trae anuncios: no se localiza %s",
                       referencia.boletin, referencia.fecha, referencia.papel)
