@@ -96,12 +96,23 @@ class Coordinador:
         from infra.ejecutor_ssh import crear_ejecutor
         return crear_ejecutor(self.cargar_conexion(), self.almacen.config / "known_hosts")
 
-    def comprobar_entorno(self, ctx: Contexto) -> dict:
-        from infra.ejecutor_ssh import comprobar_entorno
-        ejecutor = self.crear_ejecutor()
+    @staticmethod
+    def _error_conexion(ejecutor, e: Exception) -> ErrorServicio:
+        if ejecutor.modo == "remoto":
+            return ErrorServicio(
+                f"No se puede conectar con {ejecutor.host} ({e})",
+                "Compruebe que está en la red de la oficina o que Tailscale está encendido, "
+                "y revise host, usuario y clave en Configuración")
+        return ErrorServicio(str(e), "Indique un intérprete de Python válido en Configuración")
+
+    def comprobar_entorno(self, ctx: Contexto, ejecutor=None) -> dict:
+        from infra.ejecutor_ssh import ErrorEjecutor, comprobar_entorno
+        ejecutor = ejecutor or self.crear_ejecutor()
         ctx.log(f"Comprobando entorno en {ejecutor.describir()}…")
         try:
             filas = comprobar_entorno(ejecutor, ctx.cancelado)
+        except ErrorEjecutor as e:
+            raise self._error_conexion(ejecutor, e) from e
         finally:
             ejecutor.cerrar()
         for f in filas:
@@ -331,7 +342,13 @@ class Coordinador:
         if not script.exists():
             raise ErrorServicio(f"No se encuentra el script {cfg['script']}.",
                                 "Reinstale la aplicación.")
+        from infra.ejecutor_ssh import ErrorEjecutor
         ejecutor = ejecutor or self.crear_ejecutor()
+        try:
+            ejecutor.comprobar_conexion()
+        except ErrorEjecutor as e:
+            ejecutor.cerrar()
+            raise self._error_conexion(ejecutor, e) from e
         historial: list[dict] = []
         hp = dict(cfg["hiperparametros"])
         intento, padre, motivo = 0, None, "inicial"

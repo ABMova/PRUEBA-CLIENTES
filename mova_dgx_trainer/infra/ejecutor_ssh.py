@@ -67,6 +67,11 @@ class EjecutorLocal:
     def describir(self) -> str:
         return f"local ({self.interprete or 'sin intérprete'})"
 
+    def comprobar_conexion(self) -> None:
+        if not self.interprete or not (shutil.which(self.interprete) or
+                                       Path(self.interprete).is_file()):
+            raise ErrorEjecutor(f"No se encuentra el intérprete de Python «{self.interprete}».")
+
     def ejecutar(self, comando: list[str], cwd: str | Path | None,
                  al_recibir_linea: AlRecibirLinea, cancelado: Cancelado) -> int:
         entorno = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
@@ -158,6 +163,9 @@ class EjecutorSSH:
 
     def describir(self) -> str:
         return f"remoto ({self.usuario}@{self.host}:{self.puerto})"
+
+    def comprobar_conexion(self) -> None:
+        self._conectar()
 
     # --- conexión -----------------------------------------------------------
     def _conectar(self):
@@ -302,7 +310,12 @@ def comprobar_entorno(ejecutor, cancelado: Cancelado = lambda: False) -> list[di
 
     Devuelve filas {componente, disponible, version}. Lo no detectado lleva
     version = None (la UI lo marca como [PENDIENTE]).
+
+    En remoto se conecta antes: si la máquina no responde se lanza ErrorEjecutor,
+    en vez de devolver todo como «no detectado» (parecería que falta software).
     """
+    if ejecutor.modo == "remoto":
+        ejecutor.comprobar_conexion()
     filas: list[dict] = []
 
     def capturar(comando: list[str]) -> tuple[int, list[str]]:

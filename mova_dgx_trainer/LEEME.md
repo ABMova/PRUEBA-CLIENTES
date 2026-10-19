@@ -101,8 +101,15 @@ general del equipo.
 - **Remoto por SSH** (paramiko): usuario, host, puerto y clave privada o contraseña. Se suben
   configuración, dataset y script por SFTP a `~/mova_dgx_trainer/trabajos/<proyecto>_<ejecución>`
   y al terminar se bajan los artefactos. Para la Spark de MOVA: host `192.168.1.240` en la oficina
-  o `100.85.10.107` por Tailscale, usuario `mova_ia`. El Python de sistema de la Spark necesita
-  scikit-learn para `entrenar_sklearn.py` [PENDIENTE: comprobar con «Comprobar entorno»].
+  o `100.85.10.107` por Tailscale (sirve también fuera de la oficina), usuario `mova_ia` y la clave
+  `~/.ssh/dgx_spark`. **Intérprete remoto: `/opt/mova_dgx_trainer/venv/bin/python`**, un entorno
+  aparte (creado el 2026-10-19, sin tocar el Python del sistema) con scikit-learn 1.9.1, pandas
+  3.0.6 y numpy 2.5.4, las mismas versiones que la app. Probado de punta a punta por Tailscale el
+  2026-10-19: progreso en vivo, artefactos descargados, veredicto e informe. Por la IP de la
+  oficina [PENDIENTE: probar desde la oficina]. Para actualizar ese entorno:
+  `ssh spark '/opt/mova_dgx_trainer/venv/bin/python -m pip install -U scikit-learn==X'`.
+- La app guarda un solo host: fuera de la oficina use la IP de Tailscale. Si la máquina no
+  responde, «Comprobar entorno» y «Lanzar entrenamiento» lo dicen claramente (red o Tailscale).
 - La primera conexión acepta y guarda la huella del host (`almacen/config/known_hosts`); si
   después cambia, se rechaza.
 - «Comprobar entorno» ejecuta `nvidia-smi`, `python -V` e importa sklearn/torch/tensorflow; lo no
